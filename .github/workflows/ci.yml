@@ -1,0 +1,88 @@
+# CI for bevy_lights (canonical repository).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  lint:
+    name: fmt + clippy + doc
+    runs-on: [self-hosted, big]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo doc --no-deps --all-features
+        env:
+          RUSTDOCFLAGS: -D warnings
+
+  build:
+    name: build (standalone) + test
+    needs: lint
+    runs-on: [self-hosted, big]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      # **The load-bearing step, and it is `build` rather than `test` deliberately.**
+      #
+      # `cargo test` compiles dev-dependencies, and this crate's dev-dependency is the FULL `bevy`
+      # umbrella — the examples need a window and a camera, while the crate itself is trimmed to the
+      # features it names. Cargo unifies features across a build, so under `cargo test` the crate
+      # silently receives every Bevy feature there is, and a hole in its own `[dependencies]` feature
+      # list cannot fail.
+      #
+      # The sibling crate `bevy_autogib` shipped exactly that hole: it named a type behind a feature it
+      # never declared, every test passed, and the published crate did not compile for anyone. A plain
+      # `cargo build` takes no dev-dependencies, so it compiles what a consumer actually gets.
+      - name: Build with only the declared features
+        run: cargo build
+
+      - name: Build with the serde feature
+        run: cargo build --features serde
+
+      # Includes `tests/leaf.rs`, the boundary ratchet, and the model's own unit tests.
+      - name: Test
+        run: cargo test
+
+      - name: Test with the serde feature
+        run: cargo test --features serde
+
+      # Debug-info debugprofile links of a Bevy example ran a sibling crate's runner out of memory:
+      # `ld terminated with signal 7 [Bus error]`. Examples only have to load; debuginfo is turned off
+      # through the dev profile (`CARGO_PROFILE_DEV_DEBUG`) for this build alone, not through
+      # `RUSTFLAGS`, which would invalidate every fingerprint in the runner's persistent target dir.
+      - name: Build examples
+        run: cargo build --examples --all-features
+        env:
+          CARGO_PROFILE_DEV_DEBUG: "0"
+
+      # The shader is embedded at build time, so a WESL error is silent here and only shows as a dark
+      # surface in a capture. This compiles it to WGSL and parses that with naga, in a second.
+      - name: Check the shader
+        run: cargo run --release --manifest-path tools/wesl-check/Cargo.toml -- src
+
+  wasm:
+    name: wasm32 (WebGPU) library build
+    needs: lint
+    runs-on: [self-hosted, big]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - run: rustup target add wasm32-unknown-unknown
+      - run: cargo build --lib --target wasm32-unknown-unknown
