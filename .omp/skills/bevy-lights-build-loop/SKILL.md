@@ -1,0 +1,235 @@
+---
+name: bevy-lights-build-loop
+description: "Run one iteration of the bevy_lights improvement loop: capture every light from many angles, inspect and judge the images yourself as a hostile art director and a cinematographer, pick the single most valuable improvement for a game developer, research the craft and the science in home-still, implement it, and ship it only on a written critique, a GREAT verdict and a clean benchmark. Commits and pushes; never bumps the version or publishes. Use when asked to iterate, advance, or build out bevy_lights. Run from the repo root."
+---
+
+One run of this skill is one iteration of a long-running loop on bevy_lights, a Bevy 0.20 crate for
+practical lights (fires that flicker and kindle, a budgeted pool of real lights, billboard shader
+flames) that ships in a real game. Do ONE improvement per iteration, the single most valuable one
+from a game developer's point of view, finish it completely, then stop.
+
+This crate must be performant AND beautiful. Both are gates: a feature that is fast but merely
+"fine" looking is not done, and a gorgeous feature that blows the frame budget is not done. Lighting
+is also where a scene is *read*, so the art-director judgement here is a **cinematographer's**:
+key-to-fill, motivated sources, warm against cool, silhouette, falloff.
+
+You do all the work yourself, including looking at the images and judging them. Do not delegate
+visual review.
+
+Extra instructions for this run (a focus such as "flicker only") come from the invoking prompt:
+`/lights-loop <focus>` or the text after the skill name. They override the choice of item in section
+4, not the gates.
+
+State lives in `docs/loop-log.md`; rules and traps live in `AGENTS.md`. Follow them; do not
+re-derive them.
+
+## 1. Orient
+
+1. `AGENTS.md`: rules, Bevy 0.20 traps, gates.
+2. `docs/loop-log.md` (create it if missing): what earlier iterations did, found and deferred, and the
+   newest iteration's ranked backlog. The next iteration number is the last one plus one.
+3. `git log` since the last logged iteration.
+4. The `docs/research/<system>.md` note of any system you may touch, and `docs/research/corpus.md` for
+   the reading list per domain.
+5. `git status --short`. The driver (`scripts/bevy-build-loop.sh`) starts a pass only on `main` with no
+   tracked changes. If you find tracked changes you did not make, stop and log them; do not commit or
+   revert them.
+6. **Re-scan the corpus for new lighting sources.** Run `catalog_recent` (limit 200) and add any
+   cinematography, photography, lighting-design, rendering or fire-physics document that
+   `docs/research/corpus.md` does not list, as its own commit (`Research: corpus`).
+
+Preflight home-still now, so research is not blocked later:
+
+- `system_status` (MCP) or `hs status`. If distill is down, run `hs restart` once; if it stays down,
+  skip `distill_search` and `distill_index` and list each unindexed note under `Pending index`. Record
+  the live state in the log; do not copy an earlier iteration's outage note.
+- Scribe: check `scribe_health`. `scribe_convert` may queue or fail; then rely on the corpus.
+- Corpus: `~/.cache/bevy_lights_corpus/markdown`. If it is missing, sync it per
+  `docs/research/corpus.md`.
+
+## 2. Capture the current state
+
+Build first (`cargo build --release --examples --all-features`; the WESL shader is embedded at build
+time, so a stale build silently captures the old shader). Keep everything under `/tmp/lN/` (`N` the
+iteration), the baseline under `/tmp/lN/before/`. Keep a worktree of the starting commit for later
+comparisons: `git worktree add /tmp/base HEAD`.
+
+On **big** (Linux, RTX 3090). Check the GPU first: `gpu-tenant status`. If VRAM free is under 2 GB, log
+it and wait rather than fighting another holder.
+
+```sh
+xvfb-run -a -s "-screen 0 1920x1080x24" env LIGHTS_FRAMES=600 LIGHTS_SHOT=/tmp/lN/before/x.png \
+  ./target/release/examples/courtyard
+```
+
+Capture from MULTIPLE angles with `LIGHTS_EYE` / `LIGHTS_LOOK`:
+
+- ground level (a viewer's eye, ~1.7 m), eye level at the courtyard's edge, elevated, top-down, and at
+  least one **grazing** angle across the ground, where falloff and the range cut-off show worst;
+- at least two `LIGHTS_SEED`s (a different arrangement of figures) and pool sizes `LIGHTS_POOL=4,8,16`;
+- frame sequences for anything temporal (`LIGHTS_SHOT_DIR`, `LIGHTS_SHOT_EVERY`, `LIGHTS_SHOT_FROM`).
+  Flicker, kindle and the pool's hand-offs are all temporal and a still hides every one of them. Skip
+  the first ~13 frames (pipelines compile, the pool spawns on frame 1); steady state is ~frame 20.
+
+Xvfb traps that have cost whole baselines: `/tmp` (a 16 GB tmpfs on big) may be full, so Xvfb cannot
+make its socket; the display `-a` picks may be held by something invisible to this namespace. Check
+`df -h /tmp`, pass `xvfb-run -n <N>` with a fresh number per run, and retry a run that leaves no
+image. Keep worktrees and their `target/` off `/tmp`.
+
+`LIGHTS_FRAMES` pins the run at a fixed 1/60 s step, so the simulated time is the same every run. GPU
+output is not bit-deterministic.
+
+## 3. Inspect closely (you judge the images yourself)
+
+You do all the work yourself, including looking at the images and judging them. Do not delegate
+visual review. Read each image with `read` (it decodes PNGs inline) and zoom in on the fires.
+
+- Crop and upscale (nearest-neighbour, 2x-4x): `magick in.png -crop WxH+X+Y +repage -filter point -resize 400% out.png`.
+- Use OpenCV or Pillow where useful (not installed system-wide; run scripts with
+  `uv run --no-project --with opencv-python-headless --with pillow python script.py`): per-frame mean
+  luminance plots, difference images between consecutive frames, histograms.
+- Quote pixel values when a number settles it: `magick file.png -crop 40x40+X+Y +repage -format "%[fx:mean*255]" info:`.
+
+Always view at least one actual-resolution full frame: a crop can pass while the whole looks wrong.
+
+Write the **craft checklist** to `/tmp/lN/findings.md`, each line with a measurement or a file and
+region, not an impression:
+
+- **key-to-fill ratio**, measured in DN over a fire's pool versus the shadow beside it;
+- **falloff shape**: an inverse-square read with no visible hard cut-off at the light's `range`;
+- **motivated light**: every pool has a visible flame at its source, and every flame lights something;
+- **warm/cool separation** against the moon fill, and whether the frame reads as night;
+- **silhouette and readability**: can a figure be read against what is behind it;
+- **specular highlights**: present on the stone, and placed where a fire would put them;
+- **flicker rate and amplitude** against the research note's target, with a per-frame mean luminance
+  plot across the sequence;
+- **pool hand-off popping**: consecutive frames, a light that moves;
+- **flame size against its light's reach**: is the fire's size believable for the ground it lights;
+- **bloom and clipping**: the flame's core and the light's hot spot, at full frame and at zoom.
+
+## 4. Pick the single most valuable item
+
+Rank candidates from your findings, the loop log's backlog and the extra instructions, always asking
+what matters most to a game developer who will ship this:
+
+1. Visible artifacts or physically wrong results (popping, a hard range cut-off, a light with no
+   source, flicker that reads as a strobe, a flame detached from its fire).
+2. Features that look flat or unconvincing next to what shipping games achieve. Beauty gaps rank
+   here, not last.
+3. API friction: missing knobs, confusing setup, a game wanting to query something the crate hides.
+4. Missing features a game would expect from this domain.
+5. Performance that threatens a frame budget.
+
+Ownership is a gate: if `AGENTS.md`'s ownership map gives the item to a sibling crate, do not build it
+here; add a hook instead.
+
+State in one sentence why your pick beats the runner-up. If it is too big, carve off the most valuable
+self-contained slice. Record the ranked candidate list in the log, not only the winner.
+
+## 5. Research thoroughly (before any code)
+
+Every feature gets researched, new or improved, with no exceptions. Lighting is art direction with
+physics attached, so every iteration cites **three** kinds of source:
+
+1. a **craft** source — cinematography, photography or a gaffer's writing (`docs/research/corpus.md`
+   has the list: *Cinematography Beyond Technique*, the low-key and noir papers, *Light: Science and
+   Magic* when it can be imported);
+2. a **shipping-game or production** source — a GDC talk, a SIGGRAPH *Advances* course note, a studio
+   technical write-up (`s<year>-advances-*` stems);
+3. a **technical or academic** source from the corpus — the rendering or fire-physics literature.
+
+If the corpus lacks one of the three, `paper_search` for it, and record the gap under the note's
+`## Pending index`. Write the note with the headings `AGENTS.md` requires (`## Sources`,
+`## Craft principle`, `## How shipping games do it`, `## Model adopted`, `## Parameters`,
+`## Validation targets`, `## Deviations`, `## Pending index`) plus `## What great looks like`: the
+visual qualities and reference images you are aiming for. `## Craft principle` and
+`## How shipping games do it` must each **quote** the source they rest on, not paraphrase it from
+memory.
+
+Any changed default goes under `Deviations` with a citation, or is marked a design default. Commit the
+note alone before writing code: `git add docs/research/<system>.md && git commit -m "Research: <system>"`.
+
+## 6. Implement within the crate's rules
+
+- Keep every rule in `AGENTS.md`. In particular: no game vocabulary in `src/` (`tests/leaf.rs`
+  enforces it); no `unwrap()`/`expect()` outside tests; settings are `Resource + Default + Clone +
+  Debug + Reflect` added with `init_resource`; messages use `add_message`; everything is re-exported
+  flat from the crate root; systems go in the existing chained sets; one path per feature, no
+  fallbacks or shims; delete the code the change replaces.
+- `src/model/` stays engine-free: if the new maths can be a plain function, it goes there, with its own
+  tests, so it is testable without an app.
+- **Run `tools/wesl-check` before any capture** if you touched `src/flame.wesl`:
+  `cargo run --release --manifest-path tools/wesl-check/Cargo.toml -- src`. A WESL error is silent at
+  build time.
+- Sibling crates are coupled by plain data only. A needed sibling change lands in that repo first, with
+  its own tests and commit, and is named in the log.
+- Tests: for a bug, a test that fails before and passes after. Permanent tests check consumer-visible
+  behaviour, boundaries and invariants; throwaway checks go in `/tmp`.
+
+## 7. Verify and sign off: it must look GREAT
+
+You are grading your own work, so grade it as a hostile art director would — and as a
+cinematographer, who will notice the light that has no source before they notice anything you are
+proud of.
+
+- Rebuild the examples, re-capture the same scenes, seeds, pool sizes, cameras and angles as section 2
+  under `/tmp/lN/after/`, and rebuild the same zoomed evidence set.
+- View before and after side by side, every angle, and the temporal sequence frame by frame.
+- Fill in the craft checklist for the "after" captures and compare each line with the "before".
+- Write the critique BEFORE the verdict (`/tmp/lN/critique.md`): list every flaw you can find at zoom
+  and at full frame, against the research note's `## What great looks like` and `## Validation
+  targets`. Look for what is wrong, not for confirmation that your change worked.
+- Then give each feature exactly one verdict: GREAT, NOT YET or FAIL. GREAT means you would be proud to
+  ship it in a showcase. "Fine", "acceptable" and "good" are NOT YET.
+- On NOT YET or FAIL, write the specific changes that would move it to GREAT, apply them, rebuild,
+  re-capture and re-judge. Do not lower the bar to pass.
+- After 5 failed rounds on one feature, stop: log the blocker, the remaining flaws and your best
+  hypothesis, and revert to the last GREAT state.
+- **Performance gate**, equal in weight: `cargo run --release --example bench_lights` before and after
+  at the default sizes, reporting the `min_us` and `p50_us` lines. No regression without a logged,
+  justified trade. Compare only on the same machine and the same load; the bench is CPU-only, so it
+  says nothing about GPU cost — for a shader change, compare the capture's frame time in the log.
+- Run the full gate (the `AGENTS.md` set):
+  1. `cargo build --release && cargo build && cargo test && cargo test --features serde`
+  2. `cargo build --examples --all-features`
+  3. `cargo clippy --all-targets --all-features -- -D warnings`
+  4. `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`
+  5. `cargo fmt --check`
+  6. `cargo build --lib --target wasm32-unknown-unknown`
+  7. `cargo run --release --manifest-path tools/wesl-check/Cargo.toml -- src`
+
+## 8. Ship
+
+Start only after section 7 passes. Never bump the version, tag or publish; releases are the owner's
+call.
+
+1. Document: rustdoc for every changed public item, the README for user-visible changes, the research
+   note's `Deviations` and `Pending index`, and an entry under `## [Unreleased]` in `CHANGELOG.md`
+   (`Added`, `Changed`, `Fixed`, `Removed`).
+2. Regenerate the GIF and still in `docs/media/` that this change affects, from the new build
+   (`docs/DEMOS.md` has the recipe).
+3. Log: append `## Iteration N — <date> — <title>` to `docs/loop-log.md`:
+   - what changed and why it ranked first (and the runner-up)
+   - the sources used: the craft, production and technical stems, by stem
+   - your critique and verdict per angle, with evidence filenames
+   - the craft checklist's numbers, before and after
+   - benchmark numbers, before and after
+   - the commit hash, and any sibling-repo commits
+   - the top 5 remaining items, ranked, for the next iteration
+4. Branch and commit: `git checkout -b loop/iter-N` from `main`. Commit by path with messages that
+   state the user-visible change: the research note (already committed in section 5), the
+   implementation, the docs and changelog, then the log (`Loop log: iteration N, <title>`).
+   `git status --short` must be empty afterwards.
+5. Push and merge: `git push -u origin loop/iter-N`, then `git checkout main && git pull --ff-only &&
+   git merge --no-ff loop/iter-N -m "Merge loop/iter-N: <title>"`. On a conflict, `git merge --abort`,
+   log it, and stop.
+6. Re-run the gate on the merged tree; a failure stops the pass before the push. Then
+   `git push origin main`.
+
+## Rules
+
+- One improvement per iteration, fully finished: researched, implemented, GREAT-signed-off,
+  benchmarked, gated, committed, documented, logged.
+- No feature ships without a written critique, a GREAT verdict and a clean performance check.
+- If blocked, log the blocker and pick the next item. A failed gate or a visible defect is not a
+  blocker: fix it. A failed push or merge is: log the exact error and stop. Never force-push.
