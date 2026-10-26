@@ -647,3 +647,68 @@ fn the_pools_default_rank_is_illuminance() {
         "a released crate's default is a behaviour a host relies on"
     );
 }
+
+#[test]
+fn the_pools_hand_off_budget_is_its_free_reserves() {
+    // The rule iteration 14 added: a hand-off the pool cannot cross-fade is a hand-off that dims its
+    // subject, so at most as many lights change owner in a frame as there are free reserves. The rule
+    // had no test of its own, and its wrong form is silent — it looks exactly like a pool that is
+    // merely slow to respond. Measured: four steady slots, then four challengers nearer the focus in
+    // one frame. With one reserve one slot moves this frame; with no reserve all four do.
+    fn moved_in_one_frame(reserve: usize) -> usize {
+        let mut app =
+            app(LightPool { size: 4, reach: 100.0, gain: 1.0, fade_seconds: 0.35, reserve, ..default() });
+        focus_at(&mut app, Vec3::ZERO);
+        for x in 4..=7 {
+            candidate(&mut app, Vec3::new(x as f32, 0.0, 0.0), 10_000.0);
+        }
+        settle(&mut app);
+        let before = assigned(&mut app, 4);
+        // Four challengers, all nearer than every held candidate, appearing at once.
+        for x in 1..=4 {
+            candidate(&mut app, Vec3::new(x as f32 * 0.5, 0.0, 0.0), 10_000.0);
+        }
+        app.update();
+        let after = assigned(&mut app, 4);
+        before.iter().zip(after.iter()).filter(|((_, at, _, _), (_, at2, _, _))| at != at2).count()
+    }
+    assert_eq!(
+        moved_in_one_frame(0),
+        4,
+        "with no reserve there is nothing to hide a move behind, so no throttle"
+    );
+    assert_eq!(moved_in_one_frame(1), 1, "one reserve carries one cross-faded hand-off, so one move a frame");
+    assert_eq!(moved_in_one_frame(2), 2, "two reserves carry two");
+}
+
+#[test]
+fn one_new_candidate_displaces_one_light_and_no_more() {
+    // The artifact this test is for: every slot compared its held candidate against the *same* best
+    // free candidate, so one newcomer displaced all of them at once — the whole street's lights
+    // teleported, and a slot's fallback then took a candidate another slot was keeping, which left
+    // most slots dark for a frame and fading back in. A pool hands one light over, not eight.
+    let mut app = app(LightPool { size: 4, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    for x in 1..=4 {
+        candidate(&mut app, Vec3::new(x as f32, 0.0, 0.0), 10_000.0);
+    }
+    settle(&mut app);
+    let before = assigned(&mut app, 4);
+    assert_eq!(before.iter().filter(|(_, _, v, _)| *v == Visibility::Inherited).count(), 4);
+
+    // One far brighter source, far closer than the worst held candidate: it must take exactly one
+    // light, and the three others must not move or dim.
+    candidate(&mut app, Vec3::new(0.5, 0.0, 0.0), 90_000.0);
+    app.update();
+    let after = assigned(&mut app, 4);
+    let moved: Vec<_> = before
+        .iter()
+        .zip(after.iter())
+        .filter(|((_, at, _, _), (_, at2, _, _))| at != at2)
+        .map(|((slot, at, _, _), (_, at2, _, _))| (*slot, *at, *at2))
+        .collect();
+    assert_eq!(moved.len(), 1, "one hand-off, not a reshuffle: {moved:?}");
+    let full =
+        after.iter().filter(|(_, _, visibility, base)| *visibility == Visibility::Inherited && *base > 999.0);
+    assert_eq!(full.count(), 3, "the three untouched lights stayed at full brightness: {after:?}");
+}

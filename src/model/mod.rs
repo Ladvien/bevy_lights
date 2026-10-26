@@ -17,6 +17,6 @@ pub use cinematography::{
 pub use fire::{
     KINDLE_SECONDS, PUFFING_CONSTANT, flicker_factor, flicker_factor_of, flicker_rate, kindle_gain,
 };
-pub use pool::{FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, hand_off};
+pub use pool::{FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, hand_off, preferred};
 pub use reach::{RANGE_MARGIN, raised_light};
 pub use tag::{pack_flame_tag, unpack_flame_tag};

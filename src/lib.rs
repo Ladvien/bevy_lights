@@ -75,7 +75,7 @@ pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled};
 pub use model::{
     FADE_SECONDS, HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY, MOON_KEY, RANGE_MARGIN, blackbody_colour,
     fade_factor, fill_for, fire_lumens, flicker_factor, hand_off, key_to_fill, kindle_gain, pack_flame_tag,
-    raised_light, stops, unpack_flame_tag, white_balanced,
+    preferred, raised_light, stops, unpack_flame_tag, white_balanced,
 };
 pub use pool::{LightPool, LightPoolPlugin, PoolCandidate, PoolLight, Rank};
 

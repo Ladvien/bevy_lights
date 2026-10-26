@@ -53,21 +53,47 @@ pub const FADE_SECONDS: f32 = 0.35;
 /// assert!(hand_off(f32::INFINITY, 100.0, HYSTERESIS));
 /// ```
 pub fn hand_off(held_distance: f32, challenger_distance: f32, hysteresis: f32) -> bool {
-    // A challenge that is not a number cannot be compared; keep what is held rather than chatter.
+    // Both `NaN`s are answered **before** the clamp: `f32::max` returns the other operand when one is
+    // `NaN`, so a broken distance would silently become a zero — "nothing held", or "at the focus".
     if challenger_distance.is_nan() {
         return false;
-    }
-    if !held_distance.is_finite() {
-        return true;
     }
     if held_distance.is_nan() {
         return true;
     }
     // Compare on the distances, not their squares: the hysteresis is a ratio of distances.
-    let held = held_distance.max(0.0).sqrt();
-    let challenger = challenger_distance.max(0.0).sqrt();
+    preferred(held_distance.max(0.0).sqrt(), challenger_distance.max(0.0).sqrt(), hysteresis)
+}
+
+/// The overlap rule itself, on any "smaller is better" quantity: `true` when `challenger` beats `held`
+/// by the `hysteresis` margin. [`hand_off`] is this on distances.
+///
+/// A pool that ranks its candidates by something other than distance — the light each puts on the
+/// subject, say — compares that quantity here, so ranking and holding are one rule rather than two. The
+/// quantity is not square-rooted: the caller states it in the units the margin applies to, which for
+/// [`hand_off`] is the distance and not its square.
+///
+/// ```
+/// # use bevy_lights::model::pool::*;
+/// // The light arriving at the subject, as its reciprocal: a value 15 % smaller wins.
+/// assert!(preferred(1.0, 1.0 / 1.16, HYSTERESIS));
+/// assert!(!preferred(1.0, 1.0 / 1.10, HYSTERESIS));
+/// ```
+pub fn preferred(held: f32, challenger: f32, hysteresis: f32) -> bool {
+    // A challenge that is not a number cannot be compared; keep what is held rather than chatter.
+    if challenger.is_nan() {
+        return false;
+    }
+    if !held.is_finite() {
+        return true;
+    }
+    if held.is_nan() {
+        return true;
+    }
     let margin = if hysteresis.is_nan() { 1.0 } else { hysteresis.max(1.0) };
-    challenger * margin < held
+    // `is_nan` on the challenger already returned; the held value is clamped, which is right for a
+    // distance and for an illuminance reciprocal alike.
+    challenger.max(0.0) * margin < held.max(0.0)
 }
 
 /// The brightness multiplier of a light that is **leaving** a hand-off `since` seconds after it: 1 at

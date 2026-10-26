@@ -92,6 +92,24 @@ Measured on those frames, the count of saturated flame pixels runs **0 → 4 430
 frames 5, 10, 20 and 40, then holds at about 19 000: the flame grows into its fire rather than appearing
 whole.
 
+## The bench's two lines
+
+`bench_lights` prints two lines now. The first is the whole frame; the second separates the crate's two hot
+system sets, because a total tells you a change cost something and not *what*:
+
+```text
+bench_lights candidates=5000 lights=2000 pool=16 frames=600 mean_us=… p50_us=… min_us=… max_us=…
+bench_lights_systems flicker_p50_us=170 pool_p50_us=306
+```
+
+The per-system pass re-runs the same app with a resource switch (`Only`) that leaves one of
+`LightsSystems::{Flicker, Pool}` enabled. `the_switch_really_isolates_the_two_sets` in the example's tests
+proves the switch works — with `Only::Flicker` the pool spawns no slots, with `Only::Pool` the flicker writes
+no intensity — because a per-system line from a switch that does nothing would just be the frame twice.
+
+At 5 000 candidates and 2 000 lights the split is roughly **170 µs flicker, 310 µs pool**: the pool is the
+expensive half, which is what a change to the pool's sort should move.
+
 ## The bench, and the host
 
 `cargo run --release --example bench_lights` is CPU-only, so it measures the host as much as the crate.
@@ -148,6 +166,35 @@ tail the worst pair falls 0.697 -> 0.441 in mean luminance and the pairs over 0.
 none, with the median unchanged. If the two runs come out *identical*, the switches did not reach the
 pool: a switch that turns a feature off has to change what you are measuring.
 `docs/research/pool-hand-off.md` has the craft and the measurements.
+
+## Seeing a reshuffle — the pool's own total, every frame
+
+A hand-off that goes wrong is not visible in a still and barely visible in a frame's mean luminance: it is
+a **set** of lights being re-sorted, and the number that shows it is the pool's own total, which
+`LIGHTS_POOL_LOG=1` prints every frame.
+
+```sh
+LIGHTS_FRAMES=400 LIGHTS_POOL_LOG=1 ./target/release/examples/courtyard > pool.log
+```
+
+Read it with the first 15 frames skipped (the pool spawns and the braziers kindle there, and that is a
+bigger change than any hand-off):
+
+```sh
+awk '$1=="pool" && $2>=25 {print $2, $4}' pool.log   # frame, pool total
+```
+
+Two things to check, both measured on the courtyard's 400-frame default:
+
+- **No single frame may lose a light's worth of the pool.** Before iteration 14 the total fell **19 % in one
+  frame** (frame 303, 972 505 → 787 358 lm) with **8 of 13 lights reading zero** and faded back over
+  twenty frames. With the set rules the worst steady-state frame moves **1.2 %** and no frame exceeds 2 %.
+- **The pool's per-slot line must not show a mass extinction.** The bracket carries every light's
+  intensity; `0` seven times in one frame is the reshuffle. A single `0` is a hand-off's own fade.
+
+The frame rate in that log counts from 1 while `LIGHTS_SHOT_DIR`'s numbering starts at its `FROM`, so a
+screenshot's `frame0006` is rarely the log's frame 6 — measure the log for the artefact and the images for
+its look, and do not try to line the two up by index.
 
 ## The still
 

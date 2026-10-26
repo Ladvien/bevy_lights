@@ -6,11 +6,20 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **`model::pool::preferred`**, the overlap rule on any "smaller is better" quantity: `true` when a
+  challenger beats what is held by the `hysteresis` margin. `hand_off` is `preferred` on distances, and
+  the pool's own holding decision uses it on its rank value, so ranking and holding are one rule.
+
+- **`bench_lights` reports each hot system set separately.** A second line,
+  `bench_lights_systems flicker_p50_us=… pool_p50_us=…`, times `LightsSystems::Flicker` and
+  `LightsSystems::Pool` on their own by re-running the same app with a switch that leaves one enabled — so a
+  change can be attributed to the system it moved rather than to "the frame".
+
 - **The pool ranks a candidate by the light it contributes, not by its distance.** `LightPool::rank`
   defaults to `Rank::Illuminance`, which orders candidates by `intensity / distance²` — so a brazier at
   3 m burning 60 000 lm takes a real light from a torch at 2 m burning 8 000, where the old rule gave it to
-  the torch. `Rank::Distance` restores the old behaviour. The overlap rule, the hand-offs and the reserve
-  are unchanged.
+  the torch. `Rank::Distance` restores the old behaviour. (The overlap rule now compares the same rank
+  value — see *Fixed* — so this entry's "unchanged" no longer applies to it.)
 
 - **A flame is redder while its fire catches.** The shader's ramp is pulled towards an ember red as a
   fire kindles and released as it takes, so the catch reads as a young fire and not as a steady one
@@ -66,6 +75,26 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
     crate root. Their sources and parameters are in `docs/research/lighting-look.md`.
 
 ### Fixed
+
+- **One newcomer reshuffled the whole pool, and up to seven of eight lights went dark for a frame.** The
+  hand-off compared every slot against the *same* best free candidate, so a single bright prop displaced
+  all of them at once; a displaced slot's fallback could then take a candidate another slot was still
+  keeping. Measured on the courtyard, the pool's total fell 17 % in one frame and the street's torch-lit
+  pools went to zero and faded back over twenty frames. A slot's owner is now decided in one pass before
+  any slot is written, a challenger displaces the **worst-ranked** light the pool holds rather than the
+  first slot to compare, and a candidate another slot holds is never a challenger. `tests/pool.rs`'s
+  `one_new_candidate_displaces_one_light_and_no_more` fails on the old rule.
+- **The overlap rule compared distances while the rank compared illuminance.** A pool ranked by
+  `Rank::Illuminance` still held a light for a dim near torch against a bright far lantern, so the two
+  rules disagreed and the bright source could be starved. Both now compare the pool's one rank value, via
+  the new `model::pool::preferred`.
+- **A hand-off the pool could not cross-fade was made anyway, and cut a fade already in flight short.** A
+  reserve light is busy for the whole fade it carries; the pool now moves only as many lights per frame as
+  it has free reserves, so a scene needing more moves gets them over the following frames instead of
+  dimming its subject.
+- **`hand_off` turned a `NaN` distance into a zero** (`f32::max` returns its other operand when one is
+  `NaN`), so a broken distance read as "nothing held" or "at the focus" instead of keeping what was held.
+  Both `NaN`s are now answered before the clamp.
 
 - **A child candidate sat at its own local offset, not at its parent's place.** The pool preferred a
   candidate's own `Transform` (to read a root prop the frame the host moves it), but for a child that is

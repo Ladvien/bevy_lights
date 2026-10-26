@@ -1190,6 +1190,14 @@ lantern — four times the lumens, a taller flame, the case the old rule got wro
 different frames (RMSE 2 %, mean 58.17 against 57.44), and the illuminance rule puts the real lights where
 the bright sources are.
 
+### The benchmark, measured late
+
+Iteration 12 added a division per candidate per frame to the pool and **shipped without running the bench**
+— a hole in that iteration's own verification, found here. Measured now, base `9d3abf0` against head,
+interleaved on big: base p50 **434, 528, 449** against head **462, 466, 461**. The medians sit inside each
+other's spread; the change costs nothing the bench can see. Recorded because "I did not measure it" is a
+worse answer than a number, even when the number is dull.
+
 ### The gate
 
 `cargo build --release`, `cargo build`, `cargo test` (**74 tests**), `cargo test --features serde`,
@@ -1207,3 +1215,197 @@ wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
    candidate per frame, and the whole-frame p50 does not separate that from the flicker's cost.
 5. **A `Rank::Weighted`** for a host that wants gameplay priority (a carried torch matters more than a
    brazier): the rank key would take a per-candidate multiplier.
+
+## Iteration 13 — 2026-10-26 — the bench says which system cost what
+
+### What changed, and why
+
+Backlog item 4: "the bench should report the pool's work, not only the total". Iteration 12 added a
+division per candidate per frame to the pool's sort and **shipped without running the bench at all** — a
+hole in that iteration's verification, found while orienting here. So this iteration did two things: filled
+the hole, then built the instrument that makes the hole visible next time.
+
+### The hole, filled
+
+Base `9d3abf0` (before the rank change) against head, interleaved on big, three rounds:
+
+| round | base p50 | head p50 |
+|---|---|---|
+| 1 | 434 | 462 |
+| 2 | 528 | 466 |
+| 3 | 449 | 461 |
+
+The medians sit inside each other's spread: the rank change costs nothing the bench can see. Recorded
+because "I did not measure it" is a worse answer than a dull number.
+
+### The instrument
+
+`bench_lights` now prints a second line, `bench_lights_systems flicker_p50_us=… pool_p50_us=…`, by re-running
+the same app with a resource switch that leaves one of `LightsSystems::{Flicker, Pool}` enabled. The systems
+are private (internals); the crate's public boundary is the system set, so that is what is driven, and the
+switch is a run condition that is an `Option<Res<…>>` — a bare `Res` in a run condition panics when absent,
+which is one of the crate's own recorded traps.
+
+At 5 000 candidates and 2 000 lights, over three runs: **flicker 157–182 µs, pool 302–394 µs**. The pool is
+the expensive half, which is what any change to its sort or its hysteresis should move.
+
+### Proving the instrument is not a lie
+
+A per-system line from a switch that does nothing would be the frame measured twice.
+`the_switch_really_isolates_the_two_sets` runs both ways and asserts the *other* set did not run — with
+`Only::Flicker` the pool spawns no slots, with `Only::Pool` the flicker writes no intensity. Removing the
+pool's run condition makes it fail (`and the pool did not run: no slots were spawned`, 5 against 0).
+
+That test also caught a fact I had forgotten: a pool of 4 spawns **5** slots, because the cross-fade keeps a
+reserve. The expectation was wrong, not the code.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (74 tests, plus the example's own
+`cargo test --release --example bench_lights`), `cargo test --features serde`, `cargo build --examples
+--all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS="-D warnings"
+cargo doc`, `cargo fmt --check`, `cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` —
+all pass.
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+2. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+3. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
+   an atlas.
+4. **The pool's 310 µs is unexamined**: the bench can now name it, and the next pool change should say
+   whether the sort, the hysteresis pass or the cross-fade's bookkeeping is the share. A candidate worth
+   taking is sorting only the candidates within reach rather than all of them.
+5. **A `Rank::Weighted`** for a host that wants gameplay priority (a carried torch matters more than a
+   brazier): the rank key would take a per-candidate multiplier.
+
+## Iteration 14 — 2026-10-26 — the pool's hand-off is a set decision
+
+### First, the ungated work
+
+The pass that was killed had claimed iteration 13; a concurrent pass on another branch pushed its own
+iteration 13 ("the bench says which system cost what") while this one was running, so this entry is
+renumbered **14** and every reference in the note, `docs/DEMOS.md` and `tests/pool.rs` follows it.
+
+This pass opened on a **dirty tree with this iteration's implementation staged but never committed** — the
+previous pass was killed before its gate. Nothing was built on it blind: the whole gate was run on it
+first, and it failed twice.
+
+- `cargo test` was green (76 tests) the moment `/tmp` was taken off the tmpfs. The doctests had failed
+  with `LLVM ERROR: IO failure on output stream: No space left on device`, which reads as a code error
+  and was **a full 16 GB `/tmp`** (100 %, 6.8 MB free). `export TMPDIR=/home/ladvien/l13/tmp` fixed it;
+  `docs/DEMOS.md` already warns about `/tmp`, and this is the second way it bites — the *linker*, not just
+  a frame sequence.
+- `cargo clippy -D warnings` **failed**: a `match` on a single pattern at `src/pool.rs:524`. Fixed to
+  `if let`.
+- `cargo build --lib --target wasm32-unknown-unknown` **failed**: the target was not installed on big
+  (`E0463`). `rustup target add wasm32-unknown-unknown` fixed the environment, not the crate.
+
+Both code-side fixes are the ones the gate exists for, and both are in this iteration's commit.
+
+### What changed, and why it ranked first
+
+Ranked first because it is a **visible artifact of the most physical kind**: the previous pass measured
+the pool losing 17 % of its lumens in one frame with up to 7 of 8 lights reading zero, then fading back
+over twenty frames. The runner-up was the `Rank::Weighted` backlog item (a host-side priority), which is
+API convenience and cannot beat a street going dark for one frame.
+
+The rule "every slot keeps its candidate unless a challenger is better by the hysteresis" was applied
+**per slot against one global best free candidate**, so one newcomer displaced every slot at once, and a
+displaced slot's fallback could then take a candidate another slot was still keeping. Three set rules
+replace it, and the overlap rule was made a function of the rank's own quantity:
+
+- **A candidate another slot holds is never a challenger.**
+- **A challenger displaces the worst-ranked light the pool holds**, one light per challenger.
+- **At most as many lights move per frame as there are free reserves** (`LightPool::reserve`; unthrottled
+  at 0), because a hand-off the pool cannot cross-fade is a hand-off that dims its subject.
+- **`model::pool::preferred`**: the overlap rule on any "smaller is better" quantity, so ranking and
+  holding cannot disagree — iteration 12 ranked by illuminance and held by distance.
+
+Every slot's owner is now decided in **one map before any slot is written**; the pass that decides
+depends on no write order.
+
+### Sources
+
+- craft: `10.58709_niujhu.v8i3.1694` (Orisayemi & Afabor, the Bordwell & Thompson "overlapping keys" quote),
+  `10.4324_9781003671220` (Lazar, motivated movement).
+- production: `s2025-advances-materials-9` (HypeHype, stochastic tile-based lighting), `s2020-advances-pdf-slides`.
+- technical: `10.1109_tvcg.2019.2898741` (Denes et al., temporal resolution multiplexing),
+  `book_fundamentals_computer_graphics_marschner` ch. 22, `book_level_of_detail_3d_graphics_luebke` ch. 9,
+  `book_real_time_rendering_4th_akenine` pp. 918-935.
+- The note was committed alone, before any code: `1db0af7`.
+
+### The critique, and the verdict
+
+Full critique in `/home/ladvien/l13/critique.md`. **GREAT.** Evidence: `/home/ladvien/l13/`.
+
+Craft checklist, before → after, default camera, seed 7, pool 8:
+
+| line | before | after |
+|---|---|---|
+| key-to-fill (brazier pool vs moonlit far ground) | 122.7 / 51.1 DN | 122.2 / 51.1 |
+| falloff, motivated light, warm/cool, silhouette, specular, bloom | holds at every angle | unchanged |
+| **pool total, worst single frame** | **−19.0 % (frame 303: 972 505 → 787 358 lm)** | **−1.2 %** |
+| **frames changing >2 %** | **25 of 365** | **0** |
+| **most lights at zero in one frame** | **8 of 13** | **2 of 13** |
+| mean per-frame change | 11 300 lm (1.18 %) | 2 453 lm (0.24 %) |
+| mean pool total | 954 930 lm | 1 033 222 lm (+8.2 %, the bright lanterns no longer starved) |
+
+Second seed and smaller pool (`LIGHTS_SEED=3 LIGHTS_POOL=4`): worst frame **11.4 % → 1.4 %**, frames
+over 2 % **5 → 0**, dark lights **4 → 2**.
+
+The aligned crash pair (`ev/before/frame0005→0006` against `ev/after/`, whole frame): **−1.63 % and 13.2 %
+of pixels moving more than 2 DN** → **+0.16 % and 2.7 %**. The `ground_left` panel loses 1.6 DN before and
+0.38 DN after while `sky` is untouched in both, which is the pool moving and not the flame shader.
+
+Throttle measured at four reserve sizes (`logs/throttle/r0..r4`): 4.8 % worst frame at `reserve: 0`, 1.2 %
+at 1, 1.4 % at 2 and 4 — with mean dark lights rising 0.03 → 0.54 → 1.54 → 3.6. So raising `reserve` buys
+no smoothness; recorded in the note's `Deviations`.
+
+### Benchmark
+
+`bench_lights` (candidates 5000, lights 2000, pool 16), three rounds each, whole frame:
+before `mean_us` 489 / 523 / 495, p50 473 / 490 / 478; after 466 / 477 / 480, p50 469 / 471 / 465. Flat
+within the run-to-run spread.
+
+Iteration 13 landed the per-system line while this pass was running, so the work this iteration added is
+now attributable instead of merely "flat": on the merged tree, `pool_p50_us` **322 / 322 / 314** against
+the same instrument on `origin/main` (which has no set rules) at **328 / 355 / 344**. The pool's own cost
+is if anything a little lower, which is what moving the decision from a per-slot search to one map should
+look like; `flicker_p50_us` is unchanged at 130-132. CPU-only, so it says nothing about GPU cost — the
+change touches no shader, and the capture's wall time per 400 frames did not move.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (**77 tests**), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`, `cargo fmt --check`,
+`cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Media
+
+`docs/media/showcase.gif` re-encoded from the new build (60 frames, 30 fps, 480 px, 2.2 MB), same caption,
+same capture recipe. Flicker verified through the encode on a single pool: **2.50 Hz** peak-to-peak 32 %,
+identical to the previous GIF's 2.50 Hz / 32 % — the encode did not eat the flicker.
+`docs/media/courtyard.gif` and `docs/media/courtyard.png` regenerated at their recorded recipes (57 frames
+at 30 fps, 640 px, 3.3 MB).
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable). Unchanged for 13 iterations.
+2. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+3. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
+   an atlas.
+4. **The bench should report the pool's work**, not only the total: this iteration added per-candidate
+   work (a division, a sort of a larger tuple) that the whole-frame p50 cannot see past the flicker's cost.
+5. **A `Rank::Weighted`** for a host that wants gameplay priority (a carried torch matters more than a
+   brazier): the rank key would take a per-candidate multiplier.
+
+### One uncommitted change this pass did not make
+
+`.omp/skills/bevy-lights-build-loop/SKILL.md` carries an unstaged edit adding the section *"Your work is
+committed even if you are killed"* — the rule this pass opened by obeying. It was already in the working
+tree when the pass began, its content matches how the loop actually behaves, and it is **left uncommitted**
+rather than adopted: a tracked change this pass did not write is the driver's or a previous pass's to
+commit. Its guidance is right and was followed: the note was committed alone (`1db0af7`), then the
+implementation, then the docs and media, then this log.
