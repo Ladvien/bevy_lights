@@ -795,8 +795,17 @@ luminance.
 
 ### The benchmark
 
-Base against head, interleaved on big (the method iteration 5 wrote down): three rounds each. The change
-adds an `Option<&ChildOf>` to the candidate query and moves the departure test before the slot loop.
+Base (`d533e16`) against head, built into separate target dirs and run **interleaved**, three rounds
+each, on big:
+
+| round | base p50 | head p50 |
+|---|---|---|
+| 1 | 650 | 622 |
+| 2 | 524 | 571 |
+| 3 | 550 | 549 |
+
+The ranges overlap, so there is no regression: the change adds one `Option<&ChildOf>` to the candidate
+query and moves the departure test before the slot loop, neither of which is per-candidate work.
 
 ### Verdict
 
