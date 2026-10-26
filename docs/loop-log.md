@@ -905,3 +905,64 @@ existing flame tests failed — the tag tests are what make a silent mistake lik
    catches (the ember stage) before its full colour arrives. Today only its size and brightness ramp.
 5. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared
    only by distance, so the pool can hold the dim one.
+
+## Iteration 8 — 2026-10-26 — the specular answer
+
+### What changed, and why it ranked first
+
+The top item is the uncited flicker amplitude, still blocked. Second was the **last line of
+`lighting-look.md`'s "what great looks like" still unmet**: "stone near a fire shows a small, placed
+highlight … the ground does not look like matte paper". Measured first: on the ground-level capture the
+floor had **no local maximum anywhere** (p99 136 against a max of 217) — one 40 m plane at roughness
+0.55 spreads a fire's mirror lobe until it is indistinguishable from its diffuse falloff.
+
+### What changed
+
+The courtyard's floor is a grid of **2.5 m flagstones** inset by 6 cm of darker, rougher mortar, each
+stone's roughness drawn from the example's seeded stream across 0.18–0.32 and its colour from a narrow
+warm-grey band. Some stones answer a fire sharply and their neighbours stay matte; a floor of identical
+mirrors would read as a wet car park, and one matte plane read as paper.
+
+No crate API: a highlight is a material property, and the crate owns lights, not surfaces. The research
+note says so.
+
+### The metric that had to change
+
+The first attempt measured whole-frame p99.9/p99 and read almost nothing (1.38 → 1.40), because that
+statistic is dominated by the flames' cores. The craft's question is **local**: at the foot of a fire,
+does a highlight dominate its own stone?
+
+| | peak | median | peak / median |
+|---|---|---|---|
+| at the fire's foot, before | 108.0 | 89.0 | 1.21 |
+| at the fire's foot, after | 212.0 | 101.3 | **2.09** |
+| a stone 2 m away, after | 78.3 | 58.3 | 1.34 |
+
+The fire's stone now carries a highlight twice its own median; a stone out of reach stays matte. Seeing
+the frame is what caught the bad metric — the highlights were plainly visible as vertical streaks under
+each brazier while the whole-frame number called it a wash.
+
+### The verdict
+
+**GREAT** for the look: the last open line of "what great looks like" is answered and measured locally.
+The frame at ground level now says where every fire is twice — once by its falloff, once by the streak
+of light on the stone at its foot.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (67 tests), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
+wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+2. **The flame's colour against its catch**: a catching flame should read redder at its base as it
+   catches, before its full colour arrives. Today only size and brightness ramp.
+3. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+4. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared only
+   by distance, so the pool can hold the dim one.
+5. **The flagstones cost 256 draw calls** — one mesh, one material each. A crate-scale scene wants an
+   atlas or an instanced floor; the example is small enough not to care, and the number should be
+   recorded next to the look it buys.

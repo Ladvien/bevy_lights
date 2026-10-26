@@ -190,6 +190,58 @@ Nothing here lights anything on its own. The crate does not own the moon and nev
   baseline's peak), the measured key-to-fill at a brazier's pool against the shadow 4 m away is **at
   least 4:1**, and a bearer at the pool's edge reads as a warm rim on a cool body.
 
+## Iteration 8: the specular answer, and where a highlight belongs
+
+**The defect, measured.** The ground is one material (`polished_stone`, roughness 0.55, reflectance
+0.06) over a single 40 × 40 m plane. On the ground-level capture its luminance runs to a maximum of 217
+but **p99 is 136**: a broad gradient with no local maximum anywhere. A fire in the room puts no
+highlight on anything, so the frame never says *where* the fire is except by the falloff of its pool.
+
+**What the craft says.** Doyle's cinematography, in the corpus, names the technique this is missing:
+
+> "Christopher Doyle uses specular lighting techniques in *Fundamentally Happy* (2015). Specular lighting
+> is a directional and focus lighting technique to concentrate and highlight the specific area or action
+> in the scene. The lighting technique create strong highlights and shadows within the frame, thus
+> bringing viewer's attention to the lit area." (`10.32657_10220_48312`)
+
+and RTR4 is the reason it has to be *tight*: a highlight is the mirror lobe of the BRDF, so its size is
+set by the surface's roughness — a rough surface spreads the lobe until it is indistinguishable from the
+diffuse term, which is exactly what 0.55 does across a 40 m plane.
+
+**Model adopted.** No new API: a highlight is a *material* property, and the crate owns lights, not
+surfaces. The change is in the example, which is where the look is demonstrated:
+
+- The courtyard floor becomes a **grid of flagstones** — one plane per stone, with a small gap — instead
+  of one plane. Each stone gets a roughness between 0.18 and 0.32 from the example's seeded `Draw`, so
+  the floor is not uniform and some stones answer a fire sharply while their neighbours stay matte. That
+  irregularity is the point: a floor of identical mirrors reads as a wet car park, and a floor of
+  identical matte reads as paper.
+- Each stone is **inset by a mortar gap**, so the mortar (rougher) shows between them and the frame has
+  a second, darker material in the same plane — the "two roughnesses in one surface" that makes a
+  highlight legible against its neighbours.
+
+**What was measured, and the metric that had to change.** The first attempt measured the whole frame's
+p99.9/p99 and read almost no change (1.38 → 1.40). That metric is dominated by the flames' cores and says
+nothing about the floor. The right question is local, which is what the craft means by a *placed*
+highlight: **at the foot of a fire, does a highlight dominate its own stone?** Peak against the median of
+the same patch:
+
+| | peak | median | peak / median |
+|---|---|---|---|
+| at the fire's foot, before | 108.0 | 89.0 | **1.21** |
+| at the fire's foot, after | 212.0 | 101.3 | **2.09** |
+| a stone 2 m away, before | 65.3 | 62.0 | 1.05 |
+| a stone 2 m away, after | 78.3 | 58.3 | 1.34 |
+
+The fire's own stone now carries a highlight twice its own median; a stone out of the fire's reach stays
+matte. That is the line "stone near a fire shows a small, placed highlight where the fire is; the ground
+does not look like matte paper" answered, and it is measured where the eye looks for it rather than over
+a frame.
+
+**Deviations.** The flagstones are a demo material, not a crate one: `bevy_lights` must not ship a
+stone shader, and a host's own floors are its art direction. What the crate gains is nothing — which is
+correct for this item — and what the *crate's note* gains is the measurement and the craft behind it.
+
 ## Pending index
 
 Nothing from this note is unindexed: all nine stems were read live from the running library on

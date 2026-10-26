@@ -285,10 +285,66 @@ fn stone(colour: Srgba) -> StandardMaterial {
     StandardMaterial { base_color: colour.into(), perceptual_roughness: 0.9, ..default() }
 }
 
-/// The same stone, polished: a floor with a specular answer to a fire, so the frame says where the
-/// fire is even in the ground's highlight. `lighting-look.md`'s "specular answer" line.
-fn polished_stone(colour: Srgba) -> StandardMaterial {
-    StandardMaterial { base_color: colour.into(), perceptual_roughness: 0.55, reflectance: 0.06, ..default() }
+/// The courtyard's floor: flagstones, each its own material, so a fire has something to put a
+/// **placed** highlight on. A single 40 m plane at one roughness spreads a fire's mirror lobe until it
+/// is indistinguishable from its diffuse falloff — measured on the frame before this change, the floor's
+/// luminance had no local maximum at all (p99 136 against a max of 217). `docs/research/lighting-look.md`
+/// has the craft: Doyle's "specular lighting … concentrate and highlight the specific area".
+///
+/// The stones' roughnesses are drawn from the example's seeded stream and span `STONE_ROUGHNESS`, so some
+/// answer a fire sharply and their neighbours stay matte; a floor of identical mirrors reads as a wet car
+/// park.
+const FLAG_SIZE: f32 = 2.5;
+/// The gap between flagstones, in metres: the mortar, darker and rougher, showing through.
+const FLAG_GAP: f32 = 0.06;
+/// The range a flagstone's roughness is drawn from.
+const STONE_ROUGHNESS: (f32, f32) = (0.18, 0.32);
+
+fn spawn_flagstones(
+    commands: &mut Commands,
+    meshes: &mut Assets<Mesh>,
+    materials: &mut Assets<StandardMaterial>,
+) {
+    let stone = meshes.add(Plane3d::default().mesh().size(FLAG_SIZE - FLAG_GAP, FLAG_SIZE - FLAG_GAP));
+    let mortar = materials.add(StandardMaterial {
+        base_color: Srgba::rgb(0.14, 0.13, 0.12).into(),
+        perceptual_roughness: 0.85,
+        ..default()
+    });
+    // The mortar: one plane under the stones, so the gaps read as joints rather than as holes.
+    commands.spawn((
+        Name::new("Ground"),
+        Mesh3d(meshes.add(Plane3d::default().mesh().size(40.0, 40.0))),
+        MeshMaterial3d(mortar),
+    ));
+
+    const COUNT: i32 = 40 / FLAG_SIZE as i32;
+    let mut draw = Draw::new(seed() ^ 0x5eed);
+    for row in 0..COUNT {
+        for column in 0..COUNT {
+            let x = -20.0 + FLAG_SIZE * (column as f32 + 0.5);
+            let z = -20.0 + FLAG_SIZE * (row as f32 + 0.5);
+            let roughness = draw.range(STONE_ROUGHNESS.0, STONE_ROUGHNESS.1);
+            let colour = materials.add(StandardMaterial {
+                base_color: Srgba::rgb(
+                    draw.range(0.27, 0.33),
+                    draw.range(0.25, 0.31),
+                    draw.range(0.24, 0.29),
+                )
+                .into(),
+                perceptual_roughness: roughness,
+                reflectance: 0.06,
+                ..default()
+            });
+            commands.spawn((
+                Name::new(format!("Flagstone {row}/{column}")),
+                Mesh3d(stone.clone()),
+                MeshMaterial3d(colour),
+                Transform::from_xyz(x, 0.004, z),
+                NotShadowCaster,
+            ));
+        }
+    }
 }
 
 fn spawn_scene(
@@ -312,12 +368,7 @@ fn spawn_scene(
 
     // The ground: one plane, so the pool's falloff has somewhere to read, and polished enough that a
     // fire puts a highlight on it rather than a flat wash.
-    let ground_material = materials.add(polished_stone(Srgba::rgb(0.30, 0.28, 0.26)));
-    commands.spawn((
-        Name::new("Ground"),
-        Mesh3d(meshes.add(Plane3d::default().mesh().size(40.0, 40.0))),
-        MeshMaterial3d(ground_material),
-    ));
+    spawn_flagstones(&mut commands, &mut meshes, &mut materials);
 
     // Two rows of six pillars, 6 m apart, 6 m either side of the axis: the light falls on their
     // faces and the shadow-casting braziers throw them long.
