@@ -30,6 +30,26 @@ xvfb-run -a -s "-screen 0 1920x1080x24" env LIGHTS_FRAMES=300 \
   LIGHTS_SHOT_DIR=/tmp/lights-frames LIGHTS_SHOT_FROM=20 ./target/release/examples/courtyard
 ```
 
+## Seeing a hand-off
+
+The pool hands a real light to a nearer torch when one is `hysteresis` times nearer than the torch
+that holds it, and a light that does change owner fades back up over `LIGHTS_FADE` seconds. Both are
+this example's own switches:
+
+```sh
+# The pop the crate used to have: nearest wins, no fade.
+LIGHTS_HYSTERESIS=1.0 LIGHTS_FADE=0.0 LIGHTS_POOL=4 \
+LIGHTS_FRAMES=240 LIGHTS_SHOT_DIR=/tmp/lights-handoff LIGHTS_SHOT_FROM=20 \
+  ./target/release/examples/courtyard
+```
+
+Then the same run with the defaults and compare the frame pairs, **skipping the first few**: the pool
+fills in on the opening frames, and that is a larger change than any hand-off. On the steady-state
+tail the worst pair falls 0.697 -> 0.441 in mean luminance and the pairs over 0.45 go from two to
+none, with the median unchanged. If the two runs come out *identical*, the switches did not reach the
+pool: a switch that turns a feature off has to change what you are measuring.
+`docs/research/pool-hand-off.md` has the craft and the measurements.
+
 ## The still
 
 ```sh

@@ -28,6 +28,10 @@
 //!
 //! `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
 //! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`.
+//! Two more are this example's own: `LIGHTS_HYSTERESIS` (the pool's overlap ratio, default 1.15) and
+//! `LIGHTS_FADE` (seconds a light takes to come back after a hand-off, default 0.35). Set both to the
+//! old behaviour (`1.0`, `0.0`) to see the pop the crate used to have in a frame sequence — that is
+//! the before/after of `docs/research/pool-hand-off.md`.
 //! The default camera is the eye at `(0, 9, 16)` looking at the origin.
 //!
 //! ```sh
@@ -149,6 +153,14 @@ fn main() {
         // shadow casters).
         .insert_resource(LightPool {
             size: std::env::var("LIGHTS_POOL").ok().and_then(|v| v.parse().ok()).unwrap_or(8),
+            hysteresis: std::env::var("LIGHTS_HYSTERESIS")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(HYSTERESIS),
+            fade_seconds: std::env::var("LIGHTS_FADE")
+                .ok()
+                .and_then(|v| v.parse().ok())
+                .unwrap_or(FADE_SECONDS),
             reach: 20.0,
             light: PointLight {
                 color: fire_colour(),
