@@ -1673,3 +1673,126 @@ even if you are killed"*, in the working tree when this pass began, as iteration
 It is again **left uncommitted**: a tracked change this pass did not write belongs to its author. Its
 guidance was followed — the research note was committed alone before any code, and the attempt was
 finished and measured rather than abandoned half-done.
+
+## Iteration 17 — 2026-10-26 — a carried fire's light sits where its flame is
+
+Outcome: **shipped.** The crate's own showcase taught a light that was not in its fire, and the fix is one
+model function plus the three places a host copies a carried fire from.
+
+### What ranked first, and the runner-up
+
+1. **A handed-out torch light floated 1.80 m above the flame that motivates it, and was sized for a
+   height it did not have.** Picked: it is a *visible artifact and a physically wrong result* at once —
+   the first category — and it is in the crate's own showcase, the README quick start and the crate doc,
+   so it is also the shape every host will copy. Measured on `main`: every handed-out torch pool light at
+   `y = 3.60`, nearest flame `y = 1.80`; 15 402 lm sized for 250 lx at 2 m delivering **72 lx** there
+   (1.79 stops, ratio 0.289), and a lit bearer's own ground **darker** than open ground 10 m away
+   (45.6 DN against 72.6 DN, 0.63:1) — there was no torch pool at all.
+2. The bright vertical blade on a close brazier (iteration 16's #1, reverted there for lack of a
+   GREAT-able change). Real, still deferred: it needs iteration 15's ramp or a per-flame `D`.
+3. A per-flame fuel-bed `D` in the fragment stage (iteration 16's #1). Blocked on a wider `MeshTag` — an
+   allocation decision, not a tuning one, and not an example fix.
+4. `Rank::Weighted`, and the flagstones' 256 draw calls.
+5. The flicker amplitude stays uncited (blocked 16 iterations; Maynard 2013 unobtainable).
+
+The pick beats the runner-up because the runner-up is a shader look that iteration 16 already failed to
+reach GREAT on, while this was a hard geometric error with a one-function fix and a measurable gain.
+
+### Sources
+
+- craft: `10.7456_tojdac.1674124` (Doğaner — the audience "logically find[s] where the light comes from";
+  the paper separates that case from light "whose physical source is not explained"), and `10.23856_6105`
+  (the "drawing" light, whose placement is a rule rather than a taste).
+- production: `10.13140_marples.nav.lighting.thesis` (Marples 2017) — Left 4 Dead "uses both the motion
+  and simultaneous illumination offered by flames", and Alan Wake's carried torch. The one sentence that
+  says the drawn thing and the lighting thing are the same object.
+- technical: `10.1007_978-1-4842-4427-2` (*Ray Tracing Gems* ch. 18, `dω = (n·−l)/‖X−Y‖² dA` — a light's
+  position *is* its emitter) and `PBR3_05_Color_and_Radiometry` (`E = Φ/4πr²`, so the error is statable
+  in stops).
+- Note: `docs/research/carried-fire.md`, committed alone as `ef7493c`.
+- Corpus re-scan: `catalog_recent` (200 rows) found 15 lighting/rendering documents not in
+  `docs/research/corpus.md`; committed separately as `def8e0b` with two unclassified stems flagged as
+  such rather than cited.
+
+### The work
+
+`model::reach::flame_light_offset(height)` = `(0, h/2, 0)`, the flame billboard's own centre — the one
+point inside a drawn fire of any height. `PoolCandidate::offset` is documented against it (a candidate on
+the `FlameSite` needs no offset; one on a *parent* adds only the difference). The courtyard, the README
+quick start and the crate doc now spawn **one entity** holding the `FlameSite` and the `PoolCandidate`,
+with the offset from that helper and the lumens sized from the same height the light sits at. `src/`'s
+diff is 53 lines of docs plus one function and its tests.
+
+One artefact found by looking rather than measuring: the first hand placement, `(0.30, 0.35, 0.12)`, drew
+the flame **inside** the bearer's own 0.30 m capsule (`/home/ladvien/l17/zoomC.png`). Widened to
+`(0.42, 0.35, 0.16)` and re-captured; `zoomC2.png` shows every flame clear of its figure.
+
+### The critique and the verdict
+
+Full critique: `/home/ladvien/l17/critique.md`. **GREAT** on all four faces (placement, sizing from its
+own height, the model function, the docs teaching it). Nothing was reverted.
+
+| line | before → after |
+|---|---|
+| light-to-nearest-flame distance | **1.80 m → 0.18 m** (< half a 0.35 m flame) |
+| a torch's pool edge illuminance | 72 lx → 250 lx (the number it was sized for) |
+| lit bearer's own ground vs open ground | 0.63:1 (no pool) → a pool; brightest ground block 143.6 → 156.0 DN |
+| key-to-fill on the frame | 2.00:1 → 2.00:1 (unchanged) |
+| clipped pixels, `rgb ≥ 250`, every camera | 0.000 % → 0.000 % (`pool16` 0.001 %, at flame cores) |
+| frame mean, hero / ground / top-down | 48.8 → 53.0 / 35.0 → 38.3 / 50.0 → 53.3 DN |
+
+### Benchmark
+
+`bench_lights` (5000 candidates, 2000 lights, pool 16), base `7d1208c` in its own worktree and target
+directory, five interleaved rounds: base `p50` 565–606, after 575–716; `pool_p50_us` base 393–590, after
+406–484; `flicker_p50_us` base 168–192, after 198–246. **Every range overlaps**, which is what this
+change should do: it adds a pure function nothing in the hot path calls, and the bench spawns no
+`FlameSite`. The one after-run at `p50` 716 was a 942 µs mean against a 600 µs frame, i.e. the host
+under load, and `docs/DEMOS.md`'s rule is to throw a reading away whose repeat moves by more than 10 %.
+CPU-only, so it says nothing about GPU cost; the captures' frame times are unchanged.
+
+### The gate
+
+On the final tree: `cargo build --release && cargo build && cargo test` (**34 lib + 8/3/28 behaviour + 1
+readme + 14 doctests**), `cargo test --features serde`, `cargo build --examples --all-features`,
+`cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`, `cargo fmt --check`,
+`cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Environment: `/tmp` reached 0 bytes free
+
+New trap, recorded because it cost time and will recur. Mid-pass `/tmp` filled to **0 bytes** (another
+service's `vllm-child.log` was still growing at ~100 MB). At exactly zero free bytes Xvfb cannot create
+`/tmp/.tX<N>-lock` and dies with `Could not write pid to lock file`, which every capture sees as
+`XOpenDisplayFailed`. `xvfb-run` was unusable on any display number, and the two live displays (`:97`,
+`:98`) had gone with it. The working answer, which needs no privilege and touches nobody's files: run the
+capture inside `unshare -rm` with a private tmpfs mounted at `/tmp` —
+
+```sh
+unshare -rm bash -c 'mount -t tmpfs tmpfs /tmp; mkdir -p /tmp/.X11-unix; chmod 1777 /tmp/.X11-unix;
+  exec xvfb-run -a -s "-screen 0 1920x1080x24" env LIGHTS_FRAMES=120 LIGHTS_SHOT=… …'
+```
+
+`/home/ladvien/l17/shoot.sh` and `seq.sh` are that, and every capture in this iteration used them. GPU was
+idle (12.4 GiB free, no tenant). The documented Linux font path for `tools/gif.sh`
+(`/usr/share/fonts/truetype/liberation/`) does not exist on big; corrected in `docs/DEMOS.md` with the
+check to run first, because the failure lands in `magick` after the whole encode.
+
+### Top 5 remaining, ranked
+
+1. **A per-flame fuel-bed `D` in the fragment stage** (iteration 16's blocker): a wider `MeshTag` or a
+   second instance attribute, then the silhouette attempt retried with each fire's own `λ`. The
+   allocation decision comes first.
+2. **The tip must pinch and shed** — with a per-flame `λ` this is the same mechanism.
+3. **A torch's flame saturates into a shard at close range** (8 % of its pixels at ≥ 254 DN at 5 m).
+4. **The flicker amplitude, still uncited** (blocked 16 iterations).
+5. **The example's bearers have no torch prop or arms**, so at close range a flame reads as floating
+   beside a capsule. Example art, not the crate; worth a modelled hand in the showcase.
+
+### One tracked change this pass did not make
+
+`.omp/skills/bevy-lights-build-loop/SKILL.md` still carries the unstaged edit adding *"Your work is saved
+even if you are killed"*, in the working tree when this pass began, as iterations 14, 15 and 16 also
+logged. Left **uncommitted** again: a tracked change this pass did not write belongs to its author. Its
+guidance was followed — the corpus re-scan and the research note were each committed alone before any
+code, then the implementation, then the docs, then the media.
