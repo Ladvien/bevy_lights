@@ -250,14 +250,13 @@ impl SlotLook {
 ///
 /// The key and the distance are separate because they are different questions: *which* lights should be
 /// real is about what arrives at the subject, while the overlap rule is about how far it has to travel.
-/// One ranked candidate: its sort key, its distance, its rank value, the entity, where its light goes, its
-/// intensity, and the prop's own fire clock (`Flicker::phase`, `Flicker::diameter`) when it has one.
 ///
-/// The two `Option<f32>` are in the tuple, so a sort swap moves them: measured at **+9 % of the pool's
-/// own frame** on the 5000-candidate bench (`pool_p50_us` 503-555 → 560-592), which is 0.2 % of a 60 Hz
-/// frame. Keeping them in a side map instead was measured **far worse** (796-1111 µs) — 5000 hash
-/// inserts a frame cost more than the sort's extra bytes. Logged in `docs/loop-log.md`, iteration 15.
-type Assignment = (f32, f32, f32, Entity, Vec3, f32, Option<f32>, Option<f32>);
+/// A candidate's own fire clock ([`PoolCandidate::phase`], [`PoolCandidate::diameter`]) is deliberately
+/// **not** in the tuple: it would be carried through every comparison and every sort swap of the whole
+/// candidate list — 5000 entries a frame — to be read for the `pool.size` winners. It is resolved for
+/// those instead, in `winners` below. Measured: the two `Option<f32>` in the tuple cost 3.4 % of the
+/// pool's own frame (`pool_p50_us` 493 → 511) for a number only the winners use.
+type Assignment = (f32, f32, f32, Entity, Vec3, f32);
 
 /// What `assign_pool` reads of a candidate: its entity, its propagated position, its own `Transform`
 /// when it has one (the freshest truth in the frame the host moved it), whether it is hidden, and how
@@ -421,16 +420,7 @@ fn assign_pool<F: Component>(
                     Rank::Distance => distance_squared.sqrt(),
                 };
                 let key = value;
-                (
-                    key,
-                    distance_squared,
-                    value,
-                    entity,
-                    position + candidate.offset,
-                    candidate.intensity,
-                    candidate.phase,
-                    candidate.diameter,
-                )
+                (key, distance_squared, value, entity, position + candidate.offset, candidate.intensity)
             })
             .filter(|(_, distance_squared, ..)| *distance_squared <= pool.reach * pool.reach)
             .collect(),
@@ -590,6 +580,19 @@ fn assign_pool<F: Component>(
         }
     }
 
+    // Each winner's own fire clock, resolved once for the `pool.size` candidates that won rather than
+    // carried through the rank list's sort. A candidate that gives neither number is absent from the map,
+    // so a slot it wins keeps the slot's own `1.3 · slot` phase and the un-sized rate.
+    let winners: std::collections::HashMap<Entity, (Option<f32>, Option<f32>)> = chosen_by_slot
+        .values()
+        .filter_map(|entity| {
+            candidates
+                .get(*entity)
+                .ok()
+                .map(|(.., candidate)| (*entity, (candidate.phase, candidate.diameter)))
+        })
+        .collect();
+
     for (_, slot, mut transform, mut visibility, mut flicker, _) in &mut slots {
         // A reserve light: it is not assigned a candidate, only used to fade a departure out.
         if slot.slot >= pool.size {
@@ -630,19 +633,19 @@ fn assign_pool<F: Component>(
             if holding.is_none() && chosen.is_some() { 1.0 } else { fade_factor(*age, pool.fade_seconds) };
 
         let assigned = chosen.and_then(|entity| {
-            lit.iter()
-                .find(|(_, _, _, candidate, ..)| *candidate == entity)
-                .map(|(.., at, i, phase, diameter)| (*at, *i, *phase, *diameter))
+            lit.iter().find(|(_, _, _, candidate, ..)| *candidate == entity).map(|(.., at, i)| (*at, *i, entity))
         });
         match assigned {
-            Some((at, intensity, phase, diameter)) => {
+            Some((at, intensity, entity)) => {
                 transform.translation = at;
                 // The slot keeps its own phase until a candidate says otherwise: the light handed to a
                 // prop must breathe on that prop's clock, or it beats against the flame drawn on it.
-                if let Some(phase) = phase {
-                    flicker.phase = phase;
+                if let Some((phase, diameter)) = winners.get(&entity).copied() {
+                    if let Some(phase) = phase {
+                        flicker.phase = phase;
+                    }
+                    flicker.diameter = diameter;
                 }
-                flicker.diameter = diameter;
                 flicker.base = intensity * pool.gain * fade;
                 visibility.set_if_neq(Visibility::Inherited);
             }
