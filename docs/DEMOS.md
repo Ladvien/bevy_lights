@@ -52,7 +52,8 @@ captures the same thing twice.
 
 ## The README showcase
 
-`docs/media/showcase.gif` is the README's hero: two seconds, 30 fps, 480 px, ~2 MB. Its recipe, and the two
+`docs/media/showcase.gif` is the README's hero: two seconds, 30 fps, 480 px, ~2 MB. `TMPDIR` and
+`LIGHTS_SHOT_DIR` both go to disk, not `/tmp` (see the top of this file). Its recipe, and the two
 things that made the first attempts look wrong:
 
 ```sh
@@ -222,10 +223,14 @@ macOS's; on Linux use Liberation Sans, which is metrically compatible, so substi
 other does not move the caption:
 
 ```sh
-FONT=/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf \
-BOLD=/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf \
+FONT=/usr/share/fonts/liberation/LiberationSans-Regular.ttf \
+BOLD=/usr/share/fonts/liberation/LiberationSans-Bold.ttf \
   tools/gif.sh ...
 ```
+
+The `truetype/liberation/` path some distributions use does not exist on big, and
+`gif.sh` fails in `magick` after the whole encode, exactly as the macOS path does. Check the file is
+there before starting: `ls /usr/share/fonts/*/LiberationSans-Regular.ttf`.
 
 `STRIDE=2` with `FPS` left alone halves the file and plays at half speed; pair it with a doubled `FPS`
 to keep real-time speed. A GIF stores whole frames, so its size is nearly linear in frame count.
