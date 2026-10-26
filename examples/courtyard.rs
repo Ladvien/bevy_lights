@@ -28,7 +28,11 @@
 //!
 //! `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
 //! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`.
-//! Five are this example's own: `LIGHTS_RESERVE` (reserve lights for a cross-faded hand-off, default
+//! `LIGHTS_REACH`, `LIGHTS_FOCUS_WALK` (the focus's orbit radius; past the pool's reach the torches
+//! stream across the boundary, which is what makes a candidate leave the pool) and `LIGHTS_POOL_LOG`
+//! (the pool's total every frame, the only way to see a hand-off) are also this example's own.
+//!
+//! Six more are this example's own: `LIGHTS_RESERVE` (reserve lights for a cross-faded hand-off, default
 //! 1; `0` dips instead), `LIGHTS_HYSTERESIS` (the pool's overlap ratio, default 1.15),
 //! `LIGHTS_FADE` (seconds a light takes to come back after a hand-off, default 0.35),
 //! `LIGHTS_BED` (the braziers' fuel-bed diameter in metres, default 0.34, which sizes their flicker
@@ -447,7 +451,16 @@ fn walk_bearers(time: Res<Time>, mut bearers: Query<(&mut Bearer, &mut Transform
 /// Orbits the focus at 6 m on a 20 s period./// Orbits the focus at 6 m on a 20 s period.
 fn orbit_focus(time: Res<Time>, mut focus: Query<&mut Transform, With<Focus>>) {
     let elapsed = time.elapsed_secs();
-    let at = Vec3::new(6.0 * (elapsed * TAU / 20.0).cos(), 1.2, 6.0 * (elapsed * TAU / 20.0).sin());
+    // `LIGHTS_FOCUS_WALK=<radius>` sends the focus out to that radius instead of its 6 m orbit. With a
+    // radius past the pool's reach the torches stream across the reach boundary as it goes round, which
+    // is the one thing that makes a candidate leave the pool — and so the one thing that makes a
+    // cross-fade fire outside a test.
+    let radius = std::env::var("LIGHTS_FOCUS_WALK")
+        .ok()
+        .and_then(|v| v.parse::<f32>().ok())
+        .filter(|r| *r > 0.0)
+        .unwrap_or(6.0);
+    let at = Vec3::new(radius * (elapsed * TAU / 20.0).cos(), 1.2, radius * (elapsed * TAU / 20.0).sin());
     for mut transform in &mut focus {
         transform.translation = at;
     }
@@ -502,13 +515,19 @@ fn report_flicker(
     mut frame: Local<u32>,
 ) {
     *frame += 1;
-    if !frame.is_multiple_of(30) {
-        return;
-    }
     // The pool's total, which is the number a cross-fade is meant to hold: the sum of every light the
     // pool owns (its assigned slots and its reserve), across a hand-off.
     let total: f32 = lights.iter().map(|light| light.intensity).sum();
     let count = lights.iter().count();
+    // `LIGHTS_POOL_LOG=1` prints the pool's total **every frame** — the only way to see a hand-off, since
+    // a 0.35 s fade is invisible in a 30-frame sample and far below a frame's mean luminance.
+    if std::env::var_os("LIGHTS_POOL_LOG").is_some() {
+        let by_slot: Vec<String> = lights.iter().map(|light| format!("{:.0}", light.intensity)).collect();
+        println!("pool {} {} {:.1} [{}]", *frame, count, total, by_slot.join(","));
+    }
+    if !frame.is_multiple_of(30) {
+        return;
+    }
     if let Some(light) = lights.iter().next() {
         println!(
             "flicker frame {}: {:.2} (pool total {:.0} over {count}, candidates {})",
