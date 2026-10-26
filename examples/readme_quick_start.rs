@@ -25,15 +25,17 @@ fn setup(mut commands: Commands) {
         // `diameter` sizes the flicker by the fuel bed (`f = 1.5/√D` Hz); `None` uses the un-sized rate.
         Flicker { base: lumens, phase: 0.0, diameter: Some(0.34) },
         Kindle::default(),
-        // `kindle` grows the flame with its light, on the same 0.6 s envelope.
-        FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS },
+        // `kindle` grows the flame with its light, on the same 0.6 s envelope, and `diameter` matches
+        // the `Flicker`'s so the drawn flame breathes at the same rate the light does.
+        FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS, diameter: Some(0.34) },
     ));
 
     // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
     // hand-held flame is smaller, so its pool is sized from its edge.
     commands.spawn((
         PoolCandidate { offset: Vec3::Y * 1.8, intensity: fire_lumens(250.0, 2.0, 1.8) },
-        FlameSite { height: 0.35, phase: 1.9, kindle: 0.0 },
+        // The pool's lights flicker at the un-sized rate, so this flame does too.
+        FlameSite { height: 0.35, phase: 1.9, kindle: 0.0, diameter: None },
         Transform::from_xyz(4.0, 0.0, 2.0),
     ));
 

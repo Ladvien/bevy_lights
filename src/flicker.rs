@@ -9,7 +9,7 @@ use bevy::time::Time;
 
 use crate::LightsSystems;
 use crate::chain_sets;
-use crate::model::{KINDLE_SECONDS, flicker_factor, flicker_factor_of, kindle_gain};
+use crate::model::{KINDLE_SECONDS, flicker_swing, kindle_gain};
 
 /// [`FlickerPlugin`]: modulates every [`Flicker`] light and advances every [`Kindle`].
 pub struct FlickerPlugin;
@@ -194,10 +194,7 @@ fn modulate<L: Emits>(
         None => 1.0,
     };
     if !hidden {
-        let swing = match flicker.diameter {
-            Some(diameter) => flicker_factor_of(diameter, t, flicker.phase),
-            None => flicker_factor(t, flicker.phase),
-        };
+        let swing = flicker_swing(flicker.diameter, t, flicker.phase);
         *light.intensity() = flicker.base * swing * gain;
     }
     lit

@@ -36,7 +36,8 @@
 //!         // (`f = 1.5/√D` Hz, so 0.34 m is 2.6 Hz). Leave it `None` for the un-sized rate.
 //!         commands.spawn((PointLight { intensity: 60_000.0, range: 12.0, ..default() },
 //!             Flicker { base: 60_000.0, phase: 0.0, diameter: Some(0.34) }, Kindle::default(),
-//!             FlameSite { height: 0.9, phase: 0.0, kindle: 0.0 }));
+//!             // `diameter` matches the `Flicker`'s, so the drawn flame breathes with the light.
+//!             FlameSite { height: 0.9, phase: 0.0, kindle: 0.0, diameter: Some(0.34) }));
 //!         commands.spawn((MyFocus, Transform::default()));
 //!         commands.spawn((PoolCandidate { offset: Vec3::Y * 1.8, intensity: 8_000.0 },
 //!             Transform::from_xyz(4.0, 0.0, 2.0)));
@@ -74,8 +75,8 @@ pub use flame::{Flame, FlameLook, FlameMaterial, FlamePlugin, FlameSite};
 pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled};
 pub use model::{
     FADE_SECONDS, HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY, MOON_KEY, RANGE_MARGIN, blackbody_colour,
-    fade_factor, fill_for, fire_lumens, flicker_factor, hand_off, key_to_fill, kindle_gain, pack_flame_tag,
-    preferred, raised_light, stops, unpack_flame_tag, white_balanced,
+    fade_factor, fill_for, fire_lumens, flicker_factor, flicker_swing, hand_off, key_to_fill, kindle_gain,
+    pack_flame_tag, preferred, raised_light, stops, unpack_flame_tag, white_balanced,
 };
 pub use pool::{LightPool, LightPoolPlugin, PoolCandidate, PoolLight, Rank};
 

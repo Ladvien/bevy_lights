@@ -72,6 +72,27 @@ pub fn flicker_factor_of(diameter: f32, t: f32, phase: f32) -> f32 {
     0.85 + 0.15 * wobble
 }
 
+/// The flicker multiplier of a fire, sized by its fuel bed when the host knows it: the one place the
+/// "sized or un-sized" choice is made.
+///
+/// `Some(diameter)` is [`flicker_factor_of`] and `None` is [`flicker_factor`]. A fire's **light** and
+/// the **flame drawn on it** are one fire, so both are written from this function: the light's
+/// intensity by `flicker_lights` and the flame's emission by `update_flames`. Going through one
+/// function is what makes it impossible for a flame to hold still while the ground under it flickers,
+/// which is the defect this exists to prevent.
+///
+/// ```
+/// # use bevy_lights::model::fire::*;
+/// assert_eq!(flicker_swing(None, 2.0, 0.4), flicker_factor(2.0, 0.4));
+/// assert_eq!(flicker_swing(Some(0.34), 2.0, 0.4), flicker_factor_of(0.34, 2.0, 0.4));
+/// ```
+pub fn flicker_swing(diameter: Option<f32>, t: f32, phase: f32) -> f32 {
+    match diameter {
+        Some(diameter) => flicker_factor_of(diameter, t, phase),
+        None => flicker_factor(t, phase),
+    }
+}
+
 /// How long a fire takes to take hold, in seconds: a light that has a [`Kindle`] flares up over this
 /// long instead of switching on (Sanctuary decision 0127).
 ///

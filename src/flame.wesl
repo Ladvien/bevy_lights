@@ -62,6 +62,9 @@ struct FlameVertexOutput {
     // How far this flame's own fire has caught: its instance scale, which `update_flames` writes from the
     // fire's `kindle_gain`. Flat, because it is one number for the whole flame.
     @location(2) @interpolate(flat) took: f32,
+    // The fire's flicker this frame (0.70..1.00 of its base), read from the tag: the same number the light's intensity
+    // was multiplied by, so the drawn fire and the light it casts are one fire. Flat, for the same reason as `took`.
+    @location(3) @interpolate(flat) brightness: f32,
 }
 
 // ---- 2D simplex noise and the classic fbm over it (provenance UNVERIFIED, see header) ---------------------------------
@@ -126,15 +129,19 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     let took = clamp(length(world_from_local[0].xyz), 0.0, 1.0);
     let right = normalize(vec3<f32>(view.world_from_view[0].x, 0.0, view.world_from_view[0].z));
     let up = vec3<f32>(0.0, 1.0, 0.0);
-    // The flame's `MeshTag` (`pack_flame_tag` in `src/model/tag.rs`): its clock phase in the low 16 bits and its height
-    // in the high 16, both unsigned-normalised, which `unpack2x16unorm` reads back (x the phase, y the height).
-    let tag = unpack2x16unorm(mesh_functions::get_tag(vertex_in.instance_index));
+    // The flame's `MeshTag` (`pack_flame_tag` in `src/model/tag.rs`): height in the high 16 bits, unsigned-normalised,
+    // which `unpack2x16unorm` reads back as `.y`; the clock phase in the next byte and the fire's own brightness in the
+    // low byte, both plain 0..255 shares. The brightness is the fire's flicker, written every frame from the same
+    // function the light's intensity is, so the flame breathes with the ground under it.
+    let raw = mesh_functions::get_tag(vertex_in.instance_index);
+    let tag = unpack2x16unorm(raw);
     let size = tag.y * material.params.y;
     let billboard = origin + right * (vertex.position.x * size * FLAME_ASPECT) + up * (vertex.position.y * size + size * 0.5);
     out.position = position_world_to_clip(billboard);
     out.uv = vec2<f32>(vertex.position.x, vertex.position.y) + vec2<f32>(0.5, 0.5);
-    out.phase = tag.x * TAU;
+    out.phase = f32((raw >> 8u) & 0xffu) / 255.0 * TAU;
     out.took = took;
+    out.brightness = f32(raw & 0xffu) / 255.0;
     return out;
 }
 
@@ -175,5 +182,7 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     // Alpha 0 makes `AlphaMode::Add`'s blend state (`PREMULTIPLIED_ALPHA_BLENDING`, src + (1 - src.a) * dst) purely
     // additive: the same trick as `premultiply_alpha` in `bevy_pbr`'s `pbr_functions.wesl`. Any alpha above 0 would
     // darken what stands behind the flame.
-    return vec4<f32>(colour * mask * material.params.w, 0.0);
+    // The fire's own flicker scales the emission as it scales the light: a flame that held still while its pool moved was
+    // a source that did not motivate its own light. `docs/research/flame-flicker.md` measures it.
+    return vec4<f32>(colour * mask * material.params.w * in.brightness, 0.0);
 }

@@ -250,3 +250,37 @@ fn a_sized_fire_flickers_at_the_puffing_laws_rate_and_an_unsized_one_at_the_inhe
         1000.0 * flicker_factor(t, 0.0)
     );
 }
+
+/// The flame drawn on a fire and the light that fire casts must be **one fire**: the same swing, at the
+/// same rate, at the same instant. Before this, the ground under a brazier moved ±15-22 % while the
+/// flame's own pixels moved ±3.5 %, correlated at +0.07 — a source that did not motivate its own light
+/// (`docs/research/flame-flicker.md`).
+///
+/// The test reads both numbers the way the shader and the renderer will: the light's `intensity` over
+/// its base, and the low byte of the flame's `MeshTag`. `FlamePlugin` is not added, because it needs a
+/// render app; `Flame`'s dressing is `src/flame.rs`'s own test and what is proven here is the shared
+/// function — that a size given to the light reaches the flame's brightness.
+#[test]
+fn a_flames_brightness_is_the_swing_its_light_is_written_with() {
+    use bevy_lights::model::flicker_swing;
+
+    let mut app = bare_app();
+    let phase = 2.5;
+    let diameter = Some(0.34);
+    let light = app
+        .world_mut()
+        .spawn((PointLight { intensity: 0.0, ..default() }, Flicker { base: 1000.0, phase, diameter }))
+        .id();
+    // A quarter of a second in: enough for a 2.6 Hz fire to have left 0.85 several percent behind.
+    for _ in 0..15 {
+        app.update();
+    }
+    let t = app.world().resource::<Time>().elapsed_secs();
+    let intensity = app.world().get::<PointLight>(light).map(|light| light.intensity).unwrap_or(0.0);
+    let swing = flicker_swing(diameter, t, phase);
+    assert!(
+        (intensity / 1000.0 - swing).abs() < 1e-3,
+        "the light is written with the swing: {intensity} against 1000 * {swing}"
+    );
+    assert!(swing < 0.99, "the test needs the swing to have moved off 0.85 by t = {t}: {swing}");
+}

@@ -434,7 +434,12 @@ fn spawn_scene(
                     Name::new("Flame site"),
                     // The brazier's light is spawned with `Kindle::default()`, so its flame catches with it
                     // over the same envelope: the fire grows rather than appearing whole.
-                    FlameSite { height: BRAZIER_FLAME_HEIGHT, phase, kindle: KINDLE_SECONDS },
+                    FlameSite {
+                        height: BRAZIER_FLAME_HEIGHT,
+                        phase,
+                        kindle: KINDLE_SECONDS,
+                        diameter: brazier_bed(),
+                    },
                     // The flame's foot is on the coals, at the top of the box.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04, 0.0),
                 ));
@@ -489,7 +494,15 @@ fn spawn_scene(
                 ));
                 bearer.spawn((
                     Name::new("Torch flame"),
-                    FlameSite { height: if lantern { 0.5 } else { 0.35 }, phase, kindle: 0.0 },
+                    // The pool's lights flicker at the un-sized rate (`Flicker { diameter: None }` in
+                    // `pool.rs`), so the torch's flame must too — the same value on both is what keeps the
+                    // flame and its light one fire.
+                    FlameSite {
+                        height: if lantern { 0.5 } else { 0.35 },
+                        phase,
+                        kindle: 0.0,
+                        diameter: None,
+                    },
                     Transform::from_xyz(0.0, TORCH_LIFT - 0.85, 0.0),
                 ));
             });
