@@ -50,6 +50,24 @@ a frame's mean luminance cannot see a ±15 % flicker on four lights. If the two 
 check that the switch reached the process — a shell that passes `LIGHTS_UNSIZED=` on both sides
 captures the same thing twice.
 
+## Seeing a cross-faded hand-off
+
+The pool's `reserve` light is what makes a hand-off cross-fade rather than dip. The example takes
+`LIGHTS_RESERVE` (`0` turns it off), and its log prints the pool's total every 30 frames — which is the
+number to read, because a hand-off on four lights in a 1280 x 720 frame moves the frame's mean by far
+less than a DN:
+
+```sh
+LIGHTS_RESERVE=1 LIGHTS_HYSTERESIS=1.0 LIGHTS_FRAMES=150 LIGHTS_POOL=4 ./target/release/examples/courtyard
+```
+
+**A caveat this iteration found:** in the courtyard, no candidate ever *leaves* the pool in its first
+few seconds (the torches walk; they do not go out of reach), so a cross-fade never fires there and the
+`reserve` makes no difference to a capture. The mechanism is proved by
+`a_cross_faded_hand_off_holds_the_subject_and_a_dip_does_not` in `tests/pool.rs`, which displaces a
+holder and shows the subject held at 99 → 94 % of its light against the dip's 0 → 14 %. A capture that
+shows it needs a scenario where torches cross the reach boundary, which the example does not yet have.
+
 ## Seeing a hand-off
 
 The pool hands a real light to a nearer torch when one is `hysteresis` times nearer than the torch
