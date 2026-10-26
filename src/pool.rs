@@ -17,7 +17,7 @@ use bevy::light::PointLight;
 use bevy::prelude::*;
 
 use crate::flicker::{Flicker, FlickerPlugin};
-use crate::model::pool::{fade_factor, fade_out_factor, hand_off};
+use crate::model::pool::{fade_factor, fade_out_factor, preferred};
 use crate::{FADE_SECONDS, HYSTERESIS, LightsSystems, chain_sets};
 
 /// [`LightPoolPlugin`]: keeps [`LightPool::size`] real lights and hands them to the nearest
@@ -93,9 +93,13 @@ pub struct LightPool {
     /// fire lights (a palette recolouring every light that carries its fire marker) keeps its tint
     /// through the night's glide, which writes `gain` every frame.
     pub light: PointLight,
-    /// How much nearer a challenger must be than the candidate a slot already holds before it takes
-    /// the light: `1.0` is nearest-wins, the default [`HYSTERESIS`] 1.15 needs a challenger about
-    /// 13 % closer. This is the overlap rule that stops two props trading a light every frame.
+    /// How much better a challenger must be than the light a slot already holds before it takes it:
+    /// `1.0` is "any improvement wins", the default [`HYSTERESIS`] 1.15 needs a challenger about 13 %
+    /// better. This is the overlap rule that stops two props trading a light every frame.
+    ///
+    /// "Better" is [`LightPool::rank`]'s own quantity, so a pool ranking by illuminance needs a
+    /// challenger to arrive 13 % brighter (at its distance) rather than merely be nearer — the rule and
+    /// the rank cannot disagree about what a better light is.
     pub hysteresis: f32,
     /// How long, in seconds, a light takes to come back to full brightness after it changes owner.
     /// [`FADE_SECONDS`] by default; `0.0` snaps it back at once (the pre-fade behaviour).
@@ -105,8 +109,14 @@ pub struct LightPool {
     pub rank: Rank,
     /// How many extra lights the pool keeps beyond the ones it assigns, so a hand-off can be a
     /// **cross-fade**: the departing owner's light fades out while the arriving one fades in, and the
-    /// subject never brightens or darkens. One by default, which cross-fades one hand-off per frame;
-    /// `0` makes a hand-off dip rather than cross-fade (iteration 2's behaviour).
+    /// subject never brightens or darkens.
+    ///
+    /// It is also the pool's **hand-off budget**: a reserve light is busy for the whole fade it carries,
+    /// so the pool changes at most `reserve` lights' owners in a frame and the rest wait for the next
+    /// frame. One by default, which cross-fades one hand-off per frame; raise it in a scene where many
+    /// props move at once. `0` removes the cross-fade and the throttle together: a hand-off then dips
+    /// rather than cross-fading, and every light that needs moving moves at once (iteration 2's
+    /// behaviour).
     pub reserve: usize,
 }
 
@@ -125,7 +135,8 @@ impl Default for LightPool {
     }
 }
 
-/// How [`LightPool`] ranks its candidates.
+/// How [`LightPool`] ranks its candidates — and, since [`LightPool::hysteresis`] compares the same
+/// quantity, how it decides whether a challenger is worth a hand-off.
 ///
 /// The craft's rule is that the eye reads the light that matters, and what arrives at the subject is a
 /// light's output over the square of its distance: [`Rank::Illuminance`] is that sum, and
@@ -219,15 +230,15 @@ impl SlotLook {
     }
 }
 
-/// One candidate's light assignment: its distance from the focus (squared), its entity, its world
-/// position and its intensity.
-/// One candidate's light assignment: its **rank key** (ascending, so the best is first), its distance
-/// from the focus (squared, for [`hand_off`](crate::model::pool::hand_off) and the reach test), its
-/// entity, its world position and its intensity.
+/// One candidate's light assignment: its rank key (ascending is best), its distance from the focus
+/// (squared) for the reach test, its **value** — the quantity the overlap rule compares, a "smaller is
+/// better" scalar: the squared distance under [`Rank::Distance`](crate::Rank::Distance) and the squared
+/// distance over the intensity (the reciprocal of the illuminance) under
+/// [`Rank::Illuminance`](crate::Rank::Illuminance) — its entity, its world position and its intensity.
 ///
 /// The key and the distance are separate because they are different questions: *which* lights should be
 /// real is about what arrives at the subject, while the overlap rule is about how far it has to travel.
-type Assignment = (f32, f32, Entity, Vec3, f32);
+type Assignment = (f32, f32, f32, Entity, Vec3, f32);
 
 /// What `assign_pool` reads of a candidate: its entity, its propagated position, its own `Transform`
 /// when it has one (the freshest truth in the frame the host moved it), whether it is hidden, and how
@@ -283,11 +294,16 @@ struct HandOffState {
 /// 2. **Focus.** The one entity carrying `F`. None, or more than one, means no assignment this frame
 ///    (and a warning for the second case): a pool with two cameras has no single near.
 /// 3. **Candidates.** Every [`PoolCandidate`] whose own [`Visibility`] is not `Hidden`, within
-///    [`LightPool::reach`], sorted by distance and then by [`Entity`], so the assignment is the same
-///    on every machine and two props at one distance never swap between frames.
-/// 4. **Assign.** Slot `k` takes candidate `k` at the candidate's position plus its
-///    [`PoolCandidate::offset`], with `Flicker::base = intensity · gain`. Every slot with no
-///    candidate is hidden, and the whole pool is hidden when there is no focus or the gain is zero.
+///    [`LightPool::reach`], ranked by [`LightPool::rank`] and then by [`Entity`], so the assignment is the
+///    same on every machine and two props of equal rank never swap between frames.
+/// 4. **Assign.** Every slot's owner for the frame is decided **before any slot is written**: a slot keeps
+///    its candidate unless a candidate no slot holds is better by [`LightPool::hysteresis`], and a
+///    challenger takes the **worst-ranked** light the pool holds rather than displacing every slot that
+///    happens to compare against it. At most as many lights change owner per frame as [`LightPool::reserve`]
+///    allows (all of them when it is 0), so a hand-off the pool cannot cross-fade is not made. Each slot
+///    then takes its candidate's position plus its [`PoolCandidate::offset`], with
+///    `Flicker::base = intensity · gain · fade`. Every slot with no candidate is hidden, and the whole pool
+///    is hidden when there is no focus or the gain is zero.
 fn assign_pool<F: Component>(
     mut commands: Commands,
     pool: Res<LightPool>,
@@ -370,92 +386,182 @@ fn assign_pool<F: Component>(
                     _ => at.translation(),
                 };
                 let distance_squared = position.distance_squared(focus_at);
-                // The rank key. `Illuminance` is `intensity / distance²`, which is the inverse square the
-                // crate's `fire_lumens` inverts: a prop four times as bright ranks equal at twice the
-                // distance. Negated, so ascending order puts the most light first. `Distance` is the key
-                // the pool used before that rule existed.
-                let key = match pool.rank {
-                    Rank::Illuminance => -(candidate.intensity / distance_squared.max(1e-6)),
-                    Rank::Distance => distance_squared,
+                // The value is the pool's one quantity: what it **ranks** by and what the overlap rule
+                // **holds** against, in the units the hysteresis margin applies to. "Smaller is better",
+                // and positive — `preferred` clamps at zero, so a negated brightness would collapse every
+                // comparison to `0 < 0`.
+                //
+                // `Illuminance` is the reciprocal of the light arriving at the subject,
+                // `distance² / intensity`: the inverse square the crate's `fire_lumens` inverts, so a prop
+                // four times as bright ranks exactly equal at twice the distance (which is what the
+                // tie-break on entity depends on), and a challenger must arrive 15 % brighter to take a
+                // light. `Distance` is the distance itself, the pair the old rule compared, so that rule is
+                // unchanged.
+                let value = match pool.rank {
+                    Rank::Illuminance => distance_squared / candidate.intensity.max(1e-6),
+                    Rank::Distance => distance_squared.sqrt(),
                 };
-                (key, distance_squared, entity, position + candidate.offset, candidate.intensity)
+                let key = value;
+                (key, distance_squared, value, entity, position + candidate.offset, candidate.intensity)
             })
             .filter(|(_, distance_squared, ..)| *distance_squared <= pool.reach * pool.reach)
             .collect(),
         _ => Vec::new(),
     };
-    lit.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.2.to_bits().cmp(&b.2.to_bits())));
+    // Ties break on `Entity`, never on the value: four times the light at twice the distance is an exact
+    // tie by design, and two equidistant props must not swap between frames.
+    lit.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.3.to_bits().cmp(&b.3.to_bits())));
 
-    // 4. Hold or hand over. A slot keeps the candidate it held while that candidate is still a
-    //    candidate and no challenger is nearer by the hysteresis; a slot with nothing held takes the
-    //    nearest candidate no other slot holds, in slot order (so an unfilled pool reproduces
-    //    "slot k takes candidate k"). A slot that changes owner fades back up from nothing; a slot's
-    //    first light does not fade. The rule and the fade are in `model::pool`; the craft is in
-    //    `docs/research/pool-hand-off.md`.
-    // First pass: which slots keep what they hold. Nothing is decided against another slot's *old*
-    // owner, or slot 0 would see the candidate slot 1 still holds as free for one frame.
-    let mut keepers: Vec<usize> = Vec::new();
+    // 4. Hold or hand over. Every slot's owner for this frame is decided here, in a map, **before** a
+    //    single slot is written: a decision that depended on the order the slots happen to be written in
+    //    is how a slot took a candidate another slot was keeping.
+    //
+    //    Three rules, and the first two are what stop a reshuffle:
+    //
+    //    - **A candidate another slot holds is not a challenger.** It belongs to its holder. Comparing
+    //      every slot against one global best free candidate let a single bright newcomer displace all of
+    //      them at once — measured on the courtyard, seven of eight lights went dark for one frame and
+    //      faded back over the next twenty (`docs/research/pool-hand-off.md`).
+    //    - **A challenger displaces the worst-ranked light the pool holds**, one light per challenger, so
+    //      the pool's assignment is the best set it can hold rather than a wholesale re-sort.
+    //    - **At most `reserve` lights move in a frame** (all of them when the reserve is 0), because a
+    //      hand-off the pool cannot cross-fade is a hand-off that dims its subject. A scene that needs
+    //      more moves gets them on the following frames: the next frame recomputes the same challengers,
+    //      so the pool catches up without ever blacking out a street for one frame.
+    //
+    //    A slot that changes owner fades back up from nothing; a slot's first light does not fade. A slot
+    //    whose owner is gone, or displaced, takes the best candidate nobody holds. The rule and the fade
+    //    are in `model::pool`; the craft is in `docs/research/pool-hand-off.md`.
+    let mut chosen_by_slot: std::collections::HashMap<usize, Entity> = std::collections::HashMap::new();
+    // How many lights may change owner this frame, and **which** reserves carry the cross-fade. A reserve
+    // is busy for the whole of the fade it is carrying, and re-using one would cut the departing light
+    // off mid-fade — a pop at the end of a fade meant to hide one. So the free reserves are listed once,
+    // and departure `k` goes to the `k`-th *free* one: counting them and then indexing all of them
+    // would hand a busy reserve a second light. With no reserves at all there is nothing to hide a
+    // hand-off behind, so the frame is not throttled.
+    let free_reserves: Vec<usize> = (pool.size..pool.size + pool.reserve)
+        .filter(|reserve| {
+            let busy = departure_release.contains_key(reserve)
+                && fade_at.get(reserve).is_some_and(|age| {
+                    *age < pool.fade_seconds && fade_out_factor(*age, pool.fade_seconds) < 1.0
+                });
+            !busy
+        })
+        .collect();
+    let budget = if pool.reserve == 0 { pool.size } else { free_reserves.len() };
     {
-        let order: Vec<(usize, Option<Entity>)> =
+        // Slots in index order, so nothing below depends on the order the query happened to yield.
+        let mut order: Vec<(usize, Option<Entity>)> =
             slots.iter().map(|(_, slot, ..)| (slot.slot, held.get(&slot.slot).copied())).collect();
-        let mut claimed: Vec<Entity> = Vec::new();
-        for (slot, holding) in &order {
-            let held_distance = holding.and_then(|entity| {
-                lit.iter().find(|(_, _, candidate, ..)| *candidate == entity).map(|(_, d, ..)| *d)
-            });
-            let nearest_free = lit
+        order.sort_unstable_by_key(|(slot, _)| *slot);
+        order.retain(|(slot, _)| *slot < pool.size);
+        let holding_of = |slot: usize| order.iter().find(|(at, _)| *at == slot).and_then(|(_, held)| *held);
+        let rank_of = |entity: Entity| lit.iter().position(|(_, _, _, candidate, ..)| *candidate == entity);
+
+        // Who keeps what it holds: a slot whose candidate is still in the list. Everything else is an
+        // open slot, filled below.
+        let mut keepers: Vec<usize> = Vec::new();
+        let mut open: Vec<usize> = Vec::new();
+        for (slot, _) in &order {
+            match holding_of(*slot).map(rank_of) {
+                Some(Some(_)) => keepers.push(*slot),
+                _ => open.push(*slot),
+            }
+        }
+        for slot in &keepers {
+            if let Some(holding) = holding_of(*slot) {
+                chosen_by_slot.insert(*slot, holding);
+            }
+        }
+
+        // The challengers: the best-ranked candidates no slot holds, best first.
+        let held_by_any: Vec<Entity> = order.iter().filter_map(|(_, holding)| *holding).collect();
+        // Each challenger with its value, best first: the list is already in rank order.
+        let mut challengers: Vec<(Entity, f32)> = lit
+            .iter()
+            .filter(|(_, _, _, entity, ..)| !held_by_any.contains(entity))
+            .map(|(_, _, value, entity, ..)| (*entity, *value))
+            .collect();
+
+        // A challenger takes the **worst-ranked** light the pool holds, and only when the overlap rule
+        // says the move is worth making: the challenger must be nearer by `hysteresis`, so two props at
+        // nearly the same distance never trade a light frame after frame. How many may move, and behind
+        // which reserves, is decided above.
+        let mut moved = 0usize;
+        while moved < budget {
+            let worst = keepers
                 .iter()
-                .find(|(_, _, entity, ..)| !claimed.contains(entity) && Some(*entity) != *holding)
-                .map(|(_, distance, ..)| *distance);
-            let keep = match (holding, held_distance) {
-                (Some(entity), Some(distance)) => {
-                    (nearest_free == held_distance && !claimed.contains(entity))
-                        || !hand_off(distance, nearest_free.unwrap_or(f32::INFINITY), pool.hysteresis)
-                }
-                _ => false,
-            };
-            if keep && let Some(entity) = holding {
-                claimed.push(*entity);
-                keepers.push(*slot);
+                .filter_map(|slot| {
+                    let holding = holding_of(*slot)?;
+                    Some((*slot, rank_of(holding)?, lit.iter().find(|(_, _, _, e, ..)| *e == holding)?))
+                })
+                .max_by_key(|(_, rank, _)| *rank);
+            let Some((worst_slot, _, held)) = worst else { break };
+            let Some((challenger, challenger_value)) = challengers.first().copied() else { break };
+            // The overlap rule, on the rank's own quantity: a challenger has to be meaningfully nearer (or
+            // meaningfully brighter) to win, so props at nearly the same value never trade a light.
+            // Both values are "smaller is better" (see the rank key above): the same rule that ranks the
+            // candidates decides whether a challenger has earned the light.
+            if !preferred(held.2, challenger_value, pool.hysteresis) {
+                break;
+            }
+            keepers.retain(|slot| *slot != worst_slot);
+            chosen_by_slot.remove(&worst_slot);
+            open.push(worst_slot);
+            moved += 1;
+            challengers.remove(0);
+            chosen_by_slot.insert(worst_slot, challenger);
+        }
+
+        // Every open slot — an empty slot, or one whose owner was displaced — takes the best candidate
+        // nobody holds, in slot order. An unfilled pool therefore reproduces "slot k takes candidate k".
+        open.sort_unstable();
+        for slot in open {
+            if chosen_by_slot.contains_key(&slot) {
+                continue;
+            }
+            let taken = chosen_by_slot.values().copied().collect::<Vec<Entity>>();
+            if let Some((_, _, _, entity, ..)) =
+                lit.iter().find(|(_, _, _, entity, ..)| !taken.contains(entity))
+            {
+                chosen_by_slot.insert(slot, *entity);
             }
         }
     }
 
     // A cross-fade's departing light: where a slot's *old* owner was, at its intensity. It is handed to
     // a free reserve light before the slots are written, so the departing light is on in the frame the
-    // hand-off happens. One reserve light takes one departure per frame; a second departure in the same
-    // frame falls back to the dip, so the pool's budget is never exceeded.
+    // hand-off happens. The pool moves at most `reserve` lights a frame (above), so every departure in a
+    // frame gets its own reserve light and no hand-off is left to the dip.
     //
     // **The old owner need not have left the pool.** The common hand-off is a slot changing owner while
     // the old one is still a candidate — it has simply been displaced by a nearer prop — and cross-fading
     // only a *departed* owner left that case with the dip. So a departure here is "this slot's owner is
     // about to change", which is known before the slots are written.
-    let mut departure: Option<(Vec3, f32, f32)> = None;
-    for (slot, holding) in held.iter() {
-        if *slot >= pool.size {
-            continue;
+    {
+        // A slot whose owner is about to change, whether it has a replacement or not. A slot whose owner
+        // was despawned or went out of reach has no new owner, and that is still a departure — the light
+        // must fade out where it stood rather than blink off.
+        let mut departures: Vec<(usize, Entity)> = Vec::new();
+        for (slot, holding) in slots.iter().map(|(_, slot, ..)| (slot.slot, held.get(&slot.slot).copied())) {
+            if slot >= pool.size {
+                continue;
+            }
+            match (holding, chosen_by_slot.get(&slot).copied()) {
+                (Some(holding), Some(chosen)) if holding != chosen => departures.push((slot, holding)),
+                (Some(holding), None) => departures.push((slot, holding)),
+                _ => {}
+            }
         }
-        // The first pass already decided which slots keep what they hold.
-        if keepers.contains(slot) {
-            continue;
-        }
-        // This slot is about to lose its owner — to a nearer candidate, or to the owner leaving the
-        // pool. Either way the light it had is handed to a reserve to fade out.
-        if let Some((at, intensity, phase)) = old_look.get(holding).copied()
-            && departure.is_none()
-        {
-            departure = Some((at, intensity, phase));
-        }
-    }
-    if let Some(look) = departure {
-        let free = (pool.size..pool.size + pool.reserve).find(|slot| !departure_release.contains_key(slot));
-        if let Some(slot) = free {
-            departure_release.insert(slot, look);
-            fade_at.insert(slot, 0.0);
+        departures.sort_unstable();
+        for (index, (_, holding)) in departures.iter().enumerate() {
+            let Some((at, intensity, phase)) = old_look.get(holding).copied() else { continue };
+            let Some(reserve) = free_reserves.get(index).copied() else { break };
+            departure_release.insert(reserve, (at, intensity, phase));
+            fade_at.insert(reserve, 0.0);
         }
     }
 
-    let mut taken: Vec<Entity> = Vec::with_capacity(lit.len());
     for (_, slot, mut transform, mut visibility, mut flicker, _) in &mut slots {
         // A reserve light: it is not assigned a candidate, only used to fade a departure out.
         if slot.slot >= pool.size {
@@ -480,13 +586,9 @@ fn assign_pool<F: Component>(
             continue;
         }
         let holding = held.get(&slot.slot).copied();
-        // The first pass already decided which slots keep their candidate.
-        let keep = keepers.contains(&slot.slot) && !taken.contains(&holding.unwrap_or(Entity::PLACEHOLDER));
-        let chosen = if keep {
-            holding
-        } else {
-            lit.iter().find(|(_, _, entity, ..)| !taken.contains(entity)).map(|(_, _, entity, ..)| *entity)
-        };
+        // This frame's owner for the slot, decided in one pass above: the same map for every slot, so no
+        // slot's answer can depend on the order the slots are written in.
+        let chosen = chosen_by_slot.get(&slot.slot).copied();
         // A slot's first light is not a hand-off; only a change from one owner to another fades.
         let changed = holding.is_some() && chosen != holding;
 
@@ -500,7 +602,7 @@ fn assign_pool<F: Component>(
             if holding.is_none() && chosen.is_some() { 1.0 } else { fade_factor(*age, pool.fade_seconds) };
 
         let assigned = chosen.and_then(|entity| {
-            lit.iter().find(|(_, _, candidate, ..)| *candidate == entity).map(|(.., at, i)| (*at, *i))
+            lit.iter().find(|(_, _, _, candidate, ..)| *candidate == entity).map(|(.., at, i)| (*at, *i))
         });
         match assigned {
             Some((at, intensity)) => {
@@ -517,7 +619,6 @@ fn assign_pool<F: Component>(
         match chosen {
             Some(entity) => {
                 held.insert(slot.slot, entity);
-                taken.push(entity);
             }
             None => {
                 held.remove(&slot.slot);
@@ -532,7 +633,7 @@ fn assign_pool<F: Component>(
     // list and the ones a slot holds. Keyed by `Entity`, this map would otherwise grow by one entry for
     // every candidate ever pooled, which is a leak in a library that runs for hours.
     old_look.retain(|entity, _| {
-        lit.iter().any(|(_, _, candidate, ..)| candidate == entity)
+        lit.iter().any(|(_, _, _, candidate, ..)| candidate == entity)
             || held.values().any(|held| held == entity)
     });
 }

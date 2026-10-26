@@ -28,16 +28,19 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
   host hears on the frame a fire catches, for the sound of it. An invisible light is not rewritten
   (nothing is extracted for it) but its kindle still counts.
 - **The light pool** (`LightPoolPlugin::<YourFocusMarker>`). A fixed number of real point lights
-  (`LightPool::size`, default 16) is handed every frame to the `PoolCandidate`s nearest the one entity
-  carrying your focus marker, each light at the candidate's position plus its own world-space offset.
-  Everything else is a flame and nothing else. The assignment is deterministic: distance, then
-  `Entity`. A candidate is ranked by the **light it puts on the subject** (`intensity / distance²`), not by
-  its distance alone, so a bright brazier at 3 m outranks a dim torch at 2 m; `LightPool::rank` switches to
-  `Rank::Distance` for the old rule. A slot keeps the candidate it holds until a challenger is `hysteresis` times nearer
-  (default 1.15, the overlap rule), and a slot that does change owner fades back up over
-  `fade_seconds` (0.35 s) rather than popping. `reserve` (default 1) keeps a spare light so the owner
-  a hand-off leaves behind fades *out* at the same time: the subject's light is continuous through the
-  change rather than dipping, which is the craft's "overlapping key lights".
+  (`LightPool::size`, default 16) is handed every frame to the best-ranked `PoolCandidate`s around the one
+  entity carrying your focus marker, each light at the candidate's position plus its own world-space offset.
+  Everything else is a flame and nothing else. The assignment is deterministic: rank, then `Entity`.
+  A candidate is ranked by the **light it puts on the subject** (`intensity / distance²`), not by its
+  distance alone, so a bright brazier at 3 m outranks a dim torch at 2 m; `LightPool::rank` switches to
+  `Rank::Distance` for the old rule. A slot keeps the candidate it holds until a challenger is
+  `hysteresis` times better (default 1.15, the overlap rule, measured in the same quantity the rank uses),
+  and only a candidate **no other slot holds** is ever a challenger, so a newcomer displaces the pool's
+  *worst* light rather than reshuffling all of them. A slot that does change owner fades back up over
+  `fade_seconds` (0.35 s) rather than popping, and `reserve` (default 1) both keeps a spare light so the
+  owner a hand-off leaves behind fades *out* at the same time — the subject's light is continuous through
+  the change rather than dipping, which is the craft's "overlapping key lights" — and caps how many lights
+  change owner in one frame, so a hand-off is never made without a cross-fade to hide it.
 - **Shader flames** (`FlamePlugin`). An additive billboard fire (`src/flame.wesl`) is drawn on every
   `FlameSite`, out of one material and one draw per flame, with each fire's phase and height packed
   into its `MeshTag` so two fires never burn in step. One shared clock, written once a frame, on
@@ -52,15 +55,16 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
 - **Engine-free maths** (`bevy_lights::model`). Every curve the crate runs, as plain `f32` functions with
   no `bevy` in them, so a host can reuse them in its own systems: `flicker_factor` and
   `flicker_factor_of` with `flicker_rate`, `kindle_gain`, `raised_light`, `pack_flame_tag` and their
-  inverses; the pool's `hand_off` and its `fade_factor` / `fade_out_factor`; and the whole of
-  `model::cinematography` above. `tests/leaf.rs` keeps them engine-free.
+  inverses; the pool's `hand_off` and `preferred` (the overlap rule, on distances and on any "smaller is
+  better" quantity) with its `fade_factor` / `fade_out_factor`; and the whole of `model::cinematography`
+  above. `tests/leaf.rs` keeps them engine-free.
 
 ### What a host touches
 
 Everything public is `Reflect`, so a BRP front end can read and drive it. The components a game spawns or
 marks: `Flicker`, `Kindle`, `PoolCandidate`, `FlameSite`; the ones the crate spawns and a host reads or
 styles: `PoolLight` (recolour it for a palette; name its lights what you like), `Flame`; and the resources
-it sets: `LightPool` (size, reach, gain, hysteresis, fade, reserve, the slot light's template) and
+it sets: `LightPool` (size, reach, gain, rank, hysteresis, fade, reserve, the slot light's template) and
 `FlameLook` (colour, strength, the set-once `max_height`). `Kindled { entity }` is the message a host hears
 when a fire catches.
 
