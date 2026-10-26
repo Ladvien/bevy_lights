@@ -45,12 +45,26 @@ use bevy_lights::*;
 
 use common::{Draw, ExampleHarness, camera, camera_placement, seed};
 
+/// The moon's illuminance, in lux: a full moon overhead is about 0.25 lx, so 0.3 is a cool key you
+/// barely see and the braziers are the scene's only strong light. At `ev100` 3.0 a surface needs tens
+/// of lux to read; the moon (a design default) is there for the cool tint it gives the shadow side,
+/// not for the exposure.
+const NIGHT_MOON_LUX: f32 = 0.3;
 /// How many torch-bearers walk the courtyard.
 const BEARERS: usize = 48;
-/// A brazier's light, its range, and the height of its flame's foot over the box's top.
+/// A brazier's light and its range. The box is 0.7 m tall; its flame stands on the coals at the top,
+/// 0.9 m tall, and the light sits at the flame's centre (`BRAZIER_LIGHT`, metres over the ground), not
+/// at the rim: a light a hand's width over a box lights the ground around it from inside the box's
+/// own shadow, which reads as a dark square under every brazier.
 const BRAZIER_LUMENS: f32 = 60_000.0;
 const BRAZIER_RANGE: f32 = 12.0;
-const BRAZIER_FLAME: f32 = 0.9;
+const BRAZIER_TOP: f32 = 0.7;
+const BRAZIER_FLAME_HEIGHT: f32 = 0.9;
+const BRAZIER_LIGHT: f32 = BRAZIER_TOP + BRAZIER_FLAME_HEIGHT * 0.5;
+/// A fire's colour: a flame is warm, about 1900-2200 K, which is the warm half of the scene's
+/// warm-against-cool separation (the moon fill is the cool half). Design defaults.
+const BRAZIER_COLOUR: Color = Color::srgb(1.0, 0.60, 0.30);
+const TORCH_COLOUR: Color = Color::srgb(1.0, 0.70, 0.40);
 /// A carried torch's light and the height it sits over the bearer's feet.
 const TORCH_LUMENS: f32 = 8_000.0;
 const TORCH_LIFT: f32 = 1.8;
@@ -74,9 +88,11 @@ fn main() {
         .insert_resource(LightPool {
             size: std::env::var("LIGHTS_POOL").ok().and_then(|v| v.parse().ok()).unwrap_or(8),
             reach: 20.0,
-            light: PointLight { range: 8.0, intensity: 0.0, ..default() },
+            light: PointLight { color: TORCH_COLOUR, range: 8.0, intensity: 0.0, ..default() },
             ..default()
         })
+        // A cool near-black behind the courtyard's far edge, instead of the default flat grey.
+        .insert_resource(ClearColor(Color::srgb(0.010, 0.014, 0.034)))
         .insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 0.0, ..default() })
         .add_systems(Startup, (spawn_scene, spawn_camera).chain())
         .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers).chain())
@@ -129,11 +145,13 @@ fn spawn_scene(
     mut materials: ResMut<Assets<StandardMaterial>>,
 ) {
     let stone_material = materials.add(stone(Srgba::rgb(0.32, 0.30, 0.28)));
+    let bowl_material = materials.add(stone(Srgba::rgb(0.10, 0.09, 0.09)));
     let coal_material = materials.add(StandardMaterial {
         base_color: Srgba::rgb(0.14, 0.10, 0.09).into(),
-        emissive: LinearRgba::rgb(2.4, 0.55, 0.10),
+        emissive: LinearRgba::rgb(3.0, 0.6, 0.10),
         ..default()
     });
+    let coal_bed = meshes.add(Cuboid::new(0.66, 0.08, 0.66));
 
     // The ground: one plane, so the pool's falloff has somewhere to read.
     commands.spawn((
@@ -163,8 +181,9 @@ fn spawn_scene(
         Name::new("Moon"),
         DirectionalLight {
             color: Color::srgb(0.62, 0.72, 1.0),
-            illuminance: 300.0,
-            shadow_maps_enabled: true,
+            illuminance: NIGHT_MOON_LUX,
+            // 0.3 lx throws a shadow nobody can see, so it is not worth a shadow map.
+            shadow_maps_enabled: false,
             ..default()
         },
         Transform::from_rotation(Quat::from_euler(
@@ -182,14 +201,26 @@ fn spawn_scene(
             .spawn((
                 Name::new(format!("Brazier {index}")),
                 Brazier,
-                Mesh3d(meshes.add(Cuboid::new(0.8, 0.7, 0.8))),
-                MeshMaterial3d(coal_material.clone()),
-                Transform::from_translation(*at + Vec3::Y * 0.35),
+                Mesh3d(meshes.add(Cuboid::new(0.8, BRAZIER_TOP, 0.8))),
+                MeshMaterial3d(bowl_material.clone()),
+                // The coals sit in the bowl and the light is above them: the bowl does not shade its
+                // own fire. Cast, it throws a hard dark square across the ground around every brazier.
+                NotShadowCaster,
+                Transform::from_translation(*at + Vec3::Y * BRAZIER_TOP * 0.5),
             ))
             .with_children(|brazier| {
+                // The source the light is motivated by: a bed of glowing coals on the box's top.
+                brazier.spawn((
+                    Name::new("Coal bed"),
+                    Mesh3d(coal_bed.clone()),
+                    MeshMaterial3d(coal_material.clone()),
+                    Transform::from_xyz(0.0, BRAZIER_TOP * 0.5, 0.0),
+                    NotShadowCaster,
+                ));
                 brazier.spawn((
                     Name::new("Coals"),
                     PointLight {
+                        color: BRAZIER_COLOUR,
                         intensity: BRAZIER_LUMENS,
                         range: BRAZIER_RANGE,
                         shadow_maps_enabled: true,
@@ -197,12 +228,13 @@ fn spawn_scene(
                     },
                     Flicker { base: BRAZIER_LUMENS, phase },
                     Kindle::default(),
-                    Transform::from_xyz(0.0, BRAZIER_FLAME - 0.35, 0.0),
+                    Transform::from_xyz(0.0, BRAZIER_LIGHT - BRAZIER_TOP * 0.5, 0.0),
                 ));
                 brazier.spawn((
                     Name::new("Flame site"),
-                    FlameSite { height: 0.9, phase },
-                    Transform::from_xyz(0.0, BRAZIER_FLAME - 0.35, 0.0),
+                    FlameSite { height: BRAZIER_FLAME_HEIGHT, phase },
+                    // The flame's foot is on the coals, at the top of the box.
+                    Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04, 0.0),
                 ));
             });
     }
@@ -224,6 +256,8 @@ fn spawn_scene(
                 Name::new(format!("Bearer {index}")),
                 Bearer { centre, radius, rate, angle },
                 Transform::from_translation(centre + Vec3::new(radius, 0.85, 0.0)),
+                // The root of a hierarchy of meshes needs a `Visibility`, or Bevy warns (B0004).
+                Visibility::default(),
             ))
             .with_children(|bearer| {
                 bearer.spawn((
@@ -283,17 +317,18 @@ fn orbit_focus(time: Res<Time>, mut focus: Query<&mut Transform, With<Focus>>) {
 /// `K` re-lights every brazier: re-inserting [`Kindle::default()`] restarts the flare, and the
 /// message is written again.
 fn relight_braziers(
+    mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
     braziers: Query<&Children, With<Brazier>>,
-    mut lights: Query<&mut Kindle>,
+    lights: Query<(), With<Kindle>>,
 ) {
     if !keys.just_pressed(KeyCode::KeyK) {
         return;
     }
     for children in &braziers {
         for child in children.iter() {
-            if let Ok(mut kindle) = lights.get_mut(child) {
-                *kindle = Kindle::default();
+            if lights.contains(child) {
+                commands.entity(child).insert(Kindle::default());
             }
         }
     }
