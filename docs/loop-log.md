@@ -187,3 +187,149 @@ What adopting it showed, for the next iteration:
 - Hand-off popping: no consecutive-frame difference at a pool boundary has been looked at yet.
 - The flicker's rate against any source: the fire-physics papers are not in the corpus.
 - GPU cost of `FlameMaterial` (the bench is CPU only).
+
+## Iteration 1 — 2026-10-26 — the lighting look: a key, a fill, and a temperature
+
+### What changed, and why it ranked first
+
+The crate's three systems each did their job and the courtyard still was not a night. Measured on the
+baseline captures rather than guessed: the fire's *falloff* was already right (a clean inverse square,
+0.906 linear at the flame to 0.0069 six metres out), but the pools **blew out** (sRGB 255, 245, 232,
+four metres of ground above 200 DN), nothing in `src/` computed a **ratio** or a **colour
+temperature** (the fire was `srgb(1.0, 0.60, 0.30)`, the moon 0.3 lx, both picked by eye), and the
+stone had no **specular answer** (one roughness of 0.9 everywhere).
+
+This ranked first over the runner-up, a fire-size flicker parameter (backlog item 1 for two
+iterations), because the missing piece was not how one fire moves but what the scene *is*: a game
+developer adopts this crate for its night looking like a night, and no flicker rate fixes a brown wash.
+It also closes the ownership gap the user named: cinema and dramaturgical lighting, codified.
+
+### The sources
+
+Read live from home-still on 2026-10-26; all cited in `docs/research/lighting-look.md`.
+
+- **craft:** `10.4324_9781003671220` (Lazar, *Cinematography Beyond Technique*), `10.7456_tojdac.1674124`
+  (Doğaner, lighting as narrative), `10.2478_bsmr-2022-0020` (Huttunen, lighting the face),
+  `10.5897_jmcs2022.0788` (Vanden Bossche, low-key), `10.32657_10220_48312` (Doyle's cinematography),
+  `10.23856_6105` (*Harmony of light and shadow*, the softness table).
+- **production:** `s2007-advances-pdf-slides-2-8-mb` and `s2007-advances-course-notes-0-4-mb`
+  (Mitchell, Francke & Eng, TF2), `s2006-advances-full-course-notes-pdf` (the dark stormy city),
+  `s2011-advances-pdf-slides` (fire as hotness → blackbody).
+- **technical:** `PBR3_12_Light_Sources` (Planck, colour temperature), `book_real_time_rendering_4th_akenine`
+  (tone mapping, specular).
+
+### The model
+
+`src/model/cinematography.rs`, engine-free and re-exported flat:
+
+- `key_to_fill` / `stops` / `fill_for`, with `LOW_KEY` 8:1, `MOON_KEY` 4:1 and `HIGH_KEY` 2:1.
+- `fire_lumens(lux, reach, over)`: the inverse square solved for a point light (Bevy maps lumens to
+  Φ/4π candela), so a pool is given a size and a brightness and the lumens follow.
+- `blackbody_colour(kelvin, strength)`: Planck against the CIE 1931 observer to linear sRGB.
+- `white_balanced(kelvin, balance_kelvin, strength)`: the same as a camera balanced elsewhere records
+  it. This is what makes a fire orange and a sky blue from two temperatures and one balance.
+
+`examples/courtyard.rs` is the proof: every light's lumens, every colour, the moon's illuminance and
+the coal bed's emissive are derived from those numbers, and it prints the result. Its line:
+
+```
+look: fire 1900 K, sky 8000 K, balanced 2856 K, pool 1000 lx (edge 250) at 220697 lm (brazier, 4.0 m)
+and 15402 lm (torch, 2.0 m), moon 500.0 lx, key-to-fill 2.00:1 (1.00 stops), at the pool's edge 0.50:1
+```
+
+The numbers that went: 60 000 lm per brazier and 8 000 per torch (now derived: 220 697 and 15 402 lm
+from the pools they light), `srgb` triples for the fire and the sky (now temperatures), 0.3 lx for the
+moon (now `fill_for`), `ev100` 3.0 (now 6.0, computed from Bevy's `2^-ev100 / 1.2`), and a 0.66 m
+emissive coal slab under a 0.9 m flame (now 0.34 m under a 1.1 m flame).
+
+### The critique, and what it cost
+
+`/tmp/l1/critique.md`, written before the verdict. Five defects in my own work, in the order found:
+
+1. **The night went black.** Sizing the fire from its pool's *edge* and exposing as though that edge
+   were the key: the elevated frame's mean fell 72.3 → 27.6 DN. Fixed by computing the exposure from
+   Bevy's formula: at `ev100` 6.0 a 1000 lx pool on 0.3-albedo stone is linear 1.24, a 250 lx edge
+   0.31.
+2. **No cool side existed.** `blackbody_colour` clamps to gamut, and a 1900 K blackbody's blue is
+   *negative*; clamping before the white balance divided made the balance grey. Split into an
+   unclamped internal colour and a clamped public one; the balance divides first, clamps after.
+3. **The coal bed was a lightbox** — a slab nearly as wide as the flame was tall, emissive 3.0,
+   clipped to flat white. Now 0.34 m at 1.4.
+4. **A torch demanded 61 607 lm**, because it was sized like a brazier; now sized from its edge.
+5. **The flame clipped** at strength 1.0; now 0.82.
+6. **A raking fill made it worse.** Rotating the moon to rake across the figures turned the whole
+   frame into a warm wash (mean fell, figures at 3–9 DN against ground at 47–61). Reverted: a fill
+   fills. The separation is the two colours, not the fill's direction.
+7. **At 4:1 the courtyard was unreadable.** Figures between pools measured 12.6–31.9 DN against
+   moonlit ground at 76–83. Raised the target to `HIGH_KEY` (2:1, one stop) — the craft's own
+   high-key end, chosen for a *game's* reader rather than for a photograph. That is the single most
+   consequential number in this iteration, and it is a design default the owner can move back.
+
+### Verdict
+
+**GREAT** for the model and for the look. Every line of the note's "What great looks like" holds at
+full frame and at 4x, except the ground's specular answer, which is a material-and-art change and is
+iteration 2's. The frames were opened and judged here, not delegated.
+
+### The craft checklist, before and after
+
+| line | before | after |
+|---|---|---|
+| key-to-fill at a pool | no ratio existed; four 60 000 lm braziers, 12 m ranges, a 10 m courtyard: every warm surface lit by another fire | 2.00:1 at the pool's centre, 0.50:1 at its edge, printed by the demo |
+| falloff shape | inverse square already right (0.906 → 0.0069 over 6 m), but blown at the top | the same falloff, unblown: p99 245 → 211, clipped pixels 0.20 % |
+| motivated light | every pool had a bowl; the bowl was a lit box with no flame read | coal bed 0.34 m under a 1.1 m flame; every pool has a flame, every flame a pool |
+| warm/cool separation | pillar faces blue, everything else warm; the fill normalised to white | one balance (2856 K): fire orange, sky blue, shadows at 5–13 DN of blue |
+| silhouette and readability | figures 112 DN against ground at 104: no separation | figures 12–48 DN against ground at 76–83: a lit silhouette, not a hole |
+| specular highlights | none (roughness 0.9 everywhere) | graded highlights on pillar faces; no placed ground highlight yet |
+| flicker rate and amplitude | unchanged (not this iteration's system) | unchanged; the flame's colour now matches its light's temperature |
+| pool hand-off popping | not measured (backlog 2) | not measured |
+| flame size against reach | brazier 0.9 m flame, 12 m range: a candle lighting a hall | 1.1 m flame, 4 m pool; torch 0.35 m, 2 m pool |
+| bloom and clipping | pools at 255, 245, 232; 4 m of ground over 200 DN | 0.20 % clipped in the elevated frame, all in a flame core; 0.00 % at grazing |
+
+### The benchmark
+
+`cargo run --release --example bench_lights`, default sizes, same machine:
+
+| | before | after |
+|---|---|---|
+| mean_us | 629 | 205 |
+| p50_us | 403 | 202 |
+| min_us | 249 | 127 |
+
+No regression: the new module is pure maths called at startup by the example, and nothing in it runs a
+frame. (The before column is iteration 0's recorded baseline; the after figure is today's run on the
+same Mac.)
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (42 tests: 16 lib, 7 flicker, 3 leaf, 10 pool, 6
+doc), `cargo test --features serde`, `cargo build --examples --all-features`, `cargo clippy
+--all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+--all-features`, `cargo fmt --check`, `cargo build --lib --target wasm32-unknown-unknown`, and
+`tools/wesl-check` (the shader was not touched) all pass.
+
+Two doctests failed on the way and were fixed rather than deleted: both asserted the behaviour I had
+corrected in the code, so the documentation had gone stale in the same minutes.
+
+### Two things the crate got wrong that the example caught
+
+- **`blackbody_colour` clamped before normalising**, which is right for a displayable colour and wrong
+  for anything that divides by it. A public `blackbody_colour` and a private `blackbody_linear` is the
+  split; `white_balanced` uses the second.
+- **`fire_lumens`' doc example** asserted `candela / 16.0 == 12.0` for a ground-level 4 m pool, which
+  is only true for a surface square-on to the light. It is, at the pool's centre, so the doctest
+  stays — but the note says "square-on" now.
+
+### Top 5 remaining, ranked
+
+1. **A fire-size flicker parameter** (still backlog 1): a brazier and a candle flicker at one rate. The
+   fire-physics papers are still not in the corpus.
+2. **A placed specular highlight**: the one "what great looks like" line still at PARTLY. A tighter
+   roughness on some stone, or a wet-stone material, so each fire resolves a highlight inside its pool.
+3. **Pool hysteresis** (still backlog 2): a light handed between candidates pops; no consecutive-frame
+   difference has been measured at a boundary yet.
+4. **An `elements` feature** authoring the fill against `bevy_elements`' exposure, so a host in SI
+   metres does not carry `ev100` and lux separately.
+5. **A Kelvin range check on `blackbody_colour`'s gamut clamp**: the function is right, but a caller
+   asking for 1000 K gets a colour with no blue at all and no warning. A `FlameLook`/light colour that
+   saturates is a thing a host should be able to ask about.
