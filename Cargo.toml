@@ -11,8 +11,9 @@ documentation = "https://docs.rs/bevy_lights"
 readme = "README.md"
 keywords = ["bevy", "lighting", "fire", "gamedev", "rendering"]
 categories = ["game-development", "graphics", "rendering"]
-# Everything a consumer needs and nothing else. `docs/` is research notes and captures and never ships.
-include = ["src/**", "Cargo.toml", "README.md", "CHANGELOG.md", "LICENSE-*"]
+# Everything a consumer needs and nothing else. `docs/` is research notes and captures and never ships;
+# the patterns are anchored, because an unanchored `README.md` also matches `docs/research/README.md`.
+include = ["/src/**", "/Cargo.toml", "/README.md", "/CHANGELOG.md", "/LICENSE-*"]
 
 [features]
 default = []
