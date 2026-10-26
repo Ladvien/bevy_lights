@@ -36,7 +36,7 @@
 //!         // (`f = 1.5/√D` Hz, so 0.34 m is 2.6 Hz). Leave it `None` for the un-sized rate.
 //!         commands.spawn((PointLight { intensity: 60_000.0, range: 12.0, ..default() },
 //!             Flicker { base: 60_000.0, phase: 0.0, diameter: Some(0.34) }, Kindle::default(),
-//!             FlameSite { height: 0.9, phase: 0.0 }));
+//!             FlameSite { height: 0.9, phase: 0.0, kindle: 0.0 }));
 //!         commands.spawn((MyFocus, Transform::default()));
 //!         commands.spawn((PoolCandidate { offset: Vec3::Y * 1.8, intensity: 8_000.0 },
 //!             Transform::from_xyz(4.0, 0.0, 2.0)));
