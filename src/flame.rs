@@ -287,8 +287,10 @@ fn dress_flames(
 /// together and both hold still when the world is paused. That split is the crate's existing one —
 /// see `docs/research/fire-light.md` and `docs/research/flame-flicker.md`.
 ///
-/// The shared clock is one write a frame whatever the number of flames; a flame's brightness is one
-/// tag write per flame, and skipped entirely for a flame whose site has no `FlameSite` parent.
+/// The shared clock is one write a frame whatever the number of flames; a flame's brightness is a tag
+/// write only on the frames its quantised byte changes, and skipped entirely for a flame whose site has
+/// no `FlameSite` parent. `MeshTag` is in `bevy_pbr`'s `Changed<MeshTag>` re-extraction set, so a write
+/// past the change is a render-world re-extract for that flame.
 fn update_flames(
     real: Res<Time<Real>>,
     time: Res<Time>,
@@ -309,7 +311,15 @@ fn update_flames(
     for (mut flame, mut transform, mut tag, parent) in &mut flames {
         let site = sites.get(parent.parent()).ok();
         if let Some(site) = site {
-            tag.value = set_flame_brightness(tag.value, flicker_swing(site.diameter, t, site.phase));
+            // Only when the brightness byte actually changes: `MeshTag` is in `bevy_pbr`'s
+            // `Changed<MeshTag>` re-extraction set, so a write here costs a render-world re-extract for
+            // that flame. The byte holds 1/255 of the swing, so at 60 fps a 2.6 Hz fire skips some
+            // frames; a fire that never changes costs nothing at all.
+            let brightness = flicker_swing(site.diameter, t, site.phase);
+            let packed = set_flame_brightness(tag.value, brightness);
+            if packed != tag.value {
+                tag.value = packed;
+            }
         }
         if flame.kindled >= f32::MAX {
             continue;
