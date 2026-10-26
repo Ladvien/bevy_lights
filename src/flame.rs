@@ -21,7 +21,7 @@ use bevy::time::Real;
 
 use crate::LightsSystems;
 use crate::chain_sets;
-use crate::model::pack_flame_tag;
+use crate::model::{kindle_gain, pack_flame_tag};
 
 /// The flame shader, embedded in the binary by [`FlamePlugin`].
 const FLAME_SHADER_PATH: &str = "embedded://bevy_lights/flame.wesl";
@@ -121,13 +121,28 @@ pub struct FlameSite {
     /// The flame's clock phase, in radians: the same idea as [`Flicker::phase`](crate::Flicker), and
     /// usually the same number.
     pub phase: f32,
+    /// How long the flame takes to reach its full height after it is lit, in seconds: the same envelope
+    /// the fire's *light* uses ([`kindle_gain`](crate::kindle_gain)), so the flame and the light it
+    /// motivates catch together. `0.0` (the default) is a fire that has been burning all along and needs
+    /// no catch; a host lighting a fire sets it, usually to
+    /// [`KINDLE_SECONDS`](crate::KINDLE_SECONDS).
+    pub kindle: f32,
 }
 
 /// The drawn flame: the child mesh [`FlamePlugin`] spawns under each [`FlameSite`].
 ///
+/// Its `Transform` is the site's height scale times the fire's catch (a `FlameSite` with a
+/// [`kindle`](FlameSite::kindle) grows from nothing over that many seconds); the shader's own tip and
+/// noise animation is untouched by it.
+///
 /// Public so a host can find, count or recolour the flames it has; a host never spawns one itself.
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct Flame;
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq)]
+pub struct Flame {
+    /// Seconds since this flame's fire was lit, when the site asked for a catch. Counted on
+    /// `Time<Real>`, like the flame's own clock, so a paused world's flames still move — the catch is
+    /// part of the drawn fire, not of the light's.
+    pub kindled: f32,
+}
 
 /// How the scene's flames look: the fire colour every flame is tinted from, how strongly it adds,
 /// and the height scale a [`FlameSite`]'s height is measured against.
@@ -226,6 +241,7 @@ fn dress_flames(
     }
     let max_height = assets.max_height;
     for (site, flame) in &sites {
+        let catch = flame.kindle;
         let tag = MeshTag::new(pack_flame_tag(flame.phase, flame.height, max_height));
         let mesh = assets.mesh.clone();
         let material = assets.material.clone();
@@ -233,7 +249,7 @@ fn dress_flames(
             site.insert(Flamed).with_children(|parent| {
                 parent.spawn((
                     Name::new("Flame"),
-                    Flame,
+                    Flame { kindled: if catch > 0.0 { 0.0 } else { f32::MAX } },
                     tag,
                     Mesh3d(mesh),
                     MeshMaterial3d(material),
@@ -255,9 +271,31 @@ fn update_flames(
     look: Res<FlameLook>,
     assets: Res<FlameAssets>,
     mut materials: ResMut<Assets<FlameMaterial>>,
+    mut flames: Query<(&mut Flame, &mut Transform, &ChildOf)>,
+    sites: Query<&FlameSite>,
 ) {
     if !assets.built {
         return;
+    }
+    // The catch: a flame lit with its fire grows from nothing over the site's `kindle`, on the same
+    // `kindle_gain` curve the light uses, so the flame and the light it motivates catch together. A site
+    // with no kindle is left alone — a fire burning all along costs nothing here.
+    let dt = time.delta_secs();
+    for (mut flame, mut transform, parent) in &mut flames {
+        if flame.kindled >= f32::MAX {
+            continue;
+        }
+        flame.kindled = (flame.kindled + dt).min(f32::MAX);
+        let catch = sites.get(parent.parent()).map_or(0.0, |site| site.kindle);
+        let gain = if catch > 0.0 { kindle_gain(flame.kindled.min(catch)) } else { 1.0 };
+        // Width and height both: a fire that is catching is smaller in both, and a flame that grew tall
+        // while staying wide would read as a sheet. The shader's own animation is in the tag and is
+        // untouched.
+        transform.scale = Vec3::splat(gain.max(0.001));
+        if flame.kindled >= catch {
+            flame.kindled = f32::MAX;
+            transform.scale = Vec3::ONE;
+        }
     }
     let elapsed = time.elapsed_secs_wrapped();
     if let Some(mut made) = materials.get_mut(&assets.material) {
@@ -309,7 +347,10 @@ mod tests {
     #[test]
     fn every_site_gets_one_flame_and_a_second_frame_does_not_twin_it() {
         let mut app = dressing_app();
-        let site = app.world_mut().spawn((FlameSite { height: 0.9, phase: 0.4 }, Transform::default())).id();
+        let site = app
+            .world_mut()
+            .spawn((FlameSite { height: 0.9, phase: 0.4, kindle: 0.0 }, Transform::default()))
+            .id();
         app.update();
         let children = flame_children(&mut app);
         assert_eq!(children.len(), 1, "one flame");
@@ -321,7 +362,7 @@ mod tests {
     #[test]
     fn a_flames_tag_carries_its_sites_phase_and_height() {
         let mut app = dressing_app();
-        app.world_mut().spawn((FlameSite { height: 0.35, phase: 2.5 }, Transform::default()));
+        app.world_mut().spawn((FlameSite { height: 0.35, phase: 2.5, kindle: 0.0 }, Transform::default()));
         app.update();
         let max_height = app.world().resource::<FlameAssets>().max_height;
         let children = flame_children(&mut app);
@@ -351,5 +392,76 @@ mod tests {
         assert!((material.base.green - 0.9).abs() < 1e-6, "{:?}", material.base);
         assert!((material.base.alpha - 0.5).abs() < 1e-6, "{:?}", material.base);
         assert!((material.params.w - 0.5).abs() < 1e-6, "{:?}", material.params);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+mod kindle_tests {
+    use super::*;
+    use crate::KINDLE_SECONDS;
+    use bevy::time::TimeUpdateStrategy;
+
+    fn app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(Assets::<Mesh>::default())
+            .insert_resource(Assets::<FlameMaterial>::default())
+            .init_resource::<FlameLook>()
+            .init_resource::<FlameAssets>()
+            .insert_resource(TimeUpdateStrategy::ManualDuration(std::time::Duration::from_secs_f64(
+                1.0 / 60.0,
+            )));
+        app.add_systems(Startup, build_flame_assets)
+            .add_systems(Update, (dress_flames, update_flames).chain());
+        app.update();
+        app
+    }
+
+    fn scale_of(app: &mut App) -> f32 {
+        app.world_mut()
+            .query_filtered::<&Transform, With<Flame>>()
+            .iter(app.world())
+            .next()
+            .map(|transform| transform.scale.x)
+            .unwrap_or(f32::NAN)
+    }
+
+    #[test]
+    fn a_flame_lit_with_its_fire_grows_from_nothing_and_stops_at_full() {
+        // A site that asks for a catch grows over that many seconds, on the same envelope the light
+        // uses — so the flame and the light it motivates arrive together instead of the flame popping in
+        // whole a frame before the light has begun.
+        let mut app = app();
+        let site = FlameSite { height: 0.9, phase: 0.0, kindle: KINDLE_SECONDS };
+        app.world_mut().spawn((site, Transform::default()));
+        app.update();
+        // The first frame after the flame is dressed: it is barely there.
+        app.update();
+        let early = scale_of(&mut app);
+        assert!(early < 0.2, "a flame that has just caught is tiny: {early}");
+
+        // Halfway through the catch it is most of the way up, and by the end it is exactly full.
+        for _ in 0..((KINDLE_SECONDS / 2.0 * 60.0) as usize) {
+            app.update();
+        }
+        let middle = scale_of(&mut app);
+        assert!(middle > early && middle < 1.05, "the flame is still growing at half time: {middle}");
+        for _ in 0..((KINDLE_SECONDS * 60.0) as usize) {
+            app.update();
+        }
+        let settled = scale_of(&mut app);
+        assert!((settled - 1.0).abs() < 1e-5, "a caught flame is full size and stays there: {settled}");
+    }
+
+    #[test]
+    fn a_flame_that_has_been_burning_all_along_is_full_size_at_once() {
+        // The common case: a site with no kindle is untouched, so nothing changes for a fire that was
+        // already alight.
+        let mut app = app();
+        app.world_mut().spawn((FlameSite { height: 0.9, phase: 0.0, kindle: 0.0 }, Transform::default()));
+        app.update();
+        app.update();
+        assert_eq!(scale_of(&mut app), 1.0);
     }
 }

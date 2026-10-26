@@ -50,6 +50,21 @@ a frame's mean luminance cannot see a ±15 % flicker on four lights. If the two 
 check that the switch reached the process — a shell that passes `LIGHTS_UNSIZED=` on both sides
 captures the same thing twice.
 
+## Seeing a flame catch
+
+A fire that is being lit grows over `KINDLE_SECONDS` (0.6 s), light and flame together. The courtyard's
+braziers start with `Kindle::default()`, so its first half-second is the whole courtyard catching — which
+means the frames to look at are the first dozen, not the steady state:
+
+```sh
+LIGHTS_FRAMES=60 LIGHTS_SHOT_DIR=/tmp/kindle LIGHTS_SHOT_FROM=1 LIGHTS_SHOT_EVERY=1 \
+  ./target/release/examples/courtyard
+```
+
+Measured on those frames, the count of saturated flame pixels runs **0 → 4 430 → 15 145 → 19 891** at
+frames 5, 10, 20 and 40, then holds at about 19 000: the flame grows into its fire rather than appearing
+whole.
+
 ## The bench, and the host
 
 `cargo run --release --example bench_lights` is CPU-only, so it measures the host as much as the crate.

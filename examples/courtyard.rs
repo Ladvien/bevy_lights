@@ -375,7 +375,9 @@ fn spawn_scene(
                 ));
                 brazier.spawn((
                     Name::new("Flame site"),
-                    FlameSite { height: BRAZIER_FLAME_HEIGHT, phase },
+                    // The brazier's light is spawned with `Kindle::default()`, so its flame catches with it
+                    // over the same envelope: the fire grows rather than appearing whole.
+                    FlameSite { height: BRAZIER_FLAME_HEIGHT, phase, kindle: KINDLE_SECONDS },
                     // The flame's foot is on the coals, at the top of the box.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04, 0.0),
                 ));
@@ -425,7 +427,7 @@ fn spawn_scene(
                 ));
                 bearer.spawn((
                     Name::new("Torch flame"),
-                    FlameSite { height: 0.35, phase },
+                    FlameSite { height: 0.35, phase, kindle: 0.0 },
                     Transform::from_xyz(0.0, TORCH_LIFT - 0.85, 0.0),
                 ));
             });

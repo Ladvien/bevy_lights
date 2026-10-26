@@ -6,6 +6,12 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **A flame catches with its light.** `FlameSite::kindle` (seconds) makes a flame grow from nothing to
+  its full height and width over that time, on the same `kindle_gain` envelope the fire's *light* uses —
+  so a fire that is being lit arrives as one event instead of a full-size flame over a light still at
+  zero. `KINDLE_SECONDS` is the usual value; `0.0` (the default) is a fire that has been burning all
+  along and costs nothing.
+
 - **A cross-faded pool hand-off.** `LightPool::reserve` (default 1) holds lights the pool owns but never
   assigns; when a candidate leaves the pool, a reserve light takes its last position and intensity and
   fades out while the slot's new owner fades in, so the subject's light is continuous across the

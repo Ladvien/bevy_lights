@@ -35,7 +35,8 @@ lights placed over thousands of virtual ones, and billboard shader flames.
 - **Shader flames** (`FlamePlugin`). An additive billboard fire (`src/flame.wesl`) is drawn on every
   `FlameSite`, out of one material and one draw per flame, with each fire's phase and height packed
   into its `MeshTag` so two fires never burn in step. One shared clock, written once a frame, on
-  `Time<Real>` — a paused world's fires still move.
+  `Time<Real>` — a paused world's fires still move. A site with a `kindle` grows its flame from nothing
+  on the same curve its light kindles by, so the two arrive together.
 - **The lighting look** (`bevy_lights::model::cinematography`). The numbers a cinematographer sets,
   as plain functions: `key_to_fill` and `stops` (with `LOW_KEY` 8:1, `MOON_KEY` 4:1 and `HIGH_KEY`
   2:1), `fill_for`, `fire_lumens` (the lumens a pool of a given size and brightness needs),
