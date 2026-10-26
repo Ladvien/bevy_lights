@@ -20,10 +20,17 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 - **`model::tag::set_flame_brightness`**, a tag with only its brightness rewritten, so the per-frame
   write does not round-trip the height and phase through its quantisation.
 
+- **The flame's brightness is written only when its quantised byte moves.** `MeshTag` is in `bevy_pbr`'s
+  `Changed<MeshTag>` re-extraction set, so a write every frame re-extracts every flame from the render
+  world every frame. The byte holds 1/255 of the swing, so a 2.6 Hz fire skips some frames and a fire that
+  never changes costs nothing. `src/flame.rs` has a test on the change tick, which is what that set keys on.
+
 - **`PoolCandidate::phase` and `PoolCandidate::diameter`**, so a light the pool hands to a prop flickers on
   *that prop's* fire clock. The other half of the same defect: the 48 torch-bearers' pooled lights
   flickered at the slot's `1.3 · slot` while the flames drawn on them flickered at each torch's phase.
-  `None` on both is the old behaviour, so a host that models no per-prop fires is unchanged.
+  `None` on both is the old behaviour, so a host that models no per-prop fires is unchanged. The two are
+  resolved for the `pool.size` winners each frame, not carried through the rank list's sort: in the tuple
+  they cost 3.4 % of the pool's own frame (`pool_p50_us` 493 → 511) for a number only the winners read.
 
 - **`model::pool::preferred`**, the overlap rule on any "smaller is better" quantity: `true` when a
   challenger beats what is held by the `hysteresis` margin. `hand_off` is `preferred` on distances, and
