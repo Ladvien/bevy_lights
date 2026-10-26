@@ -24,7 +24,9 @@ lights placed over thousands of virtual ones, and billboard shader flames.
   (`LightPool::size`, default 16) is handed every frame to the `PoolCandidate`s nearest the one entity
   carrying your focus marker, each light at the candidate's position plus its own world-space offset.
   Everything else is a flame and nothing else. The assignment is deterministic: distance, then
-  `Entity`.
+  `Entity`. A slot keeps the candidate it holds until a challenger is `hysteresis` times nearer
+  (default 1.15, the overlap rule), and a slot that does change owner fades back up over
+  `fade_seconds` (0.35 s) rather than popping — so a light never teleports in brightness.
 - **Shader flames** (`FlamePlugin`). An additive billboard fire (`src/flame.wesl`) is drawn on every
   `FlameSite`, out of one material and one draw per flame, with each fire's phase and height packed
   into its `MeshTag` so two fires never burn in step. One shared clock, written once a frame, on

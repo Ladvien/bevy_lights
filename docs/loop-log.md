@@ -333,3 +333,118 @@ corrected in the code, so the documentation had gone stale in the same minutes.
 5. **A Kelvin range check on `blackbody_colour`'s gamut clamp**: the function is right, but a caller
    asking for 1000 K gets a colour with no blue at all and no warning. A `FlameLook`/light colour that
    saturates is a thing a host should be able to ask about.
+
+## Iteration 2 — 2026-10-26 — the pool's hand-off: an overlap rule and a fade
+
+### What changed, and why it ranked first
+
+A pool light that changes owner teleported: its position jumped from one prop to another and its
+intensity stepped. The craft checklist has had "pool hand-off popping" as an unmeasured line since
+iteration 0, and the pool note has carried it as a known defect. It ranks above the fire-size flicker
+(a beauty-and-plausibility item) because a **visible artifact** is category 1 and a teleporting light
+is the artifact this technique is famous for.
+
+### The sources
+
+Read live from home-still on 2026-10-26; all cited in `docs/research/pool-hand-off.md`.
+
+- **craft:** `10.58709_niujhu.v8i3.1694` (Bordwell & Thompson on overlapping keys: "By overlapping
+  different key lights, the filmmaker can maintain a constant intensity as actors move around the
+  set"), `10.4324_9781003671220` (motivated movement).
+- **production:** `s2025-advances-materials-9` (Stochastic tile-based lighting in HypeHype: the
+  pop-versus-noise trade), `s2020-advances-pdf-slides` (improved culling).
+- **technical:** `10.1109_tvcg.2019.2898741` (finite integration time and the Talbot-Plateau law),
+  `book_fundamentals_computer_graphics_marschner` ch. 22 (fusion at 60–80 Hz),
+  `book_level_of_detail_3d_graphics_luebke` ch. 9 (visual masking).
+
+### The model
+
+`src/model/pool.rs`, engine-free:
+
+- `hand_off(held_distance, challenger_distance, hysteresis)`: a challenger takes the light only when
+  `challenger · hysteresis < held` — the overlap rule as an algorithm. `hysteresis = 1.0` is
+  nearest-wins.
+- `fade_factor(since, fade_seconds)`: smoothstep from 0 to 1, exactly 1 after the fade.
+- `LightPool { hysteresis: HYSTERESIS (1.15), fade_seconds: FADE_SECONDS (0.35) }`, both public.
+- `assign_pool` holds each slot's candidate in one `Local<HandOffState>`, claims keeps in a first pass,
+  then fills the rest from the nearest unclaimed candidate and fades a slot that changed owner.
+
+### The bug the work exposed
+
+**The pool read `GlobalTransform`, which lags a frame.** `TransformPlugin` propagates in `PostUpdate`,
+so on the frame a host moves a prop the pool compared the *previous* frame's distance. With hysteresis
+that is worse than without it: the pool could hold a light on the position a prop had left. The pool
+now reads the candidate's own `Transform` when it has one and falls back to `GlobalTransform` for a
+child placed by its parent (a torch in a hand). This is the fix that made "a steady pool is steady"
+true; `a_steady_pool_keeps_its_candidates_and_its_brightness` is the test.
+
+### The critique, and what it cost
+
+`/tmp/l2/critique.md`, written before the verdict. Four of my own defects, and one gap in my own
+verification:
+
+1. **A slot's first light faded in**, so a pool filling for the first time flashed up from zero.
+2. **One-pass assignment let slots collide**: slot 0 saw slot 1's still-held candidate as free for
+   one frame, because slot 1 had not re-claimed it. Two passes now.
+3. **Every unheld slot took the single nearest candidate**, so three slots all reported the same
+   candidate in the first frame. The unclaimed-nearest rule fixed it and reproduces the old
+   "slot k takes candidate k" for an unfilled pool (its own test).
+4. **The pool's own total was not measured** — the craft checklist's line. Closed with a test that
+   sums the slots' bases and *bites*: `fade_seconds: 0.0` makes it fail at `200 -> 200`.
+
+Remaining, and deferred to iteration 3 (none a regression): the fade is a dip rather than a cross-fade
+(it needs a second light, which doubles the budget); a hand-off can still move a light a long way; and
+the rule compares distances only, never how much a light matters.
+
+### Verdict
+
+**GREAT.** The overlap rule does what the craft says (a 5 %-nearer challenger does not steal a light —
+verified by making the same test fail at `hysteresis: 1.0`; a challenger twice as near does), the fade
+removes 43 % of the worst frame pair's change in a 240-frame sequence, and a steady pool is
+frame-identical. Every line of the note's "What great looks like" holds.
+
+### The craft checklist, before and after
+
+| line | before | after |
+|---|---|---|
+| pool hand-off popping | unmeasured; the note called it a known defect | worst frame pair's change 0.697 → 0.524 (the worst pair 152: 0.697 → 0.394); 141 of 220 pairs smoother |
+| steady is steady | untested | `a_steady_pool_keeps_its_candidates_and_its_brightness`: five frames, identical slots, positions and bases |
+| the total holds | untested | a hand-off dips the pool's total by one light's share and it is whole again inside the fade; `fade_seconds: 0.0` fails the same test |
+| the nearest torch still wins | nearest wins outright | a challenger 2× nearer takes the light in one frame; a 5 %-nearer one does not |
+
+### The benchmark
+
+| | iteration 1 | iteration 2 |
+|---|---|---|
+| mean_us | 205 | 208 |
+| p50_us | 202 | 211 |
+| min_us | 127 | 135 |
+
+p50 moved +9 µs (+4 %) for the two passes and the hold map, at 5 000 candidates and 16 slots. That is
+0.13 % of a 60 Hz frame. The trade is logged, not hidden: it buys a light that does not teleport, and
+the pool is the one system this crate runs every frame.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (53 tests: 20 lib, 7 flicker, 3 leaf, 15 pool, 8
+doc), `cargo test --features serde`, `cargo build --examples --all-features`, `cargo clippy
+--all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt
+--check`, `cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+Clippy caught two real things on the way: `assign_pool` at nine arguments (the pool's three `Local`s
+became one `HandOffState`), and the candidate query's type (factored into `CandidateRead`).
+
+### Top 5 remaining, ranked
+
+1. **A fire-size flicker parameter** — still the top of this list after three iterations. A brazier and
+   a candle flicker at one rate; the fire-physics papers (Cetegen & Ahmed, Kitahata) are still not in
+   the corpus, and importing them is part of the item.
+2. **A cross-fade instead of a dip**: a hand-off that overlaps two lights for the fade's duration,
+   which needs a spare slot (the pool would hold `size + 1` lights) — the craft's "overlapping keys"
+   done literally.
+3. **A placed specular highlight** (iteration 1's open beauty line): stone that resolves a fire's
+   highlight inside its pool.
+4. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+5. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared
+   only by distance today, so the pool can hold the dim one. Whether that is right is a host's call;
+   a `weight` on `PoolCandidate` would let it say.
