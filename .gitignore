@@ -1,3 +1,5 @@
 /target
 Cargo.lock
 /frames/
+/target-base/
+/tools/wesl-check/target/
