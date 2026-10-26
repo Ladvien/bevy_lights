@@ -647,3 +647,35 @@ fn the_pools_default_rank_is_illuminance() {
         "a released crate's default is a behaviour a host relies on"
     );
 }
+
+#[test]
+fn one_new_candidate_displaces_one_light_and_no_more() {
+    // The artifact this test is for: every slot compared its held candidate against the *same* best
+    // free candidate, so one newcomer displaced all of them at once — the whole street's lights
+    // teleported, and a slot's fallback then took a candidate another slot was keeping, which left
+    // most slots dark for a frame and fading back in. A pool hands one light over, not eight.
+    let mut app = app(LightPool { size: 4, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    for x in 1..=4 {
+        candidate(&mut app, Vec3::new(x as f32, 0.0, 0.0), 10_000.0);
+    }
+    settle(&mut app);
+    let before = assigned(&mut app, 4);
+    assert_eq!(before.iter().filter(|(_, _, v, _)| *v == Visibility::Inherited).count(), 4);
+
+    // One far brighter source, far closer than the worst held candidate: it must take exactly one
+    // light, and the three others must not move or dim.
+    candidate(&mut app, Vec3::new(0.5, 0.0, 0.0), 90_000.0);
+    app.update();
+    let after = assigned(&mut app, 4);
+    let moved: Vec<_> = before
+        .iter()
+        .zip(after.iter())
+        .filter(|((_, at, _, _), (_, at2, _, _))| at != at2)
+        .map(|((slot, at, _, _), (_, at2, _, _))| (*slot, *at, *at2))
+        .collect();
+    assert_eq!(moved.len(), 1, "one hand-off, not a reshuffle: {moved:?}");
+    let full =
+        after.iter().filter(|(_, _, visibility, base)| *visibility == Visibility::Inherited && *base > 999.0);
+    assert_eq!(full.count(), 3, "the three untouched lights stayed at full brightness: {after:?}");
+}
