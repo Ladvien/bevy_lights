@@ -1409,3 +1409,148 @@ tree when the pass began, its content matches how the loop actually behaves, and
 rather than adopted: a tracked change this pass did not write is the driver's or a previous pass's to
 commit. Its guidance is right and was followed: the note was committed alone (`1db0af7`), then the
 implementation, then the docs and media, then this log.
+
+## Iteration 15 — 2026-10-26 — a drawn flame breathes with the light it motivates
+
+**This iteration was started by a pass that was killed before its benchmark, its gate, its log or its
+commit.** The driver had saved its tree as three `WIP(pass 11)` commits on `main`. This pass verified that
+work rather than starting a new item, because a finished-but-ungated iteration is worth more than a second
+half-idea: it re-read the diff, re-ran the gate from scratch, re-captured every angle from its own build,
+re-measured every number, and found two performance defects in the inherited code that the killed pass had
+no chance to measure. Both are fixed here (below). The research note was already committed alone
+(`d1e8128`), as the rule requires.
+
+### What changed, and why it ranked first
+
+Ranked first because it is the crate's central claim failing in the one place an audience can check by
+eye. A fire in this crate is a light (`Flicker`) and a drawing (`FlameSite`/`flame.wesl`), and until now
+they ran on **different clocks and different laws**: the light breathed at the puffing law's rate, and the
+flame's brightness did not breathe at all. Measured at the close camera over 70 steady frames, the flame's
+own pixels moved **2.4 %** while the ground under them moved **11.4 %**, correlating at **−0.003**. The
+flame is the *motivation* for the light; it was the only part of the fire holding still. The runner-up was
+the bright vertical column in the close camera (see the critique) — a scene bug, real but narrower, and it
+would have been a second improvement in one pass.
+
+What lands:
+
+- **`model::fire::flicker_swing`** — the one place the "sized or un-sized" choice is made, so the light and
+  the flame cannot drift apart: `flicker_lights` writes the light's intensity from it and `update_flames`
+  writes the flame's emission from it.
+- **`FlameSite::diameter`** — the fuel bed that sizes the flame's flicker, set to the same value as the
+  `Flicker::diameter` on the light it motivates.
+- **The flame's tag** gains a brightness byte: **height 16 | phase 8 | brightness 8** (was phase 16 |
+  height 16). The phase loses 8 bits to 2π/256 ≈ 0.025 rad, four milliseconds of clock at 6 Hz.
+- **Two clocks, deliberately split**: the silhouette's noise stays on `Time<Real>`, the brightness moves to
+  virtual `Time` with the light, so a paused world's fires hold still and the drawing on them keeps moving.
+- **`PoolCandidate::phase` / `diameter`** — the same two numbers for a prop whose light is handed to it, so
+  a light handed to a torch breathes on *that torch's* clock instead of the pool slot's `1.3 · slot`.
+
+### The two performance defects found in the inherited work, and fixed
+
+- **Every flame wrote its `MeshTag` every frame.** `MeshTag` is in `bevy_pbr`'s `Changed<MeshTag>`
+  re-extraction set (`bevy_pbr-0.20.0/src/render/mesh.rs:1967`), so a write past the change is a
+  render-world re-extract for that flame, every frame, for a byte that moves on roughly half of them. Now
+  written only when the quantised byte changes. `an_unchanged_brightness_leaves_the_tag_unwritten` in
+  `src/flame.rs` watches the **change tick** — the thing that set keys on — and fails on the old code.
+- **The two `Option<f32>` rode in every ranked candidate's tuple**, 5000 entries a frame carrying a number
+  that `pool.size` (16) of them read. Resolved for the winners instead, in a map built once per frame after
+  the assignment is decided. Measured: **+3.4 % of the pool's own frame before** (`pool_p50_us` 493 → 511
+  over five paired rounds), **gone after** (base 478–500 against after 468–489).
+
+### Sources
+
+- craft: `10.7456_tojdac.1674124` (Doğaner, *The narrational role of lighting design in The Lights of the
+  Dark City* — "the set light *mimics the candle*"), quoted in the note.
+- production: `s2011-advances-pdf-slides` (SIGGRAPH 2011 *Advances*, the Fire / Flamethrowers / Thrusters
+  talk — emission accumulated from the body that moves), and `s2008-advances-chapter-5` (StarCraft II,
+  Strugar — a flickering practical as a lighting case).
+- technical: `10.1017_jfm.2018.707` (Xia & Zhang, *A vortex-dynamical scaling theory for flickering buoyant
+  diffusion flames*), plus Cetegen & Ahmed 1993 and Chen/Roquemore through its references;
+  `10.1109_tvcg.2019.2898741` (Denes et al., critical flicker fusion — why a ±15 % swing fuses rather than
+  strobes); `book_real_time_rendering_4th_akenine` §6.3.
+- The note is `docs/research/flame-flicker.md`, committed alone before any code (`d1e8128`).
+
+### The critique, and the verdict
+
+Full critique: `/home/ladvien/l15/critique.md`. **GREAT.** Evidence: `/home/ladvien/l15/mine/` — `base/`
+built from a worktree at `5373cd9` in its own `CARGO_TARGET_DIR`, `final/` the shipped tree, both
+`LIGHTS_FRAMES=100` at the close camera, frames 0–29 dropped.
+
+| line, 70 steady frames | base | final |
+|---|---|---|
+| **flame region vs its pool, correlation** | **−0.003** | **+0.748** |
+| flame region peak-to-peak | 2.4 % | 9.1 % |
+| its pool's peak-to-peak (control, must not move) | 11.4 % | 11.4 % |
+| frame-to-frame flame step | max 0.51 DN | max 2.88 DN, 13 sign changes in 96 frames ≈ 2.5 Hz |
+| silhouette area sd while brightness moves | 665 px | **665 px** — shape untouched |
+| key-to-fill (brazier pool 87.1 DN vs far ground 40.6 DN) | — | 2.14 : 1, unchanged |
+| saturated pixels, all six angles | 0.00 % | 0.00 %; max DN 226.7 default, 249.7 topdown |
+| whole-frame diff at a matched frame | — | mean 0.292 DN; 18 301 px > 4 DN of 921 600, and **99.6 % of them warm (fire) pixels** |
+| red-channel clipping in the flame | 79.4 % of its pixels at R ≥ 254 | 46.6 % |
+
+Angles judged at full frame and zoom: default, ground, edge, elevated, topdown, grazing. The topdown is the
+strongest evidence for *motivated light* — four pools, four flames, no orphan glow — and the grazing frame
+shows no cut at any light's `range`.
+
+Flaws found and **not** fixed, ranked: (1) the bright vertical column above the near brazier, reproduced
+with `LIGHTS_POOL=0` and identical base vs final, so pre-existing and not the pool's; (2) a torch's flame at
+the close camera is a saturated shard, made *more* visible by the modulation it now has; (3) the brightness
+is a uniform multiplier, and the note asks the flame not pulse as a whole — measured core/rim 1.074 / 1.132,
+so the rim moves 5 % more than the core because the silhouette is independent, which is under the bar but
+not zero; (4) the pool's per-prop clock is proven by `tests/pool.rs` and not by a capture.
+
+### Benchmark
+
+`bench_lights` (5000 candidates, 2000 lights, pool 16), base and after binaries interleaved, five paired
+rounds, same host and load. Whole frame: base `p50` 671–686, after 703–734 — the after build carries the
+flame's work, which this example does not measure (it spawns no `FlameSite`), so read the per-system line.
+Per system: `pool_p50_us` **base 478–500, after 468–489**; `flicker_p50_us` base 240–267, after 242–265.
+CPU-only, so it says nothing about GPU cost — which is exactly what the `Changed<MeshTag>` fix above is
+for, and it cannot be measured here.
+
+### The gate
+
+On the final tree: `cargo build --release`, `cargo build`, `cargo test` (**72 tests + 13 doctests**),
+`cargo test --features serde`, `cargo build --examples --all-features`,
+`cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`, `cargo fmt --check`,
+`cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+`tests/readme.rs` passes, so the quick start still compiles.
+
+Two environment notes, recorded rather than assumed. `/tmp` was **100 % full (3.4 MB free)** at the start
+of the pass, the trap `docs/DEMOS.md` warns about — every build and capture here ran with
+`TMPDIR=/home/ladvien/tmp`. And one capture of a hundred frames panicked with its output swallowed by a
+`tail`; **twenty further runs with full logs showed no panic**, and the one run raced a `cargo build` that
+was rewriting the binary it had just started. Not claimed away: it is not reproducible on this tree.
+
+### Media
+
+`docs/media/showcase.gif` re-encoded from the new build (60 frames from 2 s, 30 fps, 480 px, **2.1 MB**),
+same caption and recipe. Its flicker was verified through the encode on single fire bodies, not on the
+frame: three separate fires peak at **2.25 Hz** against the law's 2.57, peak-to-peak 9–10 %.
+`docs/media/courtyard.gif` (58 frames, 30 fps, 640 px, 3.4 MB) and `docs/media/courtyard.png` regenerated
+at their recorded recipes.
+
+### Top 5 remaining, ranked
+
+1. **The bright vertical column above a brazier at the close camera.** Reproduced with the pool off, so it
+   is the scene: likely the ground's specular lobe plus the box's lit top face with `NotShadowCaster`. The
+   most visible artifact in the crate's own showcase camera.
+2. **A torch's flame saturates into a shard at close range** — the additive ramp against that exposure;
+   needs a ramp or strength that holds its silhouette at 5 m as well as at 15 m.
+3. **The flame's brightness is uniform over the whole flame.** The note's `## What great looks like` asks
+   for a fire that does not pulse as a whole; scaling core and rim differently wants a source, and none of
+   the three has one.
+4. **The flicker amplitude is still uncited** (Chamberlin & Rose 1928 is not open access; Maynard 2013
+   unobtainable). Unchanged for 14 iterations.
+5. **A `Rank::Weighted`** for a host that wants gameplay priority — a carried torch matters more than a
+   brazier — as a per-candidate multiplier on the rank key.
+
+### One tracked change this pass did not make
+
+`.omp/skills/bevy-lights-build-loop/SKILL.md` still carries an unstaged edit adding *"Your work is saved
+even if you are killed"*. It was in the working tree when this pass began (iteration 14 logged it too) and
+it is again **left uncommitted**: a tracked change this pass did not write is the driver's or its author's
+to commit. Its guidance is right and was followed — verify and finish the killed pass's work rather than
+beginning another, commit the research note alone, then the implementation, then docs and media, then this
+log.
