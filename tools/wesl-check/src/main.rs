@@ -105,13 +105,20 @@ fn stub_source(name: &str) -> String {
              }\n"
         }
         "bevy_pbr::render::mesh_functions" => {
+            // The instance's world matrix: not the identity, or a shader that reads a *scale* out of it would be
+            // checked against a matrix that has none — the same blind spot this tool was written to close, one
+            // level down. A non-uniform scale and a translation, so indexing the wrong column or the wrong
+            // component of the right one produces a wrong number here instead of passing.
             "fn get_world_from_local(instance_index: u32) -> mat4x4<f32> {\n\
-             \x20   var identity = mat4x4<f32>();\n\
-             \x20   identity[0][0] = 1.0;\n\
-             \x20   identity[1][1] = 1.0;\n\
-             \x20   identity[2][2] = 1.0;\n\
-             \x20   identity[3][3] = 1.0;\n\
-             \x20   return identity;\n\
+             \x20   var world = mat4x4<f32>();\n\
+             \x20   world[0][0] = 0.5;\n\
+             \x20   world[1][1] = 2.0;\n\
+             \x20   world[2][2] = 0.5;\n\
+             \x20   world[3][3] = 1.0;\n\
+             \x20   world[3][0] = 3.0;\n\
+             \x20   world[3][1] = 4.0;\n\
+             \x20   world[3][2] = 5.0;\n\
+             \x20   return world;\n\
              }\n\
              fn get_tag(instance_index: u32) -> u32 {\n\
              \x20   return 0u;\n\

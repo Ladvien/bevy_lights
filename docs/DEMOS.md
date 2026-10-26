@@ -50,6 +50,33 @@ a frame's mean luminance cannot see a ±15 % flicker on four lights. If the two 
 check that the switch reached the process — a shell that passes `LIGHTS_UNSIZED=` on both sides
 captures the same thing twice.
 
+## The README showcase
+
+`docs/media/showcase.gif` is the README's hero: two seconds, 30 fps, 480 px, ~2 MB. Its recipe, and the two
+things that made the first attempts look wrong:
+
+```sh
+# 1. Capture at 2 saved frames per simulated second => 30 fps of content (60 fps sim, EVERY=2).
+LIGHTS_FRAMES=260 LIGHTS_SHOT_DIR=/tmp/show LIGHTS_SHOT_FROM=9 LIGHTS_SHOT_EVERY=2 \
+LIGHTS_FOCUS_WALK=18 ./target/release/examples/courtyard
+# 2. Take the first 60 saved frames (2 s: the kindle, then the fires breathing) and encode at FPS=30.
+FPS=30 WIDTH=480 FONT=… BOLD=… tools/gif.sh /tmp/show/short docs/media/showcase.gif "…"
+```
+
+**Trap one: the encoder's frame rate must match the capture's.** `LIGHTS_SHOT_EVERY=N` saves one frame per
+N simulated frames, so the content is `60/N` fps. Encoding that at any other `FPS` time-warps it — the first
+attempt showed 24 fps of content at 48/2 and ran 1.2× fast, which made a 2.6 Hz flicker read as 3.1 Hz and
+had the user ask whether the *flicker* was wrong. It was the GIF.
+
+**Trap two: `dither=bayer` on a dark scene crawls.** A per-frame ordered dither pattern on a slow luminance
+gradient moves every frame, so it reads as noise laid over the flicker — the very thing the demo shows.
+`tools/gif.sh` now uses 256 colours with `dither=none`; it bands slightly and is stable, which is the right
+trade for this subject.
+
+**Verified:** one brazier's pool in the encoded GIF reads **2.50 Hz** against the law's 2.57, peak-to-peak
+74 % of its mean. Measure a *single* pool, not the frame: four pools at different phases cancel and the
+number reads 1.5 Hz whatever the truth is.
+
 ## Seeing a flame catch
 
 A fire that is being lit grows over `KINDLE_SECONDS` (0.6 s), light and flame together. The courtyard's

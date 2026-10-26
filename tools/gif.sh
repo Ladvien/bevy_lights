@@ -40,6 +40,11 @@ tmp=$(mktemp -d)
 trap 'rm -rf "$tmp"' EXIT
 
 # Two-pass palette: one palette for the whole clip, so colours do not shift frame to frame.
+#
+# **`dither=none`, 256 colours.** This clip's subject is a dark scene with slow luminance changes and a
+# 2.6 Hz flicker; `dither=bayer` puts a *per-frame* ordered pattern on those gradients, and the pattern
+# moves, so it reads as noise laid over the flicker and hides the thing the demo is showing. A 256-colour
+# palette without dithering banded slightly but was stable; 128 with bayer was unstable and busy.
 # `select` runs before `scale` so the dropped frames are never resized, and `setpts` re-times what is
 # left — without it ffmpeg keeps the original timestamps and the gap shows as a stutter.
 decimate=""
@@ -47,7 +52,7 @@ if [ "$STRIDE" -gt 1 ]; then
     decimate="select='not(mod(n\,${STRIDE}))',setpts=N/FRAME_RATE/TB,"
 fi
 ffmpeg -y -loglevel error -framerate "$FPS" -i "$FRAMES/frame%04d.png" \
-  -vf "${decimate}scale=${WIDTH}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=128[p];[b][p]paletteuse=dither=bayer:bayer_scale=3" \
+  -vf "${decimate}scale=${WIDTH}:-1:flags=lanczos,split[a][b];[a]palettegen=max_colors=256[p];[b][p]paletteuse=dither=none" \
   "$tmp/raw.gif"
 
 # Caption bottom-centre: the scene's own HUD occupies the top-left, and a caption there covers it.

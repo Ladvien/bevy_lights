@@ -59,8 +59,8 @@ pub struct FlameMaterial {
     #[uniform(0)]
     base: LinearRgba,
     /// `x` seconds (wrapped hourly), `y` the tag's height scale in world units ([`FlameLook::max_height`]),
-    /// `z` how far the scene's fires have caught (1 for a flame that took long ago; see
-    /// [`FlameSite::kindle`]), `w` the ember strength.
+    /// `z` unused (the per-flame catch is read from each flame's own instance scale, so one fire's catch
+    /// cannot tint another's), `w` the ember strength.
     #[uniform(0)]
     params: Vec4,
 }
@@ -282,11 +282,6 @@ fn update_flames(
     // `kindle_gain` curve the light uses, so the flame and the light it motivates catch together. A site
     // with no kindle is left alone — a fire burning all along costs nothing here.
     let dt = time.delta_secs();
-    // The scene's catch, for the shader's colour: the *youngest* fire in the frame decides, because a flame's
-    // colour is what the whole shared material carries. A fire still catching therefore tints every flame redder
-    // for those three tenths of a second, which is the honest reading of one shared material — and with the
-    // courtyard's braziers all lighting together it is exactly right.
-    let mut youngest = 1.0f32;
     for (mut flame, mut transform, parent) in &mut flames {
         if flame.kindled >= f32::MAX {
             continue;
@@ -294,9 +289,6 @@ fn update_flames(
         flame.kindled = (flame.kindled + dt).min(f32::MAX);
         let catch = sites.get(parent.parent()).map_or(0.0, |site| site.kindle);
         let gain = if catch > 0.0 { kindle_gain(flame.kindled.min(catch)) } else { 1.0 };
-        if catch > 0.0 {
-            youngest = youngest.min(gain);
-        }
         // Width and height both: a fire that is catching is smaller in both, and a flame that grew tall
         // while staying wide would read as a sheet. The shader's own animation is in the tag and is
         // untouched.
@@ -309,9 +301,6 @@ fn update_flames(
     let elapsed = time.elapsed_secs_wrapped();
     if let Some(mut made) = materials.get_mut(&assets.material) {
         made.params.x = elapsed;
-        // The scene's catch, for the shader's colour. One shared material means the youngest fire in the frame
-        // decides; a scene with nothing catching holds it at 1 and the shader's ramp is the steady one.
-        made.params.z = youngest;
         if look.is_changed() {
             // Rewritten in place: a `FlameLook` change is a colour or strength change, and rebuilding
             // the material would re-prepare every flame's pipeline for nothing.
@@ -501,41 +490,56 @@ mod catch_colour_tests {
         app
     }
 
-    fn uniform_z(app: &App) -> f32 {
-        let assets = app.world().resource::<FlameAssets>();
-        app.world()
-            .resource::<Assets<FlameMaterial>>()
-            .get(&assets.material)
-            .map(|material| material.params.z)
-            .unwrap_or(f32::NAN)
+    /// Each flame's instance scale: the number the shader reads as its own catch, because one shared
+    /// material cannot hold a per-flame value and the transform can.
+    fn scales(app: &mut App) -> Vec<f32> {
+        let mut found: Vec<f32> = app
+            .world_mut()
+            .query_filtered::<&Transform, With<Flame>>()
+            .iter(app.world())
+            .map(|transform| transform.scale.x)
+            .collect();
+        found.sort_by(|a, b| a.total_cmp(b));
+        found
     }
 
     #[test]
-    fn the_shader_is_told_when_a_fire_is_still_catching() {
-        // `params.z` is what the ramp uses to pull the flame redder while its fire catches: 0 at the start of the
-        // catch, 1 for a flame that took long ago. A scene with nothing catching must leave it at 1.
+    fn a_catching_flame_carries_its_own_progress_for_the_colour() {
+        // The flame's scale IS the colour's input: 0..1 while it catches, exactly 1 once it has taken.
         let mut app = app();
         app.world_mut()
             .spawn((FlameSite { height: 0.9, phase: 0.0, kindle: KINDLE_SECONDS }, Transform::default()));
         app.update();
         app.update();
-        let early = uniform_z(&app);
-        assert!(early < 0.2, "a catching fire tells the shader so: {early}");
+        let early = scales(&mut app)[0];
+        assert!(early < 0.2, "a catching flame reports a small catch: {early}");
 
         for _ in 0..((KINDLE_SECONDS * 60.0) as usize + 2) {
             app.update();
         }
-        let settled = uniform_z(&app);
-        assert!((settled - 1.0).abs() < 1e-4, "a fire that has taken leaves the steady ramp: {settled}");
+        let settled = scales(&mut app)[0];
+        assert!((settled - 1.0).abs() < 1e-5, "and exactly 1 once it has taken: {settled}");
     }
 
     #[test]
-    fn a_scene_with_no_catch_keeps_the_steady_ramp() {
+    fn one_fire_catching_does_not_tint_another() {
+        // The limit this iteration removed: with the catch in the shared uniform, the youngest fire in the frame
+        // tinted every flame in the world. Now a steady flame is skipped outright — `Flame::kindled` is `f32::MAX`
+        // and `update_flames` continues before it can touch the scale — so there is no shared number left for one
+        // fire's catch to reach another through. Note what this test can and cannot catch: the isolation holds
+        // *two* ways — the skip, and a site with `kindle: 0` giving a gain of exactly 1 — so it passes under
+        // either, and removing one of them does not fail it. It is here to pin the property, not to detect a
+        // regression in the loop's shape.
         let mut app = app();
-        app.world_mut().spawn((FlameSite { height: 0.9, phase: 0.0, kindle: 0.0 }, Transform::default()));
-        for _ in 0..5 {
-            app.update();
-        }
-        assert_eq!(uniform_z(&app), 1.0);
+        app.world_mut()
+            .spawn((FlameSite { height: 0.9, phase: 0.0, kindle: KINDLE_SECONDS }, Transform::default()));
+        app.world_mut()
+            .spawn((FlameSite { height: 0.9, phase: 1.3, kindle: 0.0 }, Transform::from_xyz(5.0, 0.0, 0.0)));
+        app.update();
+        app.update();
+        let catching = scales(&mut app);
+        assert_eq!(catching.len(), 2, "two flames: {catching:?}");
+        assert!(catching[0] < 0.2, "the catching one is small: {catching:?}");
+        assert!((catching[1] - 1.0).abs() < 1e-5, "the steady one is untouched: {catching:?}");
     }
 }
