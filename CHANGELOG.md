@@ -6,6 +6,11 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **A flame is redder while its fire catches.** The shader's ramp is pulled towards an ember red as a
+  fire kindles and released as it takes, so the catch reads as a young fire and not as a steady one
+  switching on. Driven by the same `kindle_gain` envelope as the light and the flame's growth, carried to
+  the shader in the material's spare uniform slot.
+
 - **A flame catches with its light.** `FlameSite::kindle` (seconds) makes a flame grow from nothing to
   its full height and width over that time, on the same `kindle_gain` envelope the fire's *light* uses —
   so a fire that is being lit arrives as one event instead of a full-size flame over a light still at

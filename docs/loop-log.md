@@ -966,3 +966,63 @@ wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
 5. **The flagstones cost 256 draw calls** — one mesh, one material each. A crate-scale scene wants an
    atlas or an instanced floor; the example is small enough not to care, and the number should be
    recorded next to the look it buys.
+
+## Iteration 9 — 2026-10-26 — the flame is redder while its fire catches
+
+### What changed, and why it ranked second
+
+The top item is still the uncited flicker amplitude (blocked). Second was the same ignition event's other
+half: iteration 7 made a catching flame *grow*, but its **colour** stayed the steady ramp from frame 1, so
+a fire in its first three tenths of a second showed the host fire-colour and yellow core of a fire that
+had been alight for hours. A young, small fire is redder — Planck's law, which the crate already cites in
+`lighting-look.md`.
+
+### The model
+
+The shader's ramp is pulled towards an ember red while the fire catches. `params.z` (the spare uniform
+slot) carries how far the scene's catch has run — 1 for a flame that took long ago — written once a frame
+from the *youngest* fire in the frame, and the fragment mixes `EMBER_RED * max(heat, 0.35)` towards the
+steady ramp by that number. One shared material means one number for the whole scene; the courtyard's
+four braziers light together, so it is exactly right there, and the note says so rather than implying it
+is per-flame.
+
+### The measurements
+
+The flame core's **blue** channel — the number that says "redder" — on the courtyard's catch:
+
+| frames | 15–17 (catching) | 27–35 (settled) |
+|---|---|---|
+| mean blue of the flame core | **34–42** | **65–69** |
+
+Roughly half: a catching fire is markedly redder, and by the end of `KINDLE_SECONDS` it is the steady
+flame. The signal the shader reads is pinned by `the_shader_is_told_when_a_fire_is_still_catching`
+(`params.z` < 0.2 mid-catch, exactly 1 after) and `a_scene_with_no_catch_keeps_the_steady_ramp`.
+
+### The trap the shader gate caught
+
+`catch` is a **reserved WGSL word**. `tools/wesl-check` refused it immediately — "use of a reserved
+word" — which is precisely the error `AGENTS.md` records as silent at build time and loud only in a
+capture. Renamed to `took`.
+
+I could not get a crop that showed the colour change legibly (the flames in the ground-level view are a
+few pixels tall and the region is crowded by pillars); the evidence is the core statistics above, which
+is the same measurement a crop would be eyeballing.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (69 tests), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
+wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+2. **A per-flame catch colour**: one shared material means the youngest fire tints them all. A per-instance
+   catch would ride in the `MeshTag`'s spare bits or a second instance attribute; the note records the
+   shared approximation as a known limit.
+3. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+4. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared only
+   by distance, so the pool can hold the dim one.
+5. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
+   an atlas.
