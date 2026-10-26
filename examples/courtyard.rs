@@ -123,6 +123,11 @@ fn lumens_for(pool: f32, over: f32) -> f32 {
     fire_lumens(POOL_LUX, pool, over)
 }
 
+/// A torch's light: the lumens for its pool, which is what a returning torch is given back.
+fn torch_intensity() -> f32 {
+    torch_lumens(TORCH_POOL, TORCH_LIFT - 0.85)
+}
+
 /// The lumens a **hand-held** fire needs: a torch's flame is a tenth of a brazier's coal bed, so its
 /// pool is sized from its edge ([`POOL_EDGE_LUX`]) rather than its centre. Its centre is then four
 /// times that, which at this exposure is bright but not a searchlight — asking for a brazier's centre
@@ -178,7 +183,7 @@ fn main() {
                 .ok()
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(FADE_SECONDS),
-            reach: 20.0,
+            reach: std::env::var("LIGHTS_REACH").ok().and_then(|v| v.parse().ok()).unwrap_or(20.0),
             light: PointLight {
                 color: fire_colour(),
                 // The same windowed falloff the fires have: the pool light is a torch's fire, one
@@ -411,10 +416,7 @@ fn spawn_scene(
                 // it is not. Both sit at the same lift, so the hand-off is invisible.
                 bearer.spawn((
                     Name::new("Torch light"),
-                    PoolCandidate {
-                        offset: Vec3::Y * TORCH_LIFT,
-                        intensity: torch_lumens(TORCH_POOL, TORCH_LIFT - 0.85),
-                    },
+                    PoolCandidate { offset: Vec3::Y * TORCH_LIFT, intensity: torch_intensity() },
                     Transform::from_xyz(0.0, TORCH_LIFT - 0.85, 0.0),
                 ));
                 bearer.spawn((
@@ -442,7 +444,7 @@ fn walk_bearers(time: Res<Time>, mut bearers: Query<(&mut Bearer, &mut Transform
     }
 }
 
-/// Orbits the focus at 6 m on a 20 s period.
+/// Orbits the focus at 6 m on a 20 s period./// Orbits the focus at 6 m on a 20 s period.
 fn orbit_focus(time: Res<Time>, mut focus: Query<&mut Transform, With<Focus>>) {
     let elapsed = time.elapsed_secs();
     let at = Vec3::new(6.0 * (elapsed * TAU / 20.0).cos(), 1.2, 6.0 * (elapsed * TAU / 20.0).sin());
@@ -494,7 +496,11 @@ at the pool's edge {:.2}:1",
 
 /// Prints one brazier light's intensity every 30 frames, so a capture's flicker can be read off the
 /// log rather than guessed at from a frame's mean.
-fn report_flicker(lights: Query<&PointLight, With<Flicker>>, mut frame: Local<u32>) {
+fn report_flicker(
+    lights: Query<&PointLight, With<Flicker>>,
+    candidates: Query<(), With<PoolCandidate>>,
+    mut frame: Local<u32>,
+) {
     *frame += 1;
     if !frame.is_multiple_of(30) {
         return;
@@ -504,7 +510,13 @@ fn report_flicker(lights: Query<&PointLight, With<Flicker>>, mut frame: Local<u3
     let total: f32 = lights.iter().map(|light| light.intensity).sum();
     let count = lights.iter().count();
     if let Some(light) = lights.iter().next() {
-        println!("flicker frame {}: {:.2} (pool total {:.0} over {count})", *frame, light.intensity, total);
+        println!(
+            "flicker frame {}: {:.2} (pool total {:.0} over {count}, candidates {})",
+            *frame,
+            light.intensity,
+            total,
+            candidates.iter().count()
+        );
     }
 }
 

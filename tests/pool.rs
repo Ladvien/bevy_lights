@@ -465,3 +465,77 @@ fn the_pool_forgets_a_candidate_that_has_gone() {
         "the survivors are lit: {remaining:?}"
     );
 }
+
+#[test]
+fn the_two_ends_of_a_cross_fade_keep_the_same_flicker() {
+    // A cross-fade's departing light must move exactly as the light that left did. If it keeps the
+    // reserve's own phase instead, the two ends beat against each other and their sum wobbles — which a
+    // test of the mean cannot see, because the means are equal. So this one compares the phases.
+    let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, reserve: 1, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let walker = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+
+    // Slot 0's own phase: the one the departing light must carry. (The reserve is slot 1, and its phase
+    // is its own — that is the bug this test is for.)
+    let phase_of = |app: &mut App, slot: usize| -> f32 {
+        app.world_mut()
+            .query_filtered::<(&PoolLight, &Flicker), ()>()
+            .iter(app.world())
+            .find(|(light, _)| light.slot == slot)
+            .map(|(_, flicker)| flicker.phase)
+            .unwrap_or(f32::NAN)
+    };
+    let held_phase = phase_of(&mut app, 0);
+    assert!(held_phase.is_finite(), "slot 0 exists");
+
+    // Displace the holder: the reserve fades it out, and it must be at slot 0's phase.
+    candidate(&mut app, Vec3::new(0.4, 0.0, 0.0), 100.0);
+    app.world_mut().entity_mut(walker).despawn();
+    app.update();
+
+    let reserve = app
+        .world_mut()
+        .query_filtered::<(&PoolLight, &Flicker), ()>()
+        .iter(app.world())
+        .find(|(light, _)| light.slot == 1)
+        .map(|(_, flicker)| (flicker.phase, flicker.base))
+        .unwrap_or((f32::NAN, 0.0));
+    assert!(reserve.1 > 0.0, "the reserve light is fading a departure out: {reserve:?}");
+    assert!(
+        (reserve.0 - held_phase).abs() < 1e-5,
+        "the departing light must keep the phase it had ({held_phase}), not the reserve's ({})",
+        reserve.0
+    );
+}
+
+#[test]
+fn a_departure_is_detected_at_all() {
+    let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, reserve: 1, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let walker = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    let reserve_before = app
+        .world_mut()
+        .query_filtered::<(&PoolLight, &Flicker), ()>()
+        .iter(app.world())
+        .find(|(light, _)| light.slot == 1)
+        .map(|(_, flicker)| flicker.base)
+        .unwrap_or(f32::NAN);
+    assert_eq!(reserve_before, 0.0, "the reserve is dark before the hand-off");
+
+    // The holder leaves, and no new candidate arrives: the slot goes empty.
+    app.world_mut().entity_mut(walker).despawn();
+    app.update();
+    let reserve_after = app
+        .world_mut()
+        .query_filtered::<(&PoolLight, &Flicker), ()>()
+        .iter(app.world())
+        .find(|(light, _)| light.slot == 1)
+        .map(|(_, flicker)| flicker.base)
+        .unwrap_or(f32::NAN);
+    assert!(
+        reserve_after > 0.0,
+        "a departure with no replacement must still fade out through the reserve: {reserve_after}"
+    );
+}
