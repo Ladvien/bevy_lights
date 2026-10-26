@@ -17,7 +17,8 @@ use bevy::light::PointLight;
 use bevy::prelude::*;
 
 use crate::flicker::{Flicker, FlickerPlugin};
-use crate::{LightsSystems, chain_sets};
+use crate::model::pool::{fade_factor, hand_off};
+use crate::{FADE_SECONDS, HYSTERESIS, LightsSystems, chain_sets};
 
 /// [`LightPoolPlugin`]: keeps [`LightPool::size`] real lights and hands them to the nearest
 /// [`PoolCandidate`]s.
@@ -92,6 +93,13 @@ pub struct LightPool {
     /// fire lights (a palette recolouring every light that carries its fire marker) keeps its tint
     /// through the night's glide, which writes `gain` every frame.
     pub light: PointLight,
+    /// How much nearer a challenger must be than the candidate a slot already holds before it takes
+    /// the light: `1.0` is nearest-wins, the default [`HYSTERESIS`] 1.15 needs a challenger about
+    /// 13 % closer. This is the overlap rule that stops two props trading a light every frame.
+    pub hysteresis: f32,
+    /// How long, in seconds, a light takes to come back to full brightness after it changes owner.
+    /// [`FADE_SECONDS`] by default; `0.0` snaps it back at once (the pre-fade behaviour).
+    pub fade_seconds: f32,
 }
 
 impl Default for LightPool {
@@ -101,6 +109,8 @@ impl Default for LightPool {
             reach: 60.0,
             gain: 1.0,
             light: PointLight { intensity: 0.0, range: 10.0, shadow_maps_enabled: false, ..default() },
+            hysteresis: HYSTERESIS,
+            fade_seconds: FADE_SECONDS,
         }
     }
 }
@@ -181,6 +191,38 @@ impl SlotLook {
 /// position and its intensity.
 type Assignment = (f32, Entity, Vec3, f32);
 
+/// What `assign_pool` reads of a candidate: its entity, its propagated position, its own `Transform`
+/// when it has one (the freshest truth in the frame the host moved it), whether it is hidden, and how
+/// it wants its light.
+type CandidateRead<'w, 's> = Query<
+    'w,
+    's,
+    (
+        Entity,
+        &'static GlobalTransform,
+        Option<&'static Transform>,
+        Option<&'static Visibility>,
+        &'static PoolCandidate,
+    ),
+    Without<PoolLight>,
+>;
+
+/// The pool's memory between frames: what each slot holds, how long since each slot last changed
+/// owner, and the look last copied onto the slots.
+///
+/// In one `Local` rather than three so `assign_pool` stays inside clippy's argument budget, and so a
+/// reader sees the whole of the pool's state in one place.
+#[derive(Default)]
+struct HandOffState {
+    /// The candidate each slot holds, by slot index.
+    held: std::collections::HashMap<usize, Entity>,
+    /// Seconds since each slot last changed owner. A slot that has never changed owner holds
+    /// [`f32::MAX`], so its fade is finished.
+    fade_at: std::collections::HashMap<usize, f32>,
+    /// The template's shared fields as they were last written onto the slots.
+    applied: Option<SlotLook>,
+}
+
 /// Spawns, resizes and assigns the pool's real lights.
 ///
 /// One frame, in order:
@@ -200,10 +242,13 @@ fn assign_pool<F: Component>(
     mut commands: Commands,
     pool: Res<LightPool>,
     focus: Query<&GlobalTransform, With<F>>,
-    candidates: Query<(Entity, &GlobalTransform, Option<&Visibility>, &PoolCandidate), Without<PoolLight>>,
+    candidates: CandidateRead,
     mut slots: Query<(Entity, &PoolLight, &mut Transform, &mut Visibility, &mut Flicker, &mut PointLight)>,
-    mut applied: Local<Option<SlotLook>>,
+    mut state: Local<HandOffState>,
+    time: Res<Time>,
 ) {
+    let delta = time.delta_secs();
+    let HandOffState { held, fade_at, applied } = &mut *state;
     let existing: Vec<(Entity, usize)> =
         slots.iter().map(|(entity, light, ..)| (entity, light.slot)).collect();
 
@@ -260,9 +305,12 @@ fn assign_pool<F: Component>(
         Some(focus_at) if pool.gain > 0.0 => candidates
             .iter()
             // Not `Visibility::Hidden`: a candidate with no `Visibility` at all is not hidden.
-            .filter(|(_, _, visibility, _)| !visibility.is_some_and(|v| *v == Visibility::Hidden))
-            .map(|(entity, at, _, candidate)| {
-                let position = at.translation();
+            .filter(|(.., visibility, _)| !visibility.is_some_and(|v| *v == Visibility::Hidden))
+            .map(|(entity, at, transform, _, candidate)| {
+                // The freshest position the frame has: a prop with its own `Transform` has just been
+                // moved by the host, and its `GlobalTransform` will not catch up until `PostUpdate`.
+                // A child (a torch in a hand) is placed by its parent, so it uses `GlobalTransform`.
+                let position = transform.map_or_else(|| at.translation(), |t| t.translation);
                 (
                     position.distance_squared(focus_at),
                     entity,
@@ -276,17 +324,85 @@ fn assign_pool<F: Component>(
     };
     lit.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.to_bits().cmp(&b.1.to_bits())));
 
-    // 4. Assign slot k to candidate k; hide the rest.
+    // 4. Hold or hand over. A slot keeps the candidate it held while that candidate is still a
+    //    candidate and no challenger is nearer by the hysteresis; a slot with nothing held takes the
+    //    nearest candidate no other slot holds, in slot order (so an unfilled pool reproduces
+    //    "slot k takes candidate k"). A slot that changes owner fades back up from nothing; a slot's
+    //    first light does not fade. The rule and the fade are in `model::pool`; the craft is in
+    //    `docs/research/pool-hand-off.md`.
+    // First pass: which slots keep what they hold. Nothing is decided against another slot's *old*
+    // owner, or slot 0 would see the candidate slot 1 still holds as free for one frame.
+    let mut keepers: Vec<usize> = Vec::new();
+    {
+        let order: Vec<(usize, Option<Entity>)> =
+            slots.iter().map(|(_, slot, ..)| (slot.slot, held.get(&slot.slot).copied())).collect();
+        let mut claimed: Vec<Entity> = Vec::new();
+        for (slot, holding) in &order {
+            let held_distance = holding.and_then(|entity| {
+                lit.iter().find(|(_, candidate, ..)| *candidate == entity).map(|(d, ..)| *d)
+            });
+            let nearest_free = lit
+                .iter()
+                .find(|(_, entity, ..)| !claimed.contains(entity) && Some(*entity) != *holding)
+                .map(|(distance, ..)| *distance);
+            let keep = match (holding, held_distance) {
+                (Some(entity), Some(distance)) => {
+                    (nearest_free == held_distance && !claimed.contains(entity))
+                        || !hand_off(distance, nearest_free.unwrap_or(f32::INFINITY), pool.hysteresis)
+                }
+                _ => false,
+            };
+            if keep && let Some(entity) = holding {
+                claimed.push(*entity);
+                keepers.push(*slot);
+            }
+        }
+    }
+
+    let mut taken: Vec<Entity> = Vec::with_capacity(lit.len());
     for (_, slot, mut transform, mut visibility, mut flicker, _) in &mut slots {
-        match lit.get(slot.slot) {
-            Some(&(_, _, at, intensity)) => {
+        let holding = held.get(&slot.slot).copied();
+        // The first pass already decided which slots keep their candidate.
+        let keep = keepers.contains(&slot.slot) && !taken.contains(&holding.unwrap_or(Entity::PLACEHOLDER));
+        let chosen = if keep {
+            holding
+        } else {
+            lit.iter().find(|(_, entity, ..)| !taken.contains(entity)).map(|(_, entity, ..)| *entity)
+        };
+        // A slot's first light is not a hand-off; only a change from one owner to another fades.
+        let changed = holding.is_some() && chosen != holding;
+
+        let age = fade_at.entry(slot.slot).or_insert(f32::MAX);
+        if changed {
+            *age = 0.0;
+        } else if holding.is_some() && chosen.is_some() {
+            *age += delta;
+        }
+        let fade =
+            if holding.is_none() && chosen.is_some() { 1.0 } else { fade_factor(*age, pool.fade_seconds) };
+
+        let assigned = chosen.and_then(|entity| {
+            lit.iter().find(|(_, candidate, ..)| *candidate == entity).map(|(_, _, at, i)| (*at, *i))
+        });
+        match assigned {
+            Some((at, intensity)) => {
                 transform.translation = at;
-                flicker.base = intensity * pool.gain;
+                flicker.base = intensity * pool.gain * fade;
                 visibility.set_if_neq(Visibility::Inherited);
             }
             None => {
                 flicker.base = 0.0;
                 visibility.set_if_neq(Visibility::Hidden);
+                *age = f32::MAX;
+            }
+        }
+        match chosen {
+            Some(entity) => {
+                held.insert(slot.slot, entity);
+                taken.push(entity);
+            }
+            None => {
+                held.remove(&slot.slot);
             }
         }
     }

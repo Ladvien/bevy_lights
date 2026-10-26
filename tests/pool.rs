@@ -257,3 +257,131 @@ fn two_slots_never_flicker_in_step() {
         assert!((phase - 1.3 * index as f32).abs() < 1e-5, "slot {index}'s phase is {phase}");
     }
 }
+
+// ---- The hand-off: a steady pool stays steady, and a light that changes owner fades in. ----
+
+/// Moves a candidate: its own `Transform`, which the pool reads the frame the host writes it.
+fn move_candidate(app: &mut App, entity: Entity, to: Vec3) {
+    app.world_mut().entity_mut(entity).insert(Transform::from_translation(to));
+}
+
+#[test]
+fn a_steady_pool_keeps_its_candidates_and_its_brightness() {
+    // The light a torch holds must not chatter: with nothing moving, two frames later each slot is on
+    // the same candidate at the same base.
+    let mut app = app(LightPool { size: 2, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let near = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    let far = candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    let first = slots(&mut app);
+    assert!((first[0].3 - 100.0).abs() < 1e-4, "slot 0 settled at {}", first[0].3);
+    for _ in 0..5 {
+        app.update();
+    }
+    let later = slots(&mut app);
+    assert_eq!(first, later, "a steady pool changed: {first:?} then {later:?}");
+    assert!((later[0].1.x - 1.0).abs() < 1e-5 && (later[1].1.x - 2.0).abs() < 1e-5);
+    assert!((later[0].3 - 100.0).abs() < 1e-4 && (later[1].3 - 100.0).abs() < 1e-4);
+    let _ = (near, far);
+}
+
+#[test]
+fn a_slot_that_changes_owner_fades_in_from_nothing() {
+    // Slot 0 holds the torch at 1 m. When that torch walks out to 9 m and another sits at 0.5 m, the
+    // slot takes the nearer one — and its light comes back over FADE_SECONDS rather than snapping.
+    let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let walker = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    let settled = slots(&mut app);
+    assert!((settled[0].1.x - 1.0).abs() < 1e-5, "slot 0 starts on the walker");
+    assert!((settled[0].3 - 100.0).abs() < 1e-4, "and at full brightness");
+
+    // A challenger much nearer, and the held one out of the way: this is a hand-off by any rule.
+    candidate(&mut app, Vec3::new(0.2, 0.0, 0.0), 100.0);
+    move_candidate(&mut app, walker, Vec3::new(9.0, 0.0, 0.0));
+    app.update();
+    let (_, at, _, base) = slots(&mut app)[0];
+    assert!((at.x - 0.2).abs() < 1e-5, "slot 0 moved to the challenger, at {at}");
+    assert!(base < 1.0, "the new light starts dark and fades in, not at 100: {base}");
+
+    // Within the fade it is back to full: 0.35 s is 21 frames at 60 Hz.
+    for _ in 0..24 {
+        app.update();
+    }
+    let (_, _, _, base) = slots(&mut app)[0];
+    assert!((base - 100.0).abs() < 1e-3, "the fade did not finish: {base}");
+}
+
+#[test]
+fn a_challenger_that_is_only_slightly_nearer_does_not_take_the_light() {
+    // The overlap rule: 1.15 hysteresis means a challenger must be ~13 % nearer. 1.0 m held against
+    // 0.95 m free is a challenge of 5 %, so the held torch keeps its light and nothing fades.
+    let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let held = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    let near_but_not_enough = candidate(&mut app, Vec3::new(0.95, 0.0, 0.0), 100.0);
+    app.update();
+    app.update();
+    let (_, at, _, base) = slots(&mut app)[0];
+    assert!((at.x - 1.0).abs() < 1e-5, "the held torch kept the light, slot at {at}");
+    assert!((base - 100.0).abs() < 1e-3, "and did not dim: {base}");
+
+    // Move the challenger clearly nearer and the light is handed over.
+    move_candidate(&mut app, near_but_not_enough, Vec3::new(0.5, 0.0, 0.0));
+    app.update();
+    let (_, at, _, base) = slots(&mut app)[0];
+    assert!((at.x - 0.5).abs() < 1e-5, "a challenger twice as near took the light, slot at {at}");
+    assert!(base < 100.0, "and the new owner faded in: {base}");
+    let _ = held;
+}
+
+#[test]
+fn a_held_candidate_that_goes_hands_the_light_on_at_once() {
+    // Despawned: there is no overlap to hold, so the slot takes the nearest survivor the same frame.
+    let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let held = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 100.0);
+    app.world_mut().entity_mut(held).despawn();
+    app.update();
+    let (_, at, _, base) = slots(&mut app)[0];
+    assert!((at.x - 2.0).abs() < 1e-5, "the survivor got the light, slot at {at}");
+    assert!(base < 1.0, "as a hand-off, so it fades in: {base}");
+}
+
+#[test]
+fn a_hand_off_costs_less_than_a_pop_and_recovers_within_the_fade() {
+    // The craft checklist's own line, isolated: the pool's total brightness across a hand-off. The
+    // slot keeps its intensity and gains a fade factor, so the total dips by that one light's share
+    // and is whole again by the end of the fade. A pop would keep the total and move the light.
+    let mut app = app(LightPool { size: 2, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let walker = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    candidate(&mut app, Vec3::new(1.5, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    let total = |app: &mut App| -> f32 { slots(app).iter().map(|(_, _, _, base)| base).sum() };
+
+    let settled = total(&mut app);
+    assert!((settled - 200.0).abs() < 1e-3, "both slots at full brightness: {settled}");
+
+    // The held torch walks away and a newcomer arrives much nearer: one slot changes owner.
+    move_candidate(&mut app, walker, Vec3::new(30.0, 0.0, 0.0));
+    candidate(&mut app, Vec3::new(0.2, 0.0, 0.0), 100.0);
+    app.update();
+    let after_pop = total(&mut app);
+    assert!(
+        after_pop >= settled - 100.0 && after_pop < settled - 1.0,
+        "the total dips by the one hand-off light and no more: {settled} -> {after_pop}"
+    );
+
+    // And it is whole again inside the fade.
+    for _ in 0..24 {
+        app.update();
+    }
+    let recovered = total(&mut app);
+    assert!((recovered - settled).abs() < 1e-2, "the total did not recover: {recovered} against {settled}");
+}
