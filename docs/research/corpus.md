@@ -155,3 +155,20 @@ Searched `Purkinje`, `scotopic`, `tone mapping`, `exposure`, `night vision`.
 
 A practical's flicker at 1-2 Hz is *well below* critical flicker fusion, which is why it reads as
 movement and not as a strobe — and why an amplitude above ~20 % starts to hurt.
+
+## Lighting look (added with `lighting-look.md`, 2026-10-26)
+
+Read live for iteration 1's note; all of these are in the library and indexed.
+
+| stem | what it is | use |
+|---|---|---|
+| `10.7456_tojdac.1674124` | Doğaner, the narrational role of lighting design in *The Lights of the Dark City* | motivated sources; hard vs soft as narrative |
+| `10.2478_bsmr-2022-0020` | Huttunen, ecological approach to cinematographic lighting of the face | light direction conventions; underlighting |
+| `10.32657_10220_48312` | Strategies of colour and lighting design in the cinematography of Christopher Doyle | chiaroscuro, chromatic zoning, specular placement |
+| `10.23856_6105` | *Harmony of light and shadow* | source size : distance softness table; inverse square |
+| `s2007-advances-course-notes-0-4-mb` | Mitchell, Francke & Eng 2007, TF2, the full course note | the cool-to-warm ramp and terminator reddening, quoted |
+| `s2006-advances-full-course-notes-pdf` | SIGGRAPH 2006 *Advances*, the dark stormy city | a night built from many apparent sources |
+| `s2011-advances-pdf-slides` | SIGGRAPH 2011 *Advances*, the fire talk | hotness → blackbody colour |
+| `PBR3_12_Light_Sources` | *Physically Based Rendering* 3rd ed., ch. 12 | blackbody, colour temperature, warm/cool bands |
+| `10.26503_dl.v2005i1.147` | *Shadowplay: simulated illumination in game worlds* | the game-side history of lighting as a read |
+| `10.1525_fq.2004.57.3.24` | *The emergence of filmic artifacts* | what a digital camera's night costs, for the exposure gap |
