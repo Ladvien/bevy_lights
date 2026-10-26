@@ -47,9 +47,20 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
   `blackbody_colour` (a light's colour from its temperature) and `white_balanced` (the same as a
   camera balanced elsewhere records it). Size a fire by the pool it lights and colour it by the
   temperature it burns at, instead of picking lumens and an RGB by eye.
-- **Engine-free maths** (`bevy_lights::model`). `flicker_factor`, `kindle_gain`, `raised_light`,
-  `pack_flame_tag` and their inverses, as plain `f32` functions with no `bevy` in them, so a host can
-  reuse them in its own systems.
+- **Engine-free maths** (`bevy_lights::model`). Every curve the crate runs, as plain `f32` functions with
+  no `bevy` in them, so a host can reuse them in its own systems: `flicker_factor` and
+  `flicker_factor_of` with `flicker_rate`, `kindle_gain`, `raised_light`, `pack_flame_tag` and their
+  inverses; the pool's `hand_off` and its `fade_factor` / `fade_out_factor`; and the whole of
+  `model::cinematography` above. `tests/leaf.rs` keeps them engine-free.
+
+### What a host touches
+
+Everything public is `Reflect`, so a BRP front end can read and drive it. The components a game spawns or
+marks: `Flicker`, `Kindle`, `PoolCandidate`, `FlameSite`; the ones the crate spawns and a host reads or
+styles: `PoolLight` (recolour it for a palette; name its lights what you like), `Flame`; and the resources
+it sets: `LightPool` (size, reach, gain, hysteresis, fade, reserve, the slot light's template) and
+`FlameLook` (colour, strength, the set-once `max_height`). `Kindled { entity }` is the message a host hears
+when a fire catches.
 
 ## Quick start
 
@@ -80,20 +91,26 @@ fn setup(mut commands: Commands) {
     let [r, g, b] = blackbody_colour(1900.0, 1.0);
     commands.spawn((
         PointLight { color: LinearRgba::rgb(r, g, b).into(), intensity: lumens, range: 10.0, ..default() },
-        Flicker { base: lumens, phase: 0.0 },
+        // `diameter` sizes the flicker by the fuel bed (`f = 1.5/√D` Hz); `None` uses the un-sized rate.
+        Flicker { base: lumens, phase: 0.0, diameter: Some(0.34) },
         Kindle::default(),
-        FlameSite { height: 1.1, phase: 0.0 },
+        // `kindle` grows the flame with its light, on the same 0.6 s envelope.
+        FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS },
     ));
 
     // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
     // hand-held flame is smaller, so its pool is sized from its edge.
     commands.spawn((
         PoolCandidate { offset: Vec3::Y * 1.8, intensity: fire_lumens(250.0, 2.0, 1.8) },
-        FlameSite { height: 0.35, phase: 1.9 },
+        FlameSite { height: 0.35, phase: 1.9, kindle: 0.0 },
         Transform::from_xyz(4.0, 0.0, 2.0),
     ));
 
     commands.spawn((MyFocus, Transform::default()));
+
+    // The fill: what the fires read against. The crate does not own the moon — a host adds the light and
+    // asks the crate for the illuminance that makes the ratio it wants.
+    commands.spawn(night_fill());
 }
 
 /// The night's fill: two stops under the fire. The crate does not own the moon, so the host adds it

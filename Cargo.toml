@@ -20,6 +20,9 @@ default = []
 # `serde` derives on every public component and resource, and Bevy's own `serialize` for `Color`,
 # `LinearRgba` and the light components those types are built from.
 serde = ["dep:serde", "bevy/serialize"]
+# Nothing enables this in normal use. `tests/readme.rs` turns it on for one `cargo build --example` to
+# compile the README's quick start, so a field added to a component cannot leave the README stale.
+readme-example = []
 
 [dependencies]
 # The engine, trimmed to the features the crate's code names. The list is the minimum for which
@@ -46,6 +49,14 @@ path = "examples/courtyard.rs"
 [[example]]
 name = "bench_lights"
 path = "examples/bench_lights.rs"
+
+# The README's quick start, compiled by `tests/readme.rs`. It is behind a feature nothing enables, so
+# `cargo build --examples` and the published package never see it; the test turns the feature on for one
+# `cargo build --example` call. `tests/readme.rs` writes the file from the README before that build.
+[[example]]
+name = "readme_quick_start"
+path = "examples/readme_quick_start.rs"
+required-features = ["readme-example"]
 
 [dev-dependencies]
 bevy = { version = "0.20.0" } # full umbrella, examples and tests only

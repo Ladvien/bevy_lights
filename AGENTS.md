@@ -143,6 +143,10 @@ is an art decision, so it needs the same treatment as a physics constant.
 - Do not hard-wrap markdown.
 - Close any Bevy app you launch.
 - Every dependency gets a GitHub link comment in `Cargo.toml` and a row in README's `Built on` table.
+- **The README's quick start is compiled by a test.** `tests/readme.rs` extracts the `## Quick start` block,
+  writes it to `examples/readme_quick_start.rs` (behind the `readme-example` feature, which nothing else
+  enables), formats it and builds it — so a field added to a component cannot leave the README stale. It did
+  once: `FlameSite::kindle` and `Flicker::diameter` were both missing from it for four iterations.
 - **The README is kept current with every commit, push and publish.** Its hero GIF
   (`docs/media/showcase.gif`) is how someone decides to try the crate: two seconds, 30 fps, under ~2 MB, and
   it must show the top features the crate actually has (the catch, the flicker at its own rate, a pool
