@@ -179,3 +179,29 @@ Read live for iteration 1's note; all of these are in the library and indexed.
 | `PBR3_12_Light_Sources` | *Physically Based Rendering* 3rd ed., ch. 12 | blackbody, colour temperature, warm/cool bands |
 | `10.26503_dl.v2005i1.147` | *Shadowplay: simulated illumination in game worlds* | the game-side history of lighting as a read |
 | `10.1525_fq.2004.57.3.24` | *The emergence of filmic artifacts* | what a digital camera's night costs, for the exposure gap |
+
+## Added by the 2026-10-26 re-scan (iteration 17)
+
+`catalog_recent` (200 rows) found these in the library; none was in the lists above. All are read
+live from the running index, not from memory.
+
+| stem | what it is | use |
+|---|---|---|
+| `10.1007_978-1-4842-4427-2` | *Ray Tracing Gems* (Haines & Akenine-Möller 2019), ch. 18 | many-light importance sampling; the solid-angle form of a light's falloff, `dω = (n·−l)/‖X−Y‖² dA` |
+| `PBR3_05_Color_and_Radiometry` | *Physically Based Rendering* 3rd ed., ch. 5 | irradiance `Φ/4πr²` and Lambert's law, stated from the source rather than remembered |
+| `10.13140_marples.nav.lighting.thesis` | Marples 2017, PhD thesis, *The influence of intrinsic perceptual cues on navigation and route selection in virtual environments* | **the shipping-game source for light as guidance**: flame motion as an attractor, Left 4 Dead's lit junctions, Alan Wake's carried torch |
+| `10.1109_cvpr52733.2024.00408` | *Holo-Relighting* (CVPR 2024) | volumetric portrait relighting from one image; an estimated environment, not a set practical |
+| `10.1109_tvcg.2012.112` | *Rich intrinsic image decomposition of outdoor scenes from multiple views* | separating illumination from albedo; what a bake throws away |
+| `10.24867_grid-2022-p95` | *The influence of the surrounding space on the lighting conditions in a photographic scene* | how a room's own surfaces change the light a source delivers |
+| `10.2507_daaam.scibook.2008.39` | *Influence of the lighting on the portrait photographs shot with the digital photography system* | the key's placement against the subject's axis, measured |
+| `10.24191_idealogy.v11i1.833` | *Identifying features in studio lighting tutorial videos for photography education* | how the craft is taught: source size, distance, angle as the three levers |
+| `10.1145_3386569.3392390` | *Portrait shadow manipulation* (SIGGRAPH 2020) | a shadow as a designed object, not a by-product |
+| `10.1145_3072959.3095816` | a SIGGRAPH 2017 paper (title not in the catalog) | unclassified; read before citing |
+| `10.1080_10509674.2013.782936` | a 2013 *Digital Creativity* paper (title not in the catalog) | unclassified; read before citing |
+| `10.1088_1755-1315_1099_1_012041` | *Light4Health eLearning course* | health research for interior lighting design: illuminance targets by task |
+| `10.1145_3386496` | *Real-time illumination and visual coherence for photorealistic AR/MR* | the lighting-coherence problem a practical has when it is composited |
+| `10.1007_s12144-023.04621-1`, `10.3389_fpsyg.2022.945669`, `10.48550_arxiv.2610.14334`, `10.48550_arxiv.2606.30317` | psychology and MCP-tooling papers | **not lighting**; listed so the next scan does not re-investigate them |
+| `10.55677_ijhrsss_15-2026-vol03i06` | *Prompted props, human pipelines* (Begemann & Hutson 2026) | AI-generated props for game environments; relevant to asset pipelines, not to a light's geometry |
+
+Two `EmbedSkip` rows in the scan (`10.5463_thesis.122`, `10.54612_a.3e1a1pjirr`) failed on
+`gpu busy: 1842 MB free < 5000 MB required`; both are unrelated to lighting.
