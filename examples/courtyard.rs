@@ -121,9 +121,10 @@ const BRAZIER_LIGHT: f32 = BRAZIER_TOP + BRAZIER_FLAME_HEIGHT * 0.5;
 const POOL_RANGE_MARGIN: f32 = 2.5;
 /// The bearer's own root: a 1.7 m capsule stands on the ground, so its centre is this high.
 const BEARER_LIFT: f32 = 0.85;
-/// Where the hand is, local to the bearer: out to its side and a little forward, so the fire does not
-/// stand inside the figure's own head.
-const TORCH_HAND: Vec3 = Vec3::new(0.30, 0.35, 0.12);
+/// Where the hand is, local to the bearer: out to its side and a little forward, so the fire clears the
+/// figure's own capsule. A bearer is a 0.30 m capsule, so a flame held at its axis would be drawn inside
+/// the body — the flame is a billboard whose widest point is a tenth of its height, and this clears it.
+const TORCH_HAND: Vec3 = Vec3::new(0.42, 0.35, 0.16);
 /// A carried torch's flame, and the bigger flame of a lantern.
 const TORCH_FLAME_HEIGHT: f32 = 0.35;
 const LANTERN_FLAME_HEIGHT: f32 = 0.5;
