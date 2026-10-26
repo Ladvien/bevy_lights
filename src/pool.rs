@@ -250,6 +250,13 @@ impl SlotLook {
 ///
 /// The key and the distance are separate because they are different questions: *which* lights should be
 /// real is about what arrives at the subject, while the overlap rule is about how far it has to travel.
+/// One ranked candidate: its sort key, its distance, its rank value, the entity, where its light goes, its
+/// intensity, and the prop's own fire clock (`Flicker::phase`, `Flicker::diameter`) when it has one.
+///
+/// The two `Option<f32>` are in the tuple, so a sort swap moves them: measured at **+9 % of the pool's
+/// own frame** on the 5000-candidate bench (`pool_p50_us` 503-555 → 560-592), which is 0.2 % of a 60 Hz
+/// frame. Keeping them in a side map instead was measured **far worse** (796-1111 µs) — 5000 hash
+/// inserts a frame cost more than the sort's extra bytes. Logged in `docs/loop-log.md`, iteration 15.
 type Assignment = (f32, f32, f32, Entity, Vec3, f32, Option<f32>, Option<f32>);
 
 /// What `assign_pool` reads of a candidate: its entity, its propagated position, its own `Transform`
