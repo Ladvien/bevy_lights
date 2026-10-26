@@ -1043,14 +1043,13 @@ scale from its own fire's `kindle_gain`. The shader now reads it there:
 `length(world_from_local[0].xyz)` in the vertex stage, passed flat, mixed into the ramp in the fragment.
 `params.z` returns to unused; one shared material can no longer carry one fire's state to another.
 
-### The tool had to be fixed first
+### The tool had to be fixed first — **wrong, corrected in iteration 12**
 
-The validator's stub of `get_world_from_local` returned the **identity**, so a shader reading a scale from
-it was checked against a matrix with no scale. That is the same blind spot `tools/wesl-check` exists to
-close, one level down — `AGENTS.md` already records the first one (Bevy imports reported "not checked").
-The stub now returns a non-uniform scale (0.5, 2.0, 0.5) with a translation, so indexing the wrong column
-or component gives a wrong number rather than passing. With the stub fixed, the real change is actually
-checked.
+I claimed the validator's `get_world_from_local` stub returning the **identity** was a blind spot that had
+to be fixed first. It was not. `tools/wesl-check` *compiles* each module and never runs it, so a stub's body
+is never evaluated and only its signature is checked: reverting the stub to the identity still passes, and a
+deliberate type error in the fragment still fails. The stub's richer body is documentation, not a check. The
+change to per-flame colour is still right; the reason I gave for touching the stub was not.
 
 ### A test that cannot bite, and says so
 
@@ -1101,9 +1100,8 @@ both say the README is checked before every push and the GIF re-encoded whenever
    by distance, so the pool can hold the dim one.
 4. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
    an atlas.
-5. **The validator's other stubs are still identities** — `position_world_to_clip` and `view` return
-   placeholder values, so a shader that misuses *those* is checked no further than its types. The same fix
-   as this iteration's, applied to the rest of the stub set.
+5. ~~The validator's other stubs are still identities.~~ **Struck in iteration 12:** stub bodies are never
+   run, so this was never a defect. Signatures and types are what the validator checks, and it does.
 
 ## Iteration 11 — 2026-10-26 — the README was broken, and cannot be again
 

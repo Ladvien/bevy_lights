@@ -183,11 +183,11 @@ stage takes `length(world_from_local[0].xyz)` (the instance's x scale), passes i
 mixes the ember in by it. The uniform's `params.z` goes back to unused, and one shared material can no
 longer carry one fire's state to another.
 
-**The tool had to be fixed first.** The shader's stub of `get_world_from_local` returned the **identity**,
-so a shader reading a scale out of it was checked against a matrix with no scale — the same blind spot
-`tools/wesl-check` was written to close, one level down (`AGENTS.md` records the first one). The stub now
-returns a non-uniform scale (0.5, 2.0, 0.5) with a translation, so indexing the wrong column or component
-gives a wrong number instead of passing.
+**A claim of mine that was wrong, corrected in iteration 12.** I said here that the stub of
+`get_world_from_local` returning the identity was a blind spot that had to be fixed first. It is not:
+`tools/wesl-check` **compiles** the module — it never runs it — so a stub's *body* is dead weight and only
+its signature is checked. Reverting the stub to the identity still passes, and a deliberate type error in
+the fragment still fails, which is the proof both ways. Stub bodies are documentation, not a check.
 
 **What the test can and cannot catch.** `one_fire_catching_does_not_tint_another` passes under both of the
 two ways the isolation holds — the `f32::MAX` skip and a `kindle: 0` site's gain of exactly 1 — and
