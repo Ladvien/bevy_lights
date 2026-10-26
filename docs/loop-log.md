@@ -1043,14 +1043,13 @@ scale from its own fire's `kindle_gain`. The shader now reads it there:
 `length(world_from_local[0].xyz)` in the vertex stage, passed flat, mixed into the ramp in the fragment.
 `params.z` returns to unused; one shared material can no longer carry one fire's state to another.
 
-### The tool had to be fixed first
+### The tool had to be fixed first — **wrong, corrected in iteration 12**
 
-The validator's stub of `get_world_from_local` returned the **identity**, so a shader reading a scale from
-it was checked against a matrix with no scale. That is the same blind spot `tools/wesl-check` exists to
-close, one level down — `AGENTS.md` already records the first one (Bevy imports reported "not checked").
-The stub now returns a non-uniform scale (0.5, 2.0, 0.5) with a translation, so indexing the wrong column
-or component gives a wrong number rather than passing. With the stub fixed, the real change is actually
-checked.
+I claimed the validator's `get_world_from_local` stub returning the **identity** was a blind spot that had
+to be fixed first. It was not. `tools/wesl-check` *compiles* each module and never runs it, so a stub's body
+is never evaluated and only its signature is checked: reverting the stub to the identity still passes, and a
+deliberate type error in the fragment still fails. The stub's richer body is documentation, not a check. The
+change to per-flame colour is still right; the reason I gave for touching the stub was not.
 
 ### A test that cannot bite, and says so
 
@@ -1101,9 +1100,8 @@ both say the README is checked before every push and the GIF re-encoded whenever
    by distance, so the pool can hold the dim one.
 4. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
    an atlas.
-5. **The validator's other stubs are still identities** — `position_world_to_clip` and `view` return
-   placeholder values, so a shader that misuses *those* is checked no further than its types. The same fix
-   as this iteration's, applied to the rest of the stub set.
+5. ~~The validator's other stubs are still identities.~~ **Struck in iteration 12:** stub bodies are never
+   run, so this was never a defect. Signatures and types are what the validator checks, and it does.
 
 ## Iteration 11 — 2026-10-26 — the README was broken, and cannot be again
 
@@ -1148,3 +1146,64 @@ wasm32-unknown-unknown`, `tools/wesl-check` — all pass. CI runs `cargo test`, 
    an atlas.
 5. **The validator's other stubs are still identities** — `position_world_to_clip` and `view` return
    placeholder values, so a shader that misuses *those* is checked no further than its types.
+
+## Iteration 12 — 2026-10-26 — a light's rank is its contribution, and a claim of mine was wrong
+
+### The correction first
+
+Backlog item 5 was "the validator's other stubs are still identities, so a shader misusing `view` or
+`position_world_to_clip` is only type-checked". Testing the premise killed it: `tools/wesl-check`
+**compiles** each module and never runs it, so a stub's *body* is never evaluated and only its signature is
+checked. Reverting iteration 10's `get_world_from_local` stub to the identity still passes, and a deliberate
+type error in the fragment still fails — proof both ways. So iteration 10's claim that the identity stub was
+a blind spot was **wrong**, the change it made to that stub changed nothing, and item 5 rested on the same
+mistake. Both records are corrected, and item 5 is struck in the backlog.
+
+### What was built instead
+
+The pool ranked candidates by **distance alone**, so a 2 m torch displaced a 3 m brazier burning 25× the
+lumens. That is the craft's "proximity to the subject" rule with half of it missing: what the eye reads is
+how much light *arrives*, which is output over the square of distance.
+
+`LightPool::rank` picks the rule: `Rank::Illuminance` (the new default, key `intensity / distance²`) or
+`Rank::Distance` (the old behaviour, kept so a host can switch it off). The rank key and the distance are
+carried separately in the assignment tuple, because they answer different questions: *which* lights should
+be real is about what arrives, while the overlap rule is about how far it has to travel.
+
+### The measurements
+
+- A torch at 2 m burning 8 000 lm against a brazier at 3 m burning 60 000 lm: `Illuminance` gives the light
+  to the **brazier**, `Distance` to the **torch**. The test pairs each rule with its answer, so it
+  validates both arms.
+- Four times the light at twice the distance ranks **equal**, and the tie breaks on `Entity` — the inverse
+  square, exactly, and the determinism that depends on it.
+- `gain` never reshuffles which lights are real: a quarter-gain night has the same slot in the same place at
+  a quarter the brightness.
+- `the_pools_default_rank_is_illuminance` pins the default, so changing it is a decision and not a slip;
+  with the default flipped to `Distance` that test fails.
+
+### The demo, and an honest limit
+
+The courtyard could not show the rule at all: every `PoolCandidate` is a torch at one intensity, and the two
+rules gave **bit-identical** frames. Rather than claim a demonstration, one bearer in six now carries a
+lantern — four times the lumens, a taller flame, the case the old rule got wrong. With that the rules give
+different frames (RMSE 2 %, mean 58.17 against 57.44), and the illuminance rule puts the real lights where
+the bright sources are.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (**74 tests**), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
+wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+2. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+3. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
+   an atlas.
+4. **The bench should report the pool's work**, not only the total: `Rank::Illuminance` adds a division per
+   candidate per frame, and the whole-frame p50 does not separate that from the flicker's cost.
+5. **A `Rank::Weighted`** for a host that wants gameplay priority (a carried torch matters more than a
+   brazier): the rank key would take a per-candidate multiplier.

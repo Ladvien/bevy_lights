@@ -28,7 +28,7 @@
 //!
 //! `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
 //! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`.
-//! `LIGHTS_REACH`, `LIGHTS_FOCUS_WALK` (the focus's orbit radius; past the pool's reach the torches
+//! `LIGHTS_RANK=distance` (rank by distance alone, the old rule), `LIGHTS_REACH`, `LIGHTS_FOCUS_WALK` (the focus's orbit radius; past the pool's reach the torches
 //! stream across the boundary, which is what makes a candidate leave the pool) and `LIGHTS_POOL_LOG`
 //! (the pool's total every frame, the only way to see a hand-off) are also this example's own.
 //!
@@ -177,6 +177,12 @@ fn main() {
         // shadow casters).
         .insert_resource(LightPool {
             size: std::env::var("LIGHTS_POOL").ok().and_then(|v| v.parse().ok()).unwrap_or(8),
+            // `LIGHTS_RANK=distance` ranks by distance alone, the rule before the pool weighed a light's
+            // output; the default ranks by the illuminance each candidate puts on the subject.
+            rank: match std::env::var("LIGHTS_RANK").ok().as_deref() {
+                Some("distance") => Rank::Distance,
+                _ => Rank::Illuminance,
+            },
             // `LIGHTS_RESERVE=0` makes a hand-off dip rather than cross-fade, which is the comparison.
             reserve: std::env::var("LIGHTS_RESERVE").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
             hysteresis: std::env::var("LIGHTS_HYSTERESIS")
@@ -447,6 +453,11 @@ fn spawn_scene(
         let angle = draw.range(0.0, TAU);
         let rate = draw.range(0.05, 0.16) * if index.is_multiple_of(2) { 1.0 } else { -1.0 };
         let phase = draw.range(0.0, TAU);
+        // One bearer in six carries a **lantern** rather than a torch: a bigger flame and four times the
+        // light. That is what makes the pool's ranking visible — the same distance, very different
+        // output — and it is the case the old distance-only rule got wrong.
+        let lantern = index % 6 == 0;
+        let burn = if lantern { 4.0 } else { 1.0 };
         commands
             .spawn((
                 Name::new(format!("Bearer {index}")),
@@ -473,12 +484,12 @@ fn spawn_scene(
                 // it is not. Both sit at the same lift, so the hand-off is invisible.
                 bearer.spawn((
                     Name::new("Torch light"),
-                    PoolCandidate { offset: Vec3::Y * TORCH_LIFT, intensity: torch_intensity() },
+                    PoolCandidate { offset: Vec3::Y * TORCH_LIFT, intensity: torch_intensity() * burn },
                     Transform::from_xyz(0.0, TORCH_LIFT - 0.85, 0.0),
                 ));
                 bearer.spawn((
                     Name::new("Torch flame"),
-                    FlameSite { height: 0.35, phase, kindle: 0.0 },
+                    FlameSite { height: if lantern { 0.5 } else { 0.35 }, phase, kindle: 0.0 },
                     Transform::from_xyz(0.0, TORCH_LIFT - 0.85, 0.0),
                 ));
             });

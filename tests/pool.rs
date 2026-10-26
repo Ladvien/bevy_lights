@@ -569,3 +569,81 @@ fn a_child_candidate_moves_with_its_parent() {
     let moved = assigned(&mut app, 1)[0].1;
     assert!((moved.x - 7.0).abs() < 1e-4, "the child's light followed its parent to {moved}");
 }
+
+#[test]
+fn a_brighter_light_outranks_a_nearer_dim_one() {
+    // The rule the pool used to have ranked by distance alone, so a torch two metres away took a real
+    // light from a brazier three metres away that puts 25 times the light on the subject. The rank is now
+    // the illuminance the candidate puts on the subject, `intensity / distance²`.
+    let torch_lumens = 8_000.0;
+    let brazier_lumens = 60_000.0;
+    for (rank, expected) in [(Rank::Illuminance, "brazier"), (Rank::Distance, "torch")] {
+        let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, rank, ..default() });
+        focus_at(&mut app, Vec3::ZERO);
+        let torch = candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), torch_lumens);
+        let brazier = candidate(&mut app, Vec3::new(3.0, 0.0, 0.0), brazier_lumens);
+        settle(&mut app);
+        let (_, at, _, base) = assigned(&mut app, 1)[0];
+        let wants = if expected == "brazier" { brazier_lumens } else { torch_lumens };
+        assert!(
+            (base - wants).abs() < 1e-3,
+            "{rank:?} should give the light to the {expected}: base {base} at {at}"
+        );
+        let _ = (torch, brazier);
+    }
+}
+
+#[test]
+fn four_times_the_light_at_twice_the_distance_ranks_equal_and_the_tie_breaks_on_entity() {
+    // The inverse square, exactly: `intensity / distance²` is equal for (1×, 1 m) and (4×, 2 m). The tie
+    // then falls to `Entity`, which is what keeps the assignment deterministic.
+    let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let close_dim = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 10_000.0);
+    let far_bright = candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 40_000.0);
+    settle(&mut app);
+    let (_, _, _, base) = assigned(&mut app, 1)[0];
+    let winner = if close_dim.to_bits() < far_bright.to_bits() { 10_000.0 } else { 40_000.0 };
+    assert!((base - winner).abs() < 1e-3, "the tie broke on Entity: base {base} wants {winner}");
+
+    // And the same scene assigns the same way on every frame.
+    let first = assigned(&mut app, 1);
+    for _ in 0..5 {
+        app.update();
+    }
+    assert_eq!(first, assigned(&mut app, 1), "a steady pool must not swap equidistant candidates");
+}
+
+#[test]
+fn gain_never_reshuffles_which_lights_are_real() {
+    // The night's dimmer multiplies what a slot writes, not which candidate it takes: a darker night has
+    // the same lights in the same places.
+    let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 8_000.0);
+    candidate(&mut app, Vec3::new(3.0, 0.0, 0.0), 60_000.0);
+    settle(&mut app);
+    let bright = assigned(&mut app, 1)[0];
+    app.world_mut().resource_mut::<LightPool>().gain = 0.25;
+    app.update();
+    let dim = assigned(&mut app, 1)[0];
+    assert_eq!(bright.1, dim.1, "the same slot, at the same place");
+    assert!(
+        (dim.3 - bright.3 * 0.25).abs() < 1e-2,
+        "and a quarter as bright: {} against {}",
+        dim.3,
+        bright.3
+    );
+}
+
+#[test]
+fn the_pools_default_rank_is_illuminance() {
+    // The test above pairs each rule with the answer it should give, which validates both arms but not
+    // which one a host gets by default. This one pins the default, so changing it is a decision rather
+    // than a slip.
+    assert_eq!(
+        LightPool::default().rank,
+        Rank::Illuminance,
+        "a released crate's default is a behaviour a host relies on"
+    );
+}
