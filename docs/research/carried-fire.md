@@ -87,7 +87,7 @@ technique is not used for.
 
 **What was built.** Three parts, one commit each:
 
-1. `model::flame::flame_light_offset(height)` — where a fire's light belongs, relative to a
+1. `model::reach::flame_light_offset(height)` — where a fire's light belongs, relative to a
    [`FlameSite`]'s own origin: `(0, height/2, 0)`. It is the flame billboard's own centre
    (`src/flame.wesl`'s vertex stage lifts the quad `size · 0.5` above the site's origin), so a light
    placed by it sits in the middle of the fire rather than at its foot or over the bearer's head. A plain
@@ -121,7 +121,7 @@ around it, and it is the one point that is inside the drawn fire at every `heigh
 
 ## Validation targets
 
-For `model::flame::flame_light_offset`:
+For `model::reach::flame_light_offset`:
 
 - `flame_light_offset(h).y` is exactly `h/2` for `h` in 0.05, 0.35, 0.5, 1.1, 4.0.
 - The offset's `x` and `z` are exactly zero: a fire's light is on its axis, so a host adds nothing else.

@@ -119,17 +119,29 @@ const BRAZIER_LIGHT: f32 = BRAZIER_TOP + BRAZIER_FLAME_HEIGHT * 0.5;
 /// How far past its pool a fire's light is still computed: the windowed inverse square has faded it
 /// out by here, so the falloff reads as a shoulder and never as a disc.
 const POOL_RANGE_MARGIN: f32 = 2.5;
-/// A carried torch's light sits this high over the bearer's feet.
-const TORCH_LIFT: f32 = 1.8;
+/// The bearer's own root: a 1.7 m capsule stands on the ground, so its centre is this high.
+const BEARER_LIFT: f32 = 0.85;
+/// Where the hand is, local to the bearer: out to its side and a little forward, so the fire does not
+/// stand inside the figure's own head.
+const TORCH_HAND: Vec3 = Vec3::new(0.30, 0.35, 0.12);
+/// A carried torch's flame, and the bigger flame of a lantern.
+const TORCH_FLAME_HEIGHT: f32 = 0.35;
+const LANTERN_FLAME_HEIGHT: f32 = 0.5;
+
+/// The world height of a carried fire's light over the ground: the hand's height plus the flame's own
+/// centre.
+///
+/// One number, used twice — the light is *placed* by it and the fire is *sized* by it — because those
+/// two drifting apart is a bug this example had: a torch sized for a light 0.95 m up and placed 1.8 m
+/// higher delivers 72 lx where it was sized for 250, since `E = Φ/4πr²` is measured from where the light
+/// actually is. `docs/research/carried-fire.md`.
+fn carried_light_height(flame_height: f32) -> f32 {
+    BEARER_LIFT + TORCH_HAND.y + flame_light_offset(flame_height)[1]
+}
 
 /// The lumens that put [`POOL_LUX`] on the ground `pool` metres out, `over` metres below the light.
 fn lumens_for(pool: f32, over: f32) -> f32 {
     fire_lumens(POOL_LUX, pool, over)
-}
-
-/// A torch's light: the lumens for its pool, which is what a returning torch is given back.
-fn torch_intensity() -> f32 {
-    torch_lumens(TORCH_POOL, TORCH_LIFT - 0.85)
 }
 
 /// The lumens a **hand-held** fire needs: a torch's flame is a tenth of a brazier's coal bed, so its
@@ -467,7 +479,7 @@ fn spawn_scene(
             .spawn((
                 Name::new(format!("Bearer {index}")),
                 Bearer { centre, radius, rate, angle },
-                Transform::from_translation(centre + Vec3::new(radius, 0.85, 0.0)),
+                Transform::from_translation(centre + Vec3::new(radius, BEARER_LIFT, 0.0)),
                 // The root of a hierarchy of meshes needs a `Visibility`, or Bevy warns (B0004).
                 Visibility::default(),
             ))
@@ -485,32 +497,28 @@ fn spawn_scene(
                     NotShadowCaster,
                     NotShadowReceiver,
                 ));
-                // The carried fire: a torch's light where a real light is handed out, a flame where
-                // it is not. Both sit at the same lift, so the hand-off is invisible.
+                // The carried fire: one entity, so the flame and the real light it is handed can never
+                // drift apart. The light sits at the flame's own centre
+                // (`flame_light_offset`), which is the only place a point light approximates a fire of
+                // this height without leaving the drawn flame — and the height the light is sized for is
+                // read off that same geometry, not typed a second time.
+                let flame_height = if lantern { LANTERN_FLAME_HEIGHT } else { TORCH_FLAME_HEIGHT };
+                let at = Vec3::new(TORCH_HAND.x, TORCH_HAND.y, TORCH_HAND.z);
                 bearer.spawn((
-                    Name::new("Torch light"),
+                    Name::new("Torch fire"),
                     PoolCandidate {
-                        offset: Vec3::Y * TORCH_LIFT,
-                        intensity: torch_intensity() * burn,
+                        offset: Vec3::from(flame_light_offset(flame_height)),
+                        intensity: torch_lumens(TORCH_POOL, carried_light_height(flame_height)) * burn,
                         // The handed-out light breathes on this torch's own clock, so it matches the
                         // flame drawn on it instead of the pool slot's phase.
                         phase: Some(phase),
                         diameter: None,
                     },
-                    Transform::from_xyz(0.0, TORCH_LIFT - 0.85, 0.0),
-                ));
-                bearer.spawn((
-                    Name::new("Torch flame"),
                     // The pool's lights flicker at the un-sized rate (`Flicker { diameter: None }` in
                     // `pool.rs`), so the torch's flame must too — the same value on both is what keeps the
                     // flame and its light one fire.
-                    FlameSite {
-                        height: if lantern { 0.5 } else { 0.35 },
-                        phase,
-                        kindle: 0.0,
-                        diameter: None,
-                    },
-                    Transform::from_xyz(0.0, TORCH_LIFT - 0.85, 0.0),
+                    FlameSite { height: flame_height, phase, kindle: 0.0, diameter: None },
+                    Transform::from_translation(at),
                 ));
             });
     }
@@ -524,7 +532,7 @@ fn walk_bearers(time: Res<Time>, mut bearers: Query<(&mut Bearer, &mut Transform
     for (mut bearer, mut transform) in &mut bearers {
         bearer.angle += bearer.rate * dt;
         let at = bearer.centre
-            + Vec3::new(bearer.radius * bearer.angle.cos(), 0.85, bearer.radius * bearer.angle.sin());
+            + Vec3::new(bearer.radius * bearer.angle.cos(), BEARER_LIFT, bearer.radius * bearer.angle.sin());
         transform.translation = at;
         // Facing along the circle: the capsule's forward is -Z, so the tangent is the heading.
         let heading = Vec3::new(-bearer.angle.sin(), 0.0, bearer.angle.cos()) * bearer.rate.signum();
@@ -578,7 +586,7 @@ fn report_look(fill: Res<NightFill>, mut said: Local<bool>) {
     }
     *said = true;
     let brazier_lumens = lumens_for(BRAZIER_POOL, BRAZIER_LIGHT);
-    let torch_fire = torch_lumens(TORCH_POOL, TORCH_LIFT - 0.85);
+    let torch_fire = torch_lumens(TORCH_POOL, carried_light_height(TORCH_FLAME_HEIGHT));
     println!(
         "look: fire {FIRE_KELVIN:.0} K, sky {SKY_KELVIN:.0} K, balanced {BALANCE_KELVIN:.0} K, \
 pool {POOL_LUX:.0} lx (edge {POOL_EDGE_LUX:.0}) at {brazier_lumens:.0} lm (brazier, {BRAZIER_POOL:.1} m) \

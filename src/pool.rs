@@ -172,6 +172,17 @@ pub struct PoolCandidate {
     /// Where the light goes, in **world** axes, relative to the candidate's own translation. It is
     /// not rotated with the candidate: a torch swung by a walking arm still lights upward from its
     /// head.
+    ///
+    /// A fire's light belongs at the middle of the flame drawn on it —
+    /// [`flame_light_offset`](crate::model::reach::flame_light_offset)`(height)` is that point, relative
+    /// to the `FlameSite`'s own origin — and a candidate spawned **on the `FlameSite` entity** therefore
+    /// needs no offset at all: its translation is already the flame's foot. A candidate on a *parent* of
+    /// the flame adds only the difference between the two positions.
+    ///
+    /// Adding the flame's height to a candidate that already sits at the flame puts the light above the
+    /// fire, where nothing visible emits it, and loses the sizing: a torch sized for 250 lx at 2 m
+    /// delivers 72 lx when its light ends up 1.8 m higher, because the illuminance is inverse-square in
+    /// the distance from where the light actually is. `docs/research/carried-fire.md` measures it.
     pub offset: Vec3,
     /// The light's intensity at [`LightPool::gain`] 1, in lumens.
     pub intensity: f32,

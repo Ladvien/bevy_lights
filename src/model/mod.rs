@@ -19,5 +19,5 @@ pub use fire::{
     kindle_gain,
 };
 pub use pool::{FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, hand_off, preferred};
-pub use reach::{RANGE_MARGIN, raised_light};
+pub use reach::{RANGE_MARGIN, flame_light_offset, raised_light};
 pub use tag::{pack_flame_tag, set_flame_brightness, unpack_flame_tag};
