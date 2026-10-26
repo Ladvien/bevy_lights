@@ -58,7 +58,9 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
 - **Engine-free maths** (`bevy_lights::model`). Every curve the crate runs, as plain `f32` functions with
   no `bevy` in them, so a host can reuse them in its own systems: `flicker_factor` and
   `flicker_factor_of` with `flicker_rate`, `flicker_swing` (the sized-or-un-sized choice the light and
-  the flame both read), `kindle_gain`, `raised_light`, `pack_flame_tag` and its inverse; the pool's
+  the flame both read), `kindle_gain`, `raised_light` and `flame_light_offset` (where a fire's light
+  belongs, so a flame and the real light it motivates cannot drift apart), `pack_flame_tag` and its
+  inverse; the pool's
   `hand_off` and `preferred` (the overlap rule, on distances and on any "smaller is
   better" quantity) with its `fade_factor` / `fade_out_factor`; and the whole of `model::cinematography`
   above. `tests/leaf.rs` keeps them engine-free.

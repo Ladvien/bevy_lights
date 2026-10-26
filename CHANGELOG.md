@@ -6,6 +6,28 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **`model::reach::flame_light_offset(height)`** — where a fire's own light belongs, relative to its
+  `FlameSite`'s origin: `(0, height/2, 0)`, the centre of the flame billboard `src/flame.wesl` draws. A
+  fire's flame and the real light it motivates are two entities, and a host that places them by different
+  numbers gets both defects at once: a light with no visible source, and an illuminance the sizing never
+  intended, since `E = Φ/4πr²` is measured from where the light actually is.
+  `docs/research/carried-fire.md` is the note, with the craft, production and radiometry sources.
+
+- **`PoolCandidate::offset` is documented against that helper.** A candidate spawned on the `FlameSite`
+  entity needs no offset at all; one on a *parent* adds only the difference. The wrong shape — the
+  flame's full height added to a candidate already at the flame — is named where a host will read it.
+
+### Fixed
+
+- **A carried fire's light now sits in its flame, and is sized for where it is.** `examples/courtyard`
+  put every handed-out torch pool light **1.80 m above the flame drawn on the torch** — a light with no
+  source, and one that delivered **72 lx** where its 15 402 lm were sized for **250 lx** at the pool's
+  edge (1.79 stops, a ratio of 0.289). Measured on the baseline, a lit bearer's own ground was *darker*
+  than open ground 10 m away (45.6 DN against 72.6 DN); it is now a torch pool (143.6 → 156.0 DN at the
+  brightest ground block under the figure). One entity holds the `FlameSite` and the `PoolCandidate`,
+  the offset is `flame_light_offset(height)`, and the lumens are sized from the same height the light is
+  placed at. The README quick start and the crate's doc example teach the same shape.
+
 - **A drawn flame breathes with the light it motivates.** `FlameSite::diameter` sizes the flame's own
   flicker through the same puffing law the light's uses, and `FlamePlugin` rewrites each flame's
   brightness every frame from **`model::fire::flicker_swing`** — the same function `flicker_lights` writes
