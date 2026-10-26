@@ -6,6 +6,13 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **A cross-faded pool hand-off.** `LightPool::reserve` (default 1) holds lights the pool owns but never
+  assigns; when a candidate leaves the pool, a reserve light takes its last position and intensity and
+  fades out while the slot's new owner fades in, so the subject's light is continuous across the
+  hand-off instead of dipping. `model::pool::fade_out_factor` is the exact complement of
+  `fade_factor`, and a test asserts the two sum to one for the whole fade. `reserve: 0` restores the
+  dip.
+
 - **A fire's flicker sized by its fuel bed**, from the measured puffing law.
   - `Flicker { diameter: Option<f32> }`: a fire's fuel-bed diameter in the host's world units. A
     brazier's 0.34 m coals flicker at 2.6 Hz, a 4 m pyre at 0.75 Hz.

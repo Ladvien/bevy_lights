@@ -28,7 +28,8 @@
 //!
 //! `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
 //! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`.
-//! Four are this example's own: `LIGHTS_HYSTERESIS` (the pool's overlap ratio, default 1.15),
+//! Five are this example's own: `LIGHTS_RESERVE` (reserve lights for a cross-faded hand-off, default
+//! 1; `0` dips instead), `LIGHTS_HYSTERESIS` (the pool's overlap ratio, default 1.15),
 //! `LIGHTS_FADE` (seconds a light takes to come back after a hand-off, default 0.35),
 //! `LIGHTS_BED` (the braziers' fuel-bed diameter in metres, default 0.34, which sizes their flicker
 //! through the puffing law) and `LIGHTS_UNSIZED=1` (ignore the bed and use the crate's inherited
@@ -167,6 +168,8 @@ fn main() {
         // shadow casters).
         .insert_resource(LightPool {
             size: std::env::var("LIGHTS_POOL").ok().and_then(|v| v.parse().ok()).unwrap_or(8),
+            // `LIGHTS_RESERVE=0` makes a hand-off dip rather than cross-fade, which is the comparison.
+            reserve: std::env::var("LIGHTS_RESERVE").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
             hysteresis: std::env::var("LIGHTS_HYSTERESIS")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -496,8 +499,12 @@ fn report_flicker(lights: Query<&PointLight, With<Flicker>>, mut frame: Local<u3
     if !frame.is_multiple_of(30) {
         return;
     }
+    // The pool's total, which is the number a cross-fade is meant to hold: the sum of every light the
+    // pool owns (its assigned slots and its reserve), across a hand-off.
+    let total: f32 = lights.iter().map(|light| light.intensity).sum();
+    let count = lights.iter().count();
     if let Some(light) = lights.iter().next() {
-        println!("flicker frame {}: {:.2}", *frame, light.intensity);
+        println!("flicker frame {}: {:.2} (pool total {:.0} over {count})", *frame, light.intensity, total);
     }
 }
 

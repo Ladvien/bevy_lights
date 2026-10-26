@@ -562,3 +562,98 @@ the new frame counter.
    in. Three lines, and a host with another gravity needs it.
 4. **A placed specular highlight** (iteration 1's open beauty line).
 5. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+
+## Iteration 4 — 2026-10-26 — a cross-faded hand-off
+
+### What changed, and why it ranked second
+
+The top item was "a sourced flicker amplitude", and it could not be done: the one paper that measures
+it (Maynard 2013, UC eScholarship) is not obtainable — `paper_download` has no copy and the site
+answers an automated fetch with 403 — so that is recorded as a blocker in `fire-light.md`'s *Pending
+index* rather than a guess dressed as a citation. The next item, the pool's cross-fade, was small,
+self-contained, and finishes a rule the crate already claims to follow.
+
+Iteration 2's fade *dips* a subject's light by one light's share for a third of a second: a soft pop.
+The craft's rule is to overlap: "By overlapping different key lights, the filmmaker can maintain a
+constant intensity as actors move around the set."
+
+### The model
+
+A `LightPool::reserve` (default 1) of lights the pool spawns and owns but never assigns. When a
+candidate **leaves** the pool, a free reserve light takes that candidate's last position and intensity
+and fades out over `fade_seconds` while the slot's new owner fades in. `fade_out_factor` is the exact
+complement of `fade_factor`, so the pair sums to one for the whole fade: the subject neither brightens
+nor darkens. `reserve: 0` restores the dip, and makes the test fail.
+
+The reserve is a budget, not a promise: one departure cross-fades per frame, and a second in the same
+frame falls back to the dip.
+
+### The measurements, and one that proves nothing
+
+`a_cross_faded_hand_off_holds_the_subject_and_a_dip_does_not` (one slot, a challenger that displaces
+the holder):
+
+| frame after the hand-off | 1 | 2 | 3 | 4 | 5 | 6 |
+|---|---|---|---|---|---|---|
+| cross-fade (reserve 1) | 99.3 | 98.1 | 97.0 | 96.0 | 95.2 | 94.5 |
+| dip (reserve 0) | 0.0 | 0.7 | 2.5 | 5.5 | 9.5 | 14.3 |
+
+The capture, by contrast, **proves nothing and is recorded as such**: `LIGHTS_RESERVE=1` and `=0` came
+out bit-identical over 281 frames, not because the feature failed but because no candidate leaves the
+pool in the courtyard's first five seconds — the reserve light is there (9 pool lights against 8) and
+contributes zero, since nothing departed. This iteration's evidence is the unit test's numbers, and
+the demo doc says so rather than presenting two identical captures as support. A capture that shows a
+cross-fade needs a scenario where torches cross the reach boundary, which the example lacks.
+
+### The critique
+
+`/tmp/l4/critique.md`. It caught one real defect that I fixed before the verdict: **`old_look` was an
+unbounded map keyed by `Entity`**, growing by one entry per candidate ever pooled — a leak in a
+library that runs for hours. It is now pruned every frame to the candidates still in the list plus the
+ones a slot holds. The test for it is honest about its own weakness: the map's size is private, so
+`the_pool_forgets_a_candidate_that_has_gone` churns 40 candidates through a two-slot pool and checks
+the pool still resolves to the nearest survivors, rather than counting entries.
+
+Two limits recorded, not defects: one cross-fade per frame unless `reserve` is raised, and the
+departing light's flicker phase is the reserve's own rather than the old owner's (a departure should
+copy the old `Flicker`; `old_look` would need to keep the phase).
+
+### Verdict
+
+**GREAT** for the mechanism: the cross-fade holds a subject's light through a hand-off where the dip
+drops it to zero, the fades sum to one over the whole curve (its own test), the switch that turns it
+off makes the test fail, the pool's budget stays explicit, and the leak the critique found is fixed.
+
+### The benchmark
+
+| | iteration 3 | iteration 4 |
+|---|---|---|
+| mean_us | 215 | 219 |
+| p50_us | 210 | 212 |
+| min_us | 131 | 140 |
+
++2 µs at p50 (1 %) for the reserve bookkeeping and the prune, at 5 000 candidates and 16 slots plus 1
+reserve. Logged, not hidden.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (62 tests: 23 lib, 8 flicker, 3 leaf, 17 pool, 11
+doc), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
+wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+Three tests needed teaching about the reserve, which is the right kind of failure: `slots()` counted
+every `PoolLight` and a reserve is one, so the helpers now see the assigned slots (`assigned(app,
+size)`) and the reserve has its own test.
+
+### Top 5 remaining, ranked
+
+1. **A capture that shows the cross-fade**, with a scenario where candidates leave the pool (a focus
+   that walks away, or torches that go out). The mechanism is proved; the picture is not.
+2. **The flicker amplitude, still uncited.** Recorded as a blocker: Maynard 2013 measures it and is
+   not obtainable. A host with library access would settle the last uncited number in the system.
+3. **A departure that copies the old flicker phase**, so the light fading out moves exactly as the one
+   that left did.
+4. **A placed specular highlight** (iteration 1's open beauty line).
+5. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.

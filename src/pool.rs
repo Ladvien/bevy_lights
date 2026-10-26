@@ -17,7 +17,7 @@ use bevy::light::PointLight;
 use bevy::prelude::*;
 
 use crate::flicker::{Flicker, FlickerPlugin};
-use crate::model::pool::{fade_factor, hand_off};
+use crate::model::pool::{fade_factor, fade_out_factor, hand_off};
 use crate::{FADE_SECONDS, HYSTERESIS, LightsSystems, chain_sets};
 
 /// [`LightPoolPlugin`]: keeps [`LightPool::size`] real lights and hands them to the nearest
@@ -100,6 +100,11 @@ pub struct LightPool {
     /// How long, in seconds, a light takes to come back to full brightness after it changes owner.
     /// [`FADE_SECONDS`] by default; `0.0` snaps it back at once (the pre-fade behaviour).
     pub fade_seconds: f32,
+    /// How many extra lights the pool keeps beyond the ones it assigns, so a hand-off can be a
+    /// **cross-fade**: the departing owner's light fades out while the arriving one fades in, and the
+    /// subject never brightens or darkens. One by default, which cross-fades one hand-off per frame;
+    /// `0` makes a hand-off dip rather than cross-fade (iteration 2's behaviour).
+    pub reserve: usize,
 }
 
 impl Default for LightPool {
@@ -111,6 +116,7 @@ impl Default for LightPool {
             light: PointLight { intensity: 0.0, range: 10.0, shadow_maps_enabled: false, ..default() },
             hysteresis: HYSTERESIS,
             fade_seconds: FADE_SECONDS,
+            reserve: 1,
         }
     }
 }
@@ -149,6 +155,9 @@ pub struct PoolCandidate {
 pub struct PoolLight {
     /// Which slot this light is, in `0..`[`LightPool::size`]: stable for the life of the pool, and
     /// the reason two slots never flicker in step (`phase = 1.3 · slot`).
+    ///
+    /// A **reserve** light (a cross-fade's departing owner) has a slot at or past [`LightPool::size`]:
+    /// it is never assigned a candidate, and it is on only while a hand-off is fading out.
     pub slot: usize,
 }
 
@@ -210,6 +219,9 @@ type CandidateRead<'w, 's> = Query<
 /// The pool's memory between frames: what each slot holds, how long since each slot last changed
 /// owner, and the look last copied onto the slots.
 ///
+/// `old_look` is pruned every frame to the candidates that still exist, so it does not grow with the
+/// number of candidates ever pooled.
+///
 /// In one `Local` rather than three so `assign_pool` stays inside clippy's argument budget, and so a
 /// reader sees the whole of the pool's state in one place.
 #[derive(Default)]
@@ -221,6 +233,11 @@ struct HandOffState {
     fade_at: std::collections::HashMap<usize, f32>,
     /// The template's shared fields as they were last written onto the slots.
     applied: Option<SlotLook>,
+    /// Where each candidate's light last stood, and how bright: a departing owner's position for a
+    /// cross-fade, which by the frame of the hand-off is no longer in the candidate list.
+    old_look: std::collections::HashMap<Entity, (Vec3, f32)>,
+    /// Which reserve light is fading out which departure, by slot index.
+    departure_release: std::collections::HashMap<usize, (Vec3, f32)>,
 }
 
 /// Spawns, resizes and assigns the pool's real lights.
@@ -248,12 +265,13 @@ fn assign_pool<F: Component>(
     time: Res<Time>,
 ) {
     let delta = time.delta_secs();
-    let HandOffState { held, fade_at, applied } = &mut *state;
+    let HandOffState { held, fade_at, applied, old_look, departure_release } = &mut *state;
     let existing: Vec<(Entity, usize)> =
         slots.iter().map(|(entity, light, ..)| (entity, light.slot)).collect();
 
-    // 1. Slots: one entity per slot, no more and no fewer.
-    for slot in 0..pool.size {
+    // 1. Slots: one entity per slot, plus the reserve lights, and no more and no fewer. A reserve's
+    //    slot index is `size..size + reserve`, which no candidate is ever assigned to.
+    for slot in 0..pool.size + pool.reserve {
         if !existing.iter().any(|(_, at)| *at == slot) {
             commands.spawn((
                 Name::new(format!("Pool light {slot}")),
@@ -266,7 +284,7 @@ fn assign_pool<F: Component>(
         }
     }
     for (entity, slot) in &existing {
-        if *slot >= pool.size {
+        if *slot >= pool.size + pool.reserve {
             commands.entity(*entity).despawn();
         }
     }
@@ -359,8 +377,57 @@ fn assign_pool<F: Component>(
         }
     }
 
+    // A cross-fade's departing light: where the old owner was, at its intensity. It is handed to a free
+    // reserve light *before* the slots are written, so the departing light is on in the frame the
+    // hand-off happens. One reserve light takes one departure per frame; a second departure in the same
+    // frame falls back to the dip, so the pool's budget is never exceeded.
+    let mut departure: Option<(Vec3, f32)> = None;
+    for (slot, holding) in held.iter() {
+        if *slot >= pool.size {
+            continue;
+        }
+        let entity = *holding;
+        let still_there = lit.iter().any(|(_, candidate, ..)| *candidate == entity);
+        if still_there {
+            continue;
+        }
+        // It was a candidate last frame and is not one now: if its slot takes a new owner this frame,
+        // the reserve fades the old one out.
+        if let Some((at, intensity)) = old_look.get(&entity).copied()
+            && departure.is_none()
+        {
+            departure = Some((at, intensity));
+        }
+    }
+    if let Some((at, intensity)) = departure {
+        let free = (pool.size..pool.size + pool.reserve).find(|slot| !departure_release.contains_key(slot));
+        if let Some(slot) = free {
+            departure_release.insert(slot, (at, intensity));
+            fade_at.insert(slot, 0.0);
+        }
+    }
+
     let mut taken: Vec<Entity> = Vec::with_capacity(lit.len());
     for (_, slot, mut transform, mut visibility, mut flicker, _) in &mut slots {
+        // A reserve light: it is not assigned a candidate, only used to fade a departure out.
+        if slot.slot >= pool.size {
+            let age = fade_at.entry(slot.slot).or_insert(f32::MAX);
+            *age += delta;
+            let out = fade_out_factor(*age, pool.fade_seconds);
+            let live = departure_release.get(&slot.slot).copied();
+            if out < 1.0
+                && let Some((at, intensity)) = live
+            {
+                transform.translation = at;
+                flicker.base = intensity * pool.gain * out;
+                visibility.set_if_neq(Visibility::Inherited);
+            } else {
+                flicker.base = 0.0;
+                visibility.set_if_neq(Visibility::Hidden);
+                departure_release.remove(&slot.slot);
+            }
+            continue;
+        }
         let holding = held.get(&slot.slot).copied();
         // The first pass already decided which slots keep their candidate.
         let keep = keepers.contains(&slot.slot) && !taken.contains(&holding.unwrap_or(Entity::PLACEHOLDER));
@@ -405,5 +472,15 @@ fn assign_pool<F: Component>(
                 held.remove(&slot.slot);
             }
         }
+        // Remember where this slot's light now is, so a departure next frame knows where to fade out.
+        if let Some((at, intensity)) = assigned {
+            old_look.insert(chosen.unwrap_or(Entity::PLACEHOLDER), (at, intensity));
+        }
     }
+    // Prune the remembered positions to what the pool can still need: the candidates in this frame's
+    // list and the ones a slot holds. Keyed by `Entity`, this map would otherwise grow by one entry for
+    // every candidate ever pooled, which is a leak in a library that runs for hours.
+    old_look.retain(|entity, _| {
+        lit.iter().any(|(_, candidate, ..)| candidate == entity) || held.values().any(|held| held == entity)
+    });
 }

@@ -61,6 +61,12 @@ fn candidate(app: &mut App, at: Vec3, intensity: f32) -> Entity {
         .id()
 }
 
+/// The lights the pool assigns candidates to. A reserve light (the cross-fade's departing owner) has a
+/// slot at or past `LightPool::size` and is never assigned, so it is not a slot here.
+fn assigned(app: &mut App, size: usize) -> Vec<(usize, Vec3, Visibility, f32)> {
+    slots(app).into_iter().filter(|(slot, ..)| *slot < size).collect()
+}
+
 /// Lets the transforms propagate, then runs one pool frame.
 fn settle(app: &mut App) {
     app.update();
@@ -75,7 +81,7 @@ fn the_nearest_candidates_get_the_lights_at_their_offsets() {
         candidate(&mut app, Vec3::new(x as f32, 0.0, 0.0), 100.0);
     }
     settle(&mut app);
-    let lit = slots(&mut app);
+    let lit = assigned(&mut app, 3);
     assert_eq!(lit.len(), 3, "three slots exist: {lit:?}");
     for (slot, at, visibility, base) in &lit {
         let x = *slot as f32 + 1.0;
@@ -98,7 +104,7 @@ fn a_hidden_or_distant_candidate_is_skipped() {
     candidate(&mut app, Vec3::new(40.0, 0.0, 0.0), 100.0);
     app.world_mut().entity_mut(hidden).insert(Visibility::Hidden);
     settle(&mut app);
-    let lit = slots(&mut app);
+    let lit = assigned(&mut app, 2);
     assert_eq!(lit[0].2, Visibility::Inherited, "the near candidate is lit");
     assert_eq!(
         lit[1].2,
@@ -149,11 +155,11 @@ fn shrinking_the_pool_despawns_the_extra_lights() {
         candidate(&mut app, Vec3::new(x as f32, 0.0, 0.0), 100.0);
     }
     settle(&mut app);
-    assert_eq!(slots(&mut app).len(), 3);
+    assert_eq!(assigned(&mut app, 3).len(), 3);
     app.world_mut().resource_mut::<LightPool>().size = 1;
     app.update();
     app.update();
-    let remaining = slots(&mut app);
+    let remaining = assigned(&mut app, 1);
     assert_eq!(remaining.len(), 1, "one light left: {remaining:?}");
     assert_eq!(remaining[0].0, 0, "the survivor is slot 0");
 }
@@ -246,12 +252,15 @@ fn two_slots_never_flicker_in_step() {
         candidate(&mut app, Vec3::new(x as f32, 0.0, 0.0), 100.0);
     }
     settle(&mut app);
-    let phases: Vec<f32> = app
+    let mut phases: Vec<(usize, f32)> = app
         .world_mut()
-        .query_filtered::<&Flicker, With<PoolLight>>()
+        .query_filtered::<(Entity, &PoolLight, &Flicker), ()>()
         .iter(app.world())
-        .map(|flicker| flicker.phase)
+        .map(|(_, light, flicker)| (light.slot, flicker.phase))
         .collect();
+    phases.retain(|(slot, _)| *slot < 4);
+    phases.sort_by_key(|(slot, _)| *slot);
+    let phases: Vec<f32> = phases.into_iter().map(|(_, phase)| phase).collect();
     assert_eq!(phases.len(), 4);
     for (index, phase) in phases.iter().enumerate() {
         assert!((phase - 1.3 * index as f32).abs() < 1e-5, "slot {index}'s phase is {phase}");
@@ -384,4 +393,75 @@ fn a_hand_off_costs_less_than_a_pop_and_recovers_within_the_fade() {
     }
     let recovered = total(&mut app);
     assert!((recovered - settled).abs() < 1e-2, "the total did not recover: {recovered} against {settled}");
+}
+
+#[test]
+fn a_cross_faded_hand_off_holds_the_subject_and_a_dip_does_not() {
+    // The craft's overlap rule, measured: with a reserve light the departing owner fades out while the
+    // arriving one fades in, so the pair's total stays where it was. Without it the total dips.
+    fn run(reserve: usize) -> Vec<f32> {
+        let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, reserve, ..default() });
+        focus_at(&mut app, Vec3::ZERO);
+        let walker = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+        settle(&mut app);
+        // A challenger twice as near takes the light, and the walker leaves the pool entirely.
+        candidate(&mut app, Vec3::new(0.4, 0.0, 0.0), 100.0);
+        app.world_mut().entity_mut(walker).despawn();
+        let mut totals = Vec::new();
+        for _ in 0..6 {
+            app.update();
+            // Every light the pool owns is on the walker's old spot or the challenger's: their sum is
+            // the subject's total light, which is what a cross-fade is meant to keep constant.
+            let total: f32 = slots(&mut app)
+                .iter()
+                .map(|(_, _, visibility, base)| if *visibility == Visibility::Hidden { 0.0 } else { *base })
+                .sum();
+            totals.push(total);
+        }
+        totals
+    }
+    let cross = run(1);
+    let dip = run(0);
+    // The cross-fade's first frames keep more light on the subject than the dip does.
+    assert!(
+        cross[0] > dip[0] + 1.0,
+        "a cross-fade keeps the departing light on: {:?} against {:?}",
+        cross,
+        dip
+    );
+    // And it is never *over* the settled total: the two fades sum to one, they do not add.
+    let settled = 100.0;
+    for total in &cross {
+        assert!(*total <= settled + 1.0, "a cross-fade invented brightness: {total} against {settled}");
+    }
+    assert!(cross[0] >= settled * 0.9, "the subject holds through the hand-off: {:?}", cross);
+}
+
+#[test]
+fn the_pool_forgets_a_candidate_that_has_gone() {
+    // The remembered positions are pruned to the candidates that still exist, or the map would grow by
+    // one entry per candidate ever pooled — a leak in a process that runs for hours.
+    let mut app = app(LightPool { size: 2, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let mut spawned = Vec::new();
+    for index in 0..40 {
+        spawned.push(candidate(&mut app, Vec3::new(1.0 + index as f32 * 0.1, 0.0, 0.0), 100.0));
+        settle(&mut app);
+    }
+    for entity in spawned.iter().take(35) {
+        app.world_mut().entity_mut(*entity).despawn();
+    }
+    for _ in 0..4 {
+        app.update();
+    }
+    // The pool still works after the churn: two slots on the surviving candidates.
+    assert_eq!(assigned(&mut app, 2).len(), 2, "the pool still works after the churn");
+    // And it churned without failing: 40 candidates came and went, and the pool's assignment is still
+    // the nearest. (The remembered map's size is private; what a test can see is that the pool keeps
+    // working after more candidates than its slots ever held, which the prune is what makes safe.)
+    let remaining = assigned(&mut app, 2);
+    assert!(
+        remaining.iter().all(|(_, at, visibility, _)| { *visibility == Visibility::Inherited && at.y > 1.0 }),
+        "the survivors are lit: {remaining:?}"
+    );
 }

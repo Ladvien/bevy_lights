@@ -29,7 +29,9 @@ lights placed over thousands of virtual ones, and billboard shader flames.
   Everything else is a flame and nothing else. The assignment is deterministic: distance, then
   `Entity`. A slot keeps the candidate it holds until a challenger is `hysteresis` times nearer
   (default 1.15, the overlap rule), and a slot that does change owner fades back up over
-  `fade_seconds` (0.35 s) rather than popping — so a light never teleports in brightness.
+  `fade_seconds` (0.35 s) rather than popping. `reserve` (default 1) keeps a spare light so the owner
+  a hand-off leaves behind fades *out* at the same time: the subject's light is continuous through the
+  change rather than dipping, which is the craft's "overlapping key lights".
 - **Shader flames** (`FlamePlugin`). An additive billboard fire (`src/flame.wesl`) is drawn on every
   `FlameSite`, out of one material and one draw per flame, with each fire's phase and height packed
   into its `MeshTag` so two fires never burn in step. One shared clock, written once a frame, on
