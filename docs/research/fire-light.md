@@ -144,6 +144,14 @@ off screen.
 
 ## Pending index
 
+**The amplitude is still uncited, and this iteration could not fix it.** Maynard 2013 (*Fire
+interactions and pulsation*, UC eScholarship) is the one paper found that measures what is wanted —
+"Fluctuations in image intensity, which occur throughout the pulsation cycle, were quantitatively
+analyzed" — but `paper_download` has no copy and eScholarship answers an automated fetch with 403, so
+it is neither imported nor indexed. The `±0.15` in [`flicker_factor`] therefore stays a design
+default, and this note says so. A host with library access to that dissertation, or to a pool-fire
+radiance-fluctuation paper, would settle the last uncited number in this system.
+
 Nothing in the corpus to index for this note: the search terms that would carry it (`puffing
 frequency`, `flame oscillation`, plume instability against heat-release rate) return no fire-physics
 document. To fill the gap:
