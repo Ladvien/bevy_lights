@@ -1207,3 +1207,115 @@ wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
    candidate per frame, and the whole-frame p50 does not separate that from the flicker's cost.
 5. **A `Rank::Weighted`** for a host that wants gameplay priority (a carried torch matters more than a
    brazier): the rank key would take a per-candidate multiplier.
+
+## Iteration 13 — 2026-10-26 — the pool's hand-off is a set decision
+
+### First, the ungated work
+
+This pass opened on a **dirty tree with iteration 13's implementation staged but never committed** — the
+previous pass was killed before its gate. Nothing was built on it blind: the whole gate was run on it
+first, and it failed twice.
+
+- `cargo test` was green (76 tests) the moment `/tmp` was taken off the tmpfs. The doctests had failed
+  with `LLVM ERROR: IO failure on output stream: No space left on device`, which reads as a code error
+  and was **a full 16 GB `/tmp`** (100 %, 6.8 MB free). `export TMPDIR=/home/ladvien/l13/tmp` fixed it;
+  `docs/DEMOS.md` already warns about `/tmp`, and this is the second way it bites — the *linker*, not just
+  a frame sequence.
+- `cargo clippy -D warnings` **failed**: a `match` on a single pattern at `src/pool.rs:524`. Fixed to
+  `if let`.
+- `cargo build --lib --target wasm32-unknown-unknown` **failed**: the target was not installed on big
+  (`E0463`). `rustup target add wasm32-unknown-unknown` fixed the environment, not the crate.
+
+Both code-side fixes are the ones the gate exists for, and both are in this iteration's commit.
+
+### What changed, and why it ranked first
+
+Ranked first because it is a **visible artifact of the most physical kind**: the previous pass measured
+the pool losing 17 % of its lumens in one frame with up to 7 of 8 lights reading zero, then fading back
+over twenty frames. The runner-up was the `Rank::Weighted` backlog item (a host-side priority), which is
+API convenience and cannot beat a street going dark for one frame.
+
+The rule "every slot keeps its candidate unless a challenger is better by the hysteresis" was applied
+**per slot against one global best free candidate**, so one newcomer displaced every slot at once, and a
+displaced slot's fallback could then take a candidate another slot was still keeping. Three set rules
+replace it, and the overlap rule was made a function of the rank's own quantity:
+
+- **A candidate another slot holds is never a challenger.**
+- **A challenger displaces the worst-ranked light the pool holds**, one light per challenger.
+- **At most as many lights move per frame as there are free reserves** (`LightPool::reserve`; unthrottled
+  at 0), because a hand-off the pool cannot cross-fade is a hand-off that dims its subject.
+- **`model::pool::preferred`**: the overlap rule on any "smaller is better" quantity, so ranking and
+  holding cannot disagree — iteration 12 ranked by illuminance and held by distance.
+
+Every slot's owner is now decided in **one map before any slot is written**; the pass that decides
+depends on no write order.
+
+### Sources
+
+- craft: `10.58709_niujhu.v8i3.1694` (Orisayemi & Afabor, the Bordwell & Thompson "overlapping keys" quote),
+  `10.4324_9781003671220` (Lazar, motivated movement).
+- production: `s2025-advances-materials-9` (HypeHype, stochastic tile-based lighting), `s2020-advances-pdf-slides`.
+- technical: `10.1109_tvcg.2019.2898741` (Denes et al., temporal resolution multiplexing),
+  `book_fundamentals_computer_graphics_marschner` ch. 22, `book_level_of_detail_3d_graphics_luebke` ch. 9,
+  `book_real_time_rendering_4th_akenine` pp. 918-935.
+- The note was committed alone, before any code: `1db0af7`.
+
+### The critique, and the verdict
+
+Full critique in `/home/ladvien/l13/critique.md`. **GREAT.** Evidence: `/home/ladvien/l13/`.
+
+Craft checklist, before → after, default camera, seed 7, pool 8:
+
+| line | before | after |
+|---|---|---|
+| key-to-fill (brazier pool vs moonlit far ground) | 122.7 / 51.1 DN | 122.2 / 51.1 |
+| falloff, motivated light, warm/cool, silhouette, specular, bloom | holds at every angle | unchanged |
+| **pool total, worst single frame** | **−19.0 % (frame 303: 972 505 → 787 358 lm)** | **−1.2 %** |
+| **frames changing >2 %** | **25 of 365** | **0** |
+| **most lights at zero in one frame** | **8 of 13** | **2 of 13** |
+| mean per-frame change | 11 300 lm (1.18 %) | 2 453 lm (0.24 %) |
+| mean pool total | 954 930 lm | 1 033 222 lm (+8.2 %, the bright lanterns no longer starved) |
+
+Second seed and smaller pool (`LIGHTS_SEED=3 LIGHTS_POOL=4`): worst frame **11.4 % → 1.4 %**, frames
+over 2 % **5 → 0**, dark lights **4 → 2**.
+
+The aligned crash pair (`ev/before/frame0005→0006` against `ev/after/`, whole frame): **−1.63 % and 13.2 %
+of pixels moving more than 2 DN** → **+0.16 % and 2.7 %**. The `ground_left` panel loses 1.6 DN before and
+0.38 DN after while `sky` is untouched in both, which is the pool moving and not the flame shader.
+
+Throttle measured at four reserve sizes (`logs/throttle/r0..r4`): 4.8 % worst frame at `reserve: 0`, 1.2 %
+at 1, 1.4 % at 2 and 4 — with mean dark lights rising 0.03 → 0.54 → 1.54 → 3.6. So raising `reserve` buys
+no smoothness; recorded in the note's `Deviations`.
+
+### Benchmark
+
+`bench_lights` (candidates 5000, lights 2000, pool 16), interleaved, three rounds each:
+before `mean_us` 489 / 523 / 495, p50 473 / 490 / 478; after 466 / 477 / 480, p50 469 / 471 / 465. Flat
+within the run-to-run spread; no regression. CPU-only, so it says nothing about GPU cost — the change
+touches no shader, and the capture's frame time was unchanged (400 frames in the same wall time).
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (**77 tests**), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`, `cargo fmt --check`,
+`cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Media
+
+`docs/media/showcase.gif` re-encoded from the new build (60 frames, 30 fps, 480 px, 2.2 MB), same caption,
+same capture recipe. Flicker verified through the encode on a single pool: **2.50 Hz** peak-to-peak 32 %,
+identical to the previous GIF's 2.50 Hz / 32 % — the encode did not eat the flicker.
+`docs/media/courtyard.gif` and `docs/media/courtyard.png` regenerated at their recorded recipes (57 frames
+at 30 fps, 640 px, 3.3 MB).
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable). Unchanged for 13 iterations.
+2. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+3. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
+   an atlas.
+4. **The bench should report the pool's work**, not only the total: this iteration added per-candidate
+   work (a division, a sort of a larger tuple) that the whole-frame p50 cannot see past the flicker's cost.
+5. **A `Rank::Weighted`** for a host that wants gameplay priority (a carried torch matters more than a
+   brazier): the rank key would take a per-candidate multiplier.
