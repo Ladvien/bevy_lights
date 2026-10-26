@@ -657,3 +657,91 @@ size)`) and the reserve has its own test.
    that left did.
 4. **A placed specular highlight** (iteration 1's open beauty line).
 5. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+
+## Iteration 5 — 2026-10-26 — the cross-fade's phase, and a demo that was not built
+
+### What this iteration produced
+
+One fix in iteration 4's own feature, one test that bites, one genuine demo knob, and one backlog item
+blocked rather than fudged.
+
+### The fix: the two ends of a cross-fade now share a flicker
+
+Iteration 4's cross-fade had a defect I found by re-reading it: the departing light kept the **reserve
+light's** phase (`1.3 · slot`) instead of the phase of the light that left, so the two ends of the fade
+beat against each other and their sum wobbled. Iteration 4's own test measured the *mean*, where the
+means are equal, so it could not see it.
+
+`old_look` now carries the phase with the position and intensity, and the reserve takes it while it
+fades out. `the_two_ends_of_a_cross_fade_keep_the_same_flicker` compares the phases: reverted, it fails
+at `must keep the phase it had (0), not the reserve's (1.3)`; with the fix, it passes.
+
+### The failure: a capture that shows a cross-fade
+
+Backlog item 1. Six attempts, none of which produced a capture, and the log records them because the
+next agent should not repeat them:
+
+1. A `LIGHTS_DOUSE` system removing a torch's `PoolCandidate`: candidates dropped 48 → 47, but the
+   reserve-1 and reserve-0 runs were bit-identical.
+2. Choosing the *nearest* torch each tick: the focus orbits and the bearers walk, so the nearest torch
+   is rarely one the pool's slots hold.
+3. Alternating douse/relight on `elapsed as u32 % 2`: a douse at an odd second relit in the same frame.
+4. A `TorchKind` component that was never spawned (an earlier edit had silently not applied), so the
+   system matched nothing for several runs. The candidate census is what caught it.
+5. Pinning one torch from the pool's *held* set: a `PoolCandidate` cannot say which torch a slot holds,
+   because a slot's light is the crate's own entity and not the candidate's.
+6. `LIGHTS_REACH` at 6 m and 4 m, expecting candidates to stream across the boundary: still zero
+   departures in the demo, with 48 candidates throughout.
+
+What the work did establish is worth keeping: **the crate's departure path is sound.**
+`a_departure_is_detected_at_all` despawns a holder with no replacement and the reserve fades it out. The
+mechanism works; the courtyard cannot produce the situation. All of the douse experiment was removed
+rather than shipped half-working.
+
+The demo did gain a real knob: `LIGHTS_REACH`, which the pool's reach needed anyway.
+
+### The benchmark, and a measurement that lied
+
+The first bench read p50 212 → 495 µs, a 2.3× "regression". It was the machine: this Mac's load average
+was 20 from other agents' work, and successive runs of the *same* binary read 495, 856, 851, 865. Benched
+against a worktree at the last commit, at the same moment, the **pre-change** tree read p50 1013 µs and
+the changed tree 842: the change is not a regression, the machine was. The diff adds one `f32` per
+remembered entry and one phase write, which cannot cost 280 µs.
+
+**Lesson for the loop:** a bench on this host is only comparable taken back to back with the base
+commit in the same minute, and a reading that moves between successive runs of one binary is the load.
+
+Measured properly (two trees built into their own target dirs on big, benched interleaved three rounds
+each): base p50 **674, 690, 671** µs against head **696, 706, 708** — a consistent **+3 to +5 %**, which
+is the honest cost of one extra `f32` per remembered entry and one phase write. (Big's absolute numbers
+are higher than this Mac's were in earlier iterations because big was busy too; the ratio is what the
+interleaving buys.)
+
+### Verdict
+
+**GREAT** for the fix: the two ends of a cross-fade move together, which is what "overlapping key
+lights" means, and the test fails without it.
+
+**Blocked** for backlog item 1, with the reason and the plan: a capture that shows a cross-fade needs a
+subject that *leaves* the pool, and the courtyard's torches never do. The concrete plan is a camera
+behaviour — a focus that walks away from the torches — not a lighting one. That is what iteration 6
+should build.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (64 tests), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
+wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Top 5 remaining, ranked
+
+1. **A focus that walks away** — a camera behaviour in the example, so the torches fall out of the
+   pool's reach and a cross-fade fires. This is the only way backlog item 1 gets its capture, and it is
+   a demo change, not a crate one.
+2. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+3. **A placed specular highlight** (iteration 1's open beauty line).
+4. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+5. **A bench that controls for host load** — build base and head into separate target dirs and run them
+   interleaved, refusing a reading whose repeat differs by more than 10 %. The script this iteration
+   used is in `docs/DEMOS.md`'s bench section from now on.

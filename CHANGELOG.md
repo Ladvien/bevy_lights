@@ -50,6 +50,11 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Fixed
 
+- **Both ends of a pool cross-fade now keep the same flicker.** A reserve light that was fading a
+  departing owner out carried its own flicker phase, so the two ends of the cross-fade beat against
+  each other and their sum wobbled. It now keeps the phase of the light that left.
+
+
 - **The pool read a candidate's `GlobalTransform`, which lags a frame.** A host that moved a prop had
   the pool decide against the previous frame's position, which read as an extra hand-off (and, with
   hysteresis, could hold a light on a prop that had already gone). The pool now reads the candidate's
