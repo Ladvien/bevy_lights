@@ -144,8 +144,15 @@ benchmark and the existing tests check.
   them taking a candidate another slot had.
 - **Four times the light at twice the distance is an exact tie**, and the tie breaks on `Entity`. The rank
   value must not be inserted before `Entity` in the sort tuple: doing so silently replaces the tie-break.
+- **The hand-off budget is the free reserves** (`the_pools_hand_off_budget_is_its_free_reserves`): four
+  challengers nearer than every held slot in one frame move 4 lights at `reserve: 0`, 1 at the default, and
+  2 at `reserve: 2`. This rule is silent when it is wrong — it looks exactly like a pool that is merely
+  slow — so it has its own test; with the throttle removed the `reserve: 1` arm reports 4 and fails.
 - In a frame sequence of the courtyard, the largest single-frame change in mean luminance falls against
-  the pre-change capture, and no frame loses most of the pool.
+  the pre-change capture, and no frame loses most of the pool. Measured on the pool's own total
+  (`LIGHTS_POOL_LOG=1`, frames 25+: the first 15 are the pool spawning and the braziers kindling):
+  worst single frame **19.0 % → 1.2 %**, frames changing more than 2 % **25 → 0**, most lights dark in
+  one frame **8 of 13 → 2 of 13** (a hand-off's own fade), at two seeds and two pool sizes.
 
 ## Deviations
 
@@ -154,6 +161,14 @@ benchmark and the existing tests check.
   dips by that one light's falloff rather than staying exactly constant. The hysteresis (the overlap
   rule) is what keeps the *assignment* from changing often enough for the dip to be noticed.
 - **No hysteresis on the focus.** The focus moving is the host's camera; it is not this note's problem.
+- **The throttle turns the reserve into a move budget, so raising it does not help.** Measured on the
+  courtyard's 400-frame run with the throttle in place: `reserve` 0 gives a 4.8 % worst frame (no throttle,
+  no cross-fade), 1 gives 1.2 %, 2 gives 1.4 % and 4 gives 1.4 % — while the mean count of dark lights
+  *rises* (0.03, 0.54, 1.54, 3.6). So the default of 1 is the point where the curve turns, and a host that
+  raises `reserve` for a busier scene pays in dark reserves and gains no smoothness. The budget exists to
+  guarantee that a move which *is* made can be cross-faded, not to make more moves. A host that needs many
+  moves per frame should lower `fade_seconds` (a shorter fade frees a reserve sooner) rather than raise
+  `reserve`.
 - **The fade is on `Time` (virtual), like the flicker**, so a paused world's hand-off holds still
   rather than resolving while nobody is looking.
 

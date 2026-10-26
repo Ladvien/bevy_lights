@@ -149,6 +149,35 @@ none, with the median unchanged. If the two runs come out *identical*, the switc
 pool: a switch that turns a feature off has to change what you are measuring.
 `docs/research/pool-hand-off.md` has the craft and the measurements.
 
+## Seeing a reshuffle — the pool's own total, every frame
+
+A hand-off that goes wrong is not visible in a still and barely visible in a frame's mean luminance: it is
+a **set** of lights being re-sorted, and the number that shows it is the pool's own total, which
+`LIGHTS_POOL_LOG=1` prints every frame.
+
+```sh
+LIGHTS_FRAMES=400 LIGHTS_POOL_LOG=1 ./target/release/examples/courtyard > pool.log
+```
+
+Read it with the first 15 frames skipped (the pool spawns and the braziers kindle there, and that is a
+bigger change than any hand-off):
+
+```sh
+awk '$1=="pool" && $2>=25 {print $2, $4}' pool.log   # frame, pool total
+```
+
+Two things to check, both measured on the courtyard's 400-frame default:
+
+- **No single frame may lose a light's worth of the pool.** Before iteration 13 the total fell **19 % in one
+  frame** (frame 303, 972 505 → 787 358 lm) with **8 of 13 lights reading zero** and faded back over
+  twenty frames. With the set rules the worst steady-state frame moves **1.2 %** and no frame exceeds 2 %.
+- **The pool's per-slot line must not show a mass extinction.** The bracket carries every light's
+  intensity; `0` seven times in one frame is the reshuffle. A single `0` is a hand-off's own fade.
+
+The frame rate in that log counts from 1 while `LIGHTS_SHOT_DIR`'s numbering starts at its `FROM`, so a
+screenshot's `frame0006` is rarely the log's frame 6 — measure the log for the artefact and the images for
+its look, and do not try to line the two up by index.
+
 ## The still
 
 ```sh
