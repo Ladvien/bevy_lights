@@ -59,7 +59,8 @@ pub struct FlameMaterial {
     #[uniform(0)]
     base: LinearRgba,
     /// `x` seconds (wrapped hourly), `y` the tag's height scale in world units ([`FlameLook::max_height`]),
-    /// `z` unused, `w` the ember strength.
+    /// `z` how far the scene's fires have caught (1 for a flame that took long ago; see
+    /// [`FlameSite::kindle`]), `w` the ember strength.
     #[uniform(0)]
     params: Vec4,
 }
@@ -281,6 +282,11 @@ fn update_flames(
     // `kindle_gain` curve the light uses, so the flame and the light it motivates catch together. A site
     // with no kindle is left alone — a fire burning all along costs nothing here.
     let dt = time.delta_secs();
+    // The scene's catch, for the shader's colour: the *youngest* fire in the frame decides, because a flame's
+    // colour is what the whole shared material carries. A fire still catching therefore tints every flame redder
+    // for those three tenths of a second, which is the honest reading of one shared material — and with the
+    // courtyard's braziers all lighting together it is exactly right.
+    let mut youngest = 1.0f32;
     for (mut flame, mut transform, parent) in &mut flames {
         if flame.kindled >= f32::MAX {
             continue;
@@ -288,6 +294,9 @@ fn update_flames(
         flame.kindled = (flame.kindled + dt).min(f32::MAX);
         let catch = sites.get(parent.parent()).map_or(0.0, |site| site.kindle);
         let gain = if catch > 0.0 { kindle_gain(flame.kindled.min(catch)) } else { 1.0 };
+        if catch > 0.0 {
+            youngest = youngest.min(gain);
+        }
         // Width and height both: a fire that is catching is smaller in both, and a flame that grew tall
         // while staying wide would read as a sheet. The shader's own animation is in the tag and is
         // untouched.
@@ -300,6 +309,9 @@ fn update_flames(
     let elapsed = time.elapsed_secs_wrapped();
     if let Some(mut made) = materials.get_mut(&assets.material) {
         made.params.x = elapsed;
+        // The scene's catch, for the shader's colour. One shared material means the youngest fire in the frame
+        // decides; a scene with nothing catching holds it at 1 and the shader's ramp is the steady one.
+        made.params.z = youngest;
         if look.is_changed() {
             // Rewritten in place: a `FlameLook` change is a colour or strength change, and rebuilding
             // the material would re-prepare every flame's pipeline for nothing.
@@ -463,5 +475,67 @@ mod kindle_tests {
         app.update();
         app.update();
         assert_eq!(scale_of(&mut app), 1.0);
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+mod catch_colour_tests {
+    use super::*;
+    use crate::KINDLE_SECONDS;
+    use bevy::time::TimeUpdateStrategy;
+
+    fn app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(Assets::<Mesh>::default())
+            .insert_resource(Assets::<FlameMaterial>::default())
+            .init_resource::<FlameLook>()
+            .init_resource::<FlameAssets>()
+            .insert_resource(TimeUpdateStrategy::ManualDuration(std::time::Duration::from_secs_f64(
+                1.0 / 60.0,
+            )));
+        app.add_systems(Startup, build_flame_assets)
+            .add_systems(Update, (dress_flames, update_flames).chain());
+        app.update();
+        app
+    }
+
+    fn uniform_z(app: &App) -> f32 {
+        let assets = app.world().resource::<FlameAssets>();
+        app.world()
+            .resource::<Assets<FlameMaterial>>()
+            .get(&assets.material)
+            .map(|material| material.params.z)
+            .unwrap_or(f32::NAN)
+    }
+
+    #[test]
+    fn the_shader_is_told_when_a_fire_is_still_catching() {
+        // `params.z` is what the ramp uses to pull the flame redder while its fire catches: 0 at the start of the
+        // catch, 1 for a flame that took long ago. A scene with nothing catching must leave it at 1.
+        let mut app = app();
+        app.world_mut()
+            .spawn((FlameSite { height: 0.9, phase: 0.0, kindle: KINDLE_SECONDS }, Transform::default()));
+        app.update();
+        app.update();
+        let early = uniform_z(&app);
+        assert!(early < 0.2, "a catching fire tells the shader so: {early}");
+
+        for _ in 0..((KINDLE_SECONDS * 60.0) as usize + 2) {
+            app.update();
+        }
+        let settled = uniform_z(&app);
+        assert!((settled - 1.0).abs() < 1e-4, "a fire that has taken leaves the steady ramp: {settled}");
+    }
+
+    #[test]
+    fn a_scene_with_no_catch_keeps_the_steady_ramp() {
+        let mut app = app();
+        app.world_mut().spawn((FlameSite { height: 0.9, phase: 0.0, kindle: 0.0 }, Transform::default()));
+        for _ in 0..5 {
+            app.update();
+        }
+        assert_eq!(uniform_z(&app), 1.0);
     }
 }
