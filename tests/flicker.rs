@@ -65,7 +65,7 @@ fn a_kindling_light_is_heard_once_and_settles_inside_its_flicker_window() {
     let mut app = app();
     app.world_mut().spawn((
         PointLight { intensity: 0.0, ..default() },
-        Flicker { base: 1000.0, phase: 0.0 },
+        Flicker { base: 1000.0, phase: 0.0, diameter: None },
         Kindle::default(),
     ));
     // Two seconds, more than three times the kindle's length.
@@ -88,7 +88,7 @@ fn a_light_present_on_the_very_first_frame_is_heard_once() {
     let mut app = bare_app();
     app.world_mut().spawn((
         PointLight { intensity: 0.0, ..default() },
-        Flicker { base: 1000.0, phase: 0.0 },
+        Flicker { base: 1000.0, phase: 0.0, diameter: None },
         Kindle::default(),
     ));
     for _ in 0..30 {
@@ -101,7 +101,10 @@ fn a_light_present_on_the_very_first_frame_is_heard_once() {
 fn a_spot_light_flickers_too() {
     // The deliberate behaviour change: a wall sconce is a spot light, and it was meant to flicker.
     let mut app = app();
-    app.world_mut().spawn((SpotLight { intensity: 0.0, ..default() }, Flicker { base: 5000.0, phase: 1.3 }));
+    app.world_mut().spawn((
+        SpotLight { intensity: 0.0, ..default() },
+        Flicker { base: 5000.0, phase: 1.3, diameter: None },
+    ));
     let mut seen = Vec::new();
     for _ in 0..12 {
         app.update();
@@ -130,7 +133,7 @@ fn a_culled_light_keeps_its_intensity_and_still_kindles() {
         .world_mut()
         .spawn((
             PointLight { intensity: 1234.0, ..default() },
-            Flicker { base: 1000.0, phase: 0.0 },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None },
             Kindle::default(),
             // What a camera's visibility pass leaves on a light it culled: false.
             ViewVisibility::default(),
@@ -157,7 +160,7 @@ fn a_hidden_light_is_not_written() {
         .world_mut()
         .spawn((
             PointLight { intensity: 0.0, ..default() },
-            Flicker { base: 1000.0, phase: 0.0 },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None },
             Visibility::Hidden,
         ))
         .id();
@@ -178,7 +181,7 @@ fn re_inserting_the_kindle_writes_a_second_message() {
         .world_mut()
         .spawn((
             PointLight { intensity: 0.0, ..default() },
-            Flicker { base: 1000.0, phase: 0.0 },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None },
             Kindle::default(),
         ))
         .id();
@@ -196,9 +199,54 @@ fn re_inserting_the_kindle_writes_a_second_message() {
 #[test]
 fn a_light_without_a_kindle_reaches_its_plain_flicker_at_once() {
     let mut app = app();
-    app.world_mut().spawn((PointLight { intensity: 0.0, ..default() }, Flicker { base: 1000.0, phase: 0.0 }));
+    app.world_mut().spawn((
+        PointLight { intensity: 0.0, ..default() },
+        Flicker { base: 1000.0, phase: 0.0, diameter: None },
+    ));
     app.update();
     let intensity = intensities(&mut app)[0];
     assert!((700.0..=1000.0).contains(&intensity), "no kindle means no flare: {intensity}");
     assert!(heard(&app).is_empty(), "nothing to hear without a kindle");
+}
+
+#[test]
+fn a_sized_fire_flickers_at_the_puffing_laws_rate_and_an_unsized_one_at_the_inherited_rate() {
+    // The law is `f = 1.5 / sqrt(D)` Hz. A light with a diameter must move at that rate; a light
+    // without one must be unchanged from before this feature existed.
+    use bevy_lights::model::{flicker_factor, flicker_factor_of};
+
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, FlickerPlugin))
+        .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(1.0 / 60.0)));
+    let sized = app
+        .world_mut()
+        .spawn((
+            PointLight { intensity: 0.0, ..default() },
+            Flicker { base: 1000.0, phase: 0.0, diameter: Some(0.34) },
+        ))
+        .id();
+    let plain = app
+        .world_mut()
+        .spawn((
+            PointLight { intensity: 0.0, ..default() },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None },
+        ))
+        .id();
+    app.update();
+    let t = app.world().resource::<Time>().elapsed_secs();
+    let read = |app: &App, entity: Entity| {
+        app.world().get::<PointLight>(entity).map(|light| light.intensity).unwrap_or(0.0)
+    };
+    assert!(
+        (read(&app, sized) - 1000.0 * flicker_factor_of(0.34, t, 0.0)).abs() < 1e-2,
+        "a sized fire must follow the law's rate: {} against {}",
+        read(&app, sized),
+        1000.0 * flicker_factor_of(0.34, t, 0.0)
+    );
+    assert!(
+        (read(&app, plain) - 1000.0 * flicker_factor(t, 0.0)).abs() < 1e-2,
+        "an unsized fire must be the inherited shape: {} against {}",
+        read(&app, plain),
+        1000.0 * flicker_factor(t, 0.0)
+    );
 }

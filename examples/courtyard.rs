@@ -28,10 +28,12 @@
 //!
 //! `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
 //! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`.
-//! Two more are this example's own: `LIGHTS_HYSTERESIS` (the pool's overlap ratio, default 1.15) and
-//! `LIGHTS_FADE` (seconds a light takes to come back after a hand-off, default 0.35). Set both to the
-//! old behaviour (`1.0`, `0.0`) to see the pop the crate used to have in a frame sequence — that is
-//! the before/after of `docs/research/pool-hand-off.md`.
+//! Four are this example's own: `LIGHTS_HYSTERESIS` (the pool's overlap ratio, default 1.15),
+//! `LIGHTS_FADE` (seconds a light takes to come back after a hand-off, default 0.35),
+//! `LIGHTS_BED` (the braziers' fuel-bed diameter in metres, default 0.34, which sizes their flicker
+//! through the puffing law) and `LIGHTS_UNSIZED=1` (ignore the bed and use the crate's inherited
+//! rate, to see the difference). The first two set to the old behaviour (`1.0`, `0.0`) show the pop
+//! the crate used to have, which is `docs/research/pool-hand-off.md`'s before/after.
 //! The default camera is the eye at `(0, 9, 16)` looking at the origin.
 //!
 //! ```sh
@@ -79,6 +81,18 @@ const POOL_LUX: f32 = 1000.0;
 /// The illuminance at the *edge* of a fire's pool: a quarter of the centre, so the edge is two stops
 /// down — the shoulder `lighting-look.md` asks for.
 const POOL_EDGE_LUX: f32 = 250.0;
+/// The diameter of a brazier's coal bed, in metres: the fuel bed the puffing law sizes the fire's
+/// flicker by. A bigger bed breathes more slowly. `LIGHTS_BED` overrides it; `LIGHTS_UNSIZED=1` gives
+/// the fires no size at all (the crate's inherited rate), which is the comparison this feature is.
+const BRAZIER_BED: f32 = 0.34;
+
+/// The fuel bed the braziers are given, or nothing for the un-sized rate.
+fn brazier_bed() -> Option<f32> {
+    if std::env::var_os("LIGHTS_UNSIZED").is_some() {
+        return None;
+    }
+    Some(std::env::var("LIGHTS_BED").ok().and_then(|v| v.parse().ok()).unwrap_or(BRAZIER_BED))
+}
 /// How far a brazier's pool reaches, in metres: the ground it lights to [`POOL_LUX`].
 const BRAZIER_POOL: f32 = 4.0;
 /// How far a carried torch's pool reaches. Smaller than a brazier's: a 0.35 m flame lighting a 4 m
@@ -186,6 +200,7 @@ fn main() {
         .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers).chain())
         .add_systems(Update, report_kindled)
         .add_systems(Update, report_look)
+        .add_systems(Update, report_flicker)
         .run();
 }
 
@@ -342,7 +357,7 @@ fn spawn_scene(
                         shadow_maps_enabled: true,
                         ..default()
                     },
-                    Flicker { base: lumens, phase },
+                    Flicker { base: lumens, phase, diameter: brazier_bed() },
                     Kindle::default(),
                     Transform::from_xyz(0.0, BRAZIER_LIGHT - BRAZIER_TOP * 0.5, 0.0),
                 ));
@@ -472,6 +487,18 @@ at the pool's edge {:.2}:1",
         stops(key_to_fill(POOL_LUX, fill.illuminance)),
         key_to_fill(POOL_EDGE_LUX, fill.illuminance),
     );
+}
+
+/// Prints one brazier light's intensity every 30 frames, so a capture's flicker can be read off the
+/// log rather than guessed at from a frame's mean.
+fn report_flicker(lights: Query<&PointLight, With<Flicker>>, mut frame: Local<u32>) {
+    *frame += 1;
+    if !frame.is_multiple_of(30) {
+        return;
+    }
+    if let Some(light) = lights.iter().next() {
+        println!("flicker frame {}: {:.2}", *frame, light.intensity);
+    }
 }
 
 /// Prints every [`Kindled`]: four lines when the courtyard catches, four more on every `K`.

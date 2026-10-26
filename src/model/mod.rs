@@ -14,7 +14,9 @@ pub mod tag;
 pub use cinematography::{
     HIGH_KEY, LOW_KEY, MOON_KEY, blackbody_colour, fill_for, fire_lumens, key_to_fill, stops, white_balanced,
 };
-pub use fire::{KINDLE_SECONDS, flicker_factor, kindle_gain};
+pub use fire::{
+    KINDLE_SECONDS, PUFFING_CONSTANT, flicker_factor, flicker_factor_of, flicker_rate, kindle_gain,
+};
 pub use pool::{FADE_SECONDS, HYSTERESIS, fade_factor, hand_off};
 pub use reach::{RANGE_MARGIN, raised_light};
 pub use tag::{pack_flame_tag, unpack_flame_tag};

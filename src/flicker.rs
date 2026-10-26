@@ -9,7 +9,7 @@ use bevy::time::Time;
 
 use crate::LightsSystems;
 use crate::chain_sets;
-use crate::model::{KINDLE_SECONDS, flicker_factor, kindle_gain};
+use crate::model::{KINDLE_SECONDS, flicker_factor, flicker_factor_of, kindle_gain};
 
 /// [`FlickerPlugin`]: modulates every [`Flicker`] light and advances every [`Kindle`].
 pub struct FlickerPlugin;
@@ -41,6 +41,12 @@ pub struct Flicker {
     /// The flicker's clock phase, in radians. Any two fires with different phases are out of step;
     /// a common recipe is a multiple of the index (`slot as f32 * 1.3`).
     pub phase: f32,
+    /// The fire's fuel-bed diameter, in the host's world units, when the host knows it: this sizes the
+    /// flicker through the puffing law (`f = 1.5/√D` Hz), so a brazier moves faster than a pyre.
+    ///
+    /// `None` (the default) uses the crate's un-sized rate, which is a host's choice for a fire whose
+    /// size is not modelled. `Some(0.34)` is a brazier's coal bed; `Some(4.0)` a bonfire.
+    pub diameter: Option<f32>,
 }
 
 /// A light that is taking hold: its intensity flares up over [`KINDLE_SECONDS`] instead of switching
@@ -188,7 +194,11 @@ fn modulate<L: Emits>(
         None => 1.0,
     };
     if !hidden {
-        *light.intensity() = flicker.base * flicker_factor(t, flicker.phase) * gain;
+        let swing = match flicker.diameter {
+            Some(diameter) => flicker_factor_of(diameter, t, flicker.phase),
+            None => flicker_factor(t, flicker.phase),
+        };
+        *light.intensity() = flicker.base * swing * gain;
     }
     lit
 }
