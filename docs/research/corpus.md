@@ -122,7 +122,14 @@ nothing. Look for it, or read Patry 2021 and the 2025 *Advances* note in its pla
 
 Searched `puffing frequency`, `flame oscillation`, `flicker`, `candle`, `buoyant plume`, `pool fire`.
 
-**Nothing in the corpus on 2026-10-25.** The combustion hits are biomass burning and atmospheric
+**Filled 2026-10-26.** `10.1017_jfm.2018.707` (Xia & Zhang 2018, *J. Fluid Mech.*, open access) is
+in the library and indexed: it states the `f ∝ D^{-1/2}` law with the factor 1.5 and fits
+`f_p = 0.48 √(g/D)` to the pool-fire data of six earlier studies, so it carries Cetegen & Ahmed 1993's
+result as well as its own vortex-shedding derivation. `docs/research/fire-light.md` adopts the law.
+Still missing: the primary Cetegen & Ahmed 1993 (not open access; `paper_download` found no copy) and
+Kitahata et al. 2005 on candle oscillation.
+
+**Nothing else in the corpus as of 2026-10-25.** The combustion hits are biomass burning and atmospheric
 chemistry (`10.5194_acp-11-6445-2011`, boreal forest fire emissions), not flame dynamics. Every
 fire-light rate in this crate is therefore a **design default** inherited from Sanctuary, and
 `docs/research/fire-light.md` says so at each one.
