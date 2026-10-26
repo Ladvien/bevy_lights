@@ -120,6 +120,27 @@ benchmark and the existing tests check.
 - **The fade is on `Time` (virtual), like the flicker**, so a paused world's hand-off holds still
   rather than resolving while nobody is looking.
 
+## Iteration 2's findings
+
+Adopted as written, with four things the implementation taught:
+
+- **The pool had been reading a stale position.** It used the candidate's `GlobalTransform`, which is
+  propagated in `PostUpdate`, so on the frame a host moved a prop the pool compared last frame's
+  distance. That reads as an extra hand-off, and with hysteresis it can hold a light on a prop that has
+  gone. It now reads the candidate's own `Transform` when it has one, and falls back to
+  `GlobalTransform` for a child (a torch in a hand) that only a parent places. This is a *fix*, not a
+  deviation: the note's "steady is steady" line could not hold without it.
+- **A slot's first light is not a hand-off.** The first draft faded a slot in from nothing whenever it
+  gained a candidate, so a pool filling for the first time flashed every light up from zero. Only a
+  change of owner fades.
+- **Slots are claimed in a first pass.** A one-pass assignment lets slot 0 see slot 1's still-held
+  candidate as free for one frame, because slot 1 has not re-claimed it yet.
+- **The fade is measured, not asserted.** `a_hand_off_costs_less_than_a_pop_and_recovers_within_the_fade`
+  sums the slots' bases: two full slots are 200, a hand-off dips the total and it is whole again by
+  the end of the fade; with `fade_seconds: 0.0` the same test fails at `200 -> 200`, which is the old
+  pop. In the courtyard's 240-frame sequence the worst frame pair's change fell 0.697 -> 0.524 and
+  141 of 220 pairs got smoother, with the median unchanged (a steady pool is untouched).
+
 ## Pending index
 
 Nothing in this note is unindexed: every stem in *Sources* was read live from the running library on

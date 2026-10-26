@@ -6,6 +6,14 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **The pool's hand-off: an overlap rule and a fade**, so a light that changes owner does not pop.
+  - `LightPool::hysteresis` (default `HYSTERESIS` = 1.15): a slot keeps the candidate it holds until a
+    challenger is about 13 % nearer. `1.0` is the old nearest-wins rule.
+  - `LightPool::fade_seconds` (default `FADE_SECONDS` = 0.35): a slot that changes owner comes back up
+    from nothing over that time instead of snapping on. `0.0` restores the old behaviour.
+  - `model::pool::hand_off` and `model::pool::fade_factor`: the rule and the curve, engine-free and
+    re-exported flat, so a host can reason about a hand-off without an app.
+
 - **`model::cinematography`: a scene's lighting as the numbers a cinematographer sets**, so a host can
   size and colour its practicals instead of picking them by eye.
   - `key_to_fill(key_lux, fill_lux)` and `stops(ratio)`: the ratio of a scene's key to its fill, with the
@@ -22,6 +30,13 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
     `balance_kelvin` records it, which is how one balance turns a fire orange and the sky blue.
   - All five are engine-free (in `src/model/`, covered by `tests/leaf.rs`) and re-exported flat from the
     crate root. Their sources and parameters are in `docs/research/lighting-look.md`.
+
+### Fixed
+
+- **The pool read a candidate's `GlobalTransform`, which lags a frame.** A host that moved a prop had
+  the pool decide against the previous frame's position, which read as an extra hand-off (and, with
+  hysteresis, could hold a light on a prop that had already gone). The pool now reads the candidate's
+  own `Transform` when it has one and falls back to `GlobalTransform` for a child placed by its parent.
 
 ## [0.1.0] - 2026-10-25
 
