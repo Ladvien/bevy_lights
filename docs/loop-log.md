@@ -829,3 +829,79 @@ wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
    default; whether the showcase should ship with torches visibly changing hands is an art call.
 5. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared
    only by distance, so the pool can hold the dim one.
+
+## Iteration 7 — 2026-10-26 — a flame catches with its light
+
+### What changed, and why it ranked first
+
+The top backlog item was still the uncited flicker amplitude (blocked: unobtainable), so the pick came
+from the pattern iteration 6 exposed: **state that should follow something and does not**. Reading the
+flame path for it found a visible artifact.
+
+A fire a host lights flares its *light* up over `KINDLE_SECONDS` — and its *flame* appeared at full
+height and full brightness on the first frame. The courtyard showed it on frame 1 of every brazier: a
+full-size flame over a light at zero. That inverts `lighting-look.md`'s motivated-source rule, and it
+contradicts `fire-light.md`'s own craft line, that the flare "is the sound cue's visual half": one event
+was arriving as two.
+
+### The model
+
+`FlameSite::kindle` (seconds) makes a flame grow from nothing to its full height **and width** over that
+time, on the same `kindle_gain` envelope the light uses — one curve shared by both halves of the catch,
+rather than two that could drift apart. The scale goes in the child flame's `Transform`, because the
+`MeshTag` packs the height as a fraction of `max_height` and a packed tag cannot be re-scaled. A settled
+flame is skipped with one comparison, so a fire that has been burning all along costs nothing. `0.0` is
+the default and `KINDLE_SECONDS` the usual value.
+
+Width scales with height deliberately: a flame that grew tall but stayed wide would read as a sheet.
+
+### The measurements
+
+`a_flame_lit_with_its_fire_grows_from_nothing_and_stops_at_full` fails without the scaling (the flame
+reads `1.0` on the frame it should be tiny); `a_flame_that_has_been_burning_all_along_is_full_size_at_once`
+pins the unchanged case.
+
+On the courtyard's first 60 frames (braziers start with `Kindle::default()`), the count of saturated
+flame pixels:
+
+| frame | 5 | 10 | 20 | 40 | 59 |
+|---|---|---|---|---|---|
+| flame pixels | 0 | 4 430 | 15 145 | 19 891 | 19 156 |
+
+The flame grows into its fire and then holds. I could not get a *crop* that showed it cleanly — the flame
+region is crowded by torch flames and a pillar, and two attempts framed the wrong thing — so the evidence
+here is the pixel count, which is the same measurement a crop would be eyeballing.
+
+### The benchmark
+
+Base (`df0612b`) against head, built into separate target dirs, run interleaved, three rounds:
+
+| round | base p50 | head p50 |
+|---|---|---|
+| 1 | 549 | 542 |
+| 2 | 502 | 494 |
+| 3 | 513 | 482 |
+
+No regression (head is marginally faster: the bench has no flames, and the new per-flame loop exits on a
+single comparison for a settled fire).
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (67 tests), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
+wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+One thing the gate caught: my first edit dropped the `MeshTag` from the flame's spawn tuple and two
+existing flame tests failed — the tag tests are what make a silent mistake like that loud.
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+2. **A placed specular highlight** (iteration 1's open beauty line): the last line of
+   `lighting-look.md`'s "what great looks like" still at PARTLY.
+3. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+4. **The flame's colour against its catch**: a catching flame should read *redder* at its base as it
+   catches (the ember stage) before its full colour arrives. Today only its size and brightness ramp.
+5. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared
+   only by distance, so the pool can hold the dim one.
