@@ -8,6 +8,14 @@
 // flames"; the octave sum is the turbulence function of Akenine-Moller et al., Real-Time Rendering, 4th ed.,
 // section 6.3. (The first version tiled the quad into five columns, a row of tongues: decision 0228.)
 //
+// **The silhouette has no mirror plane.** Each side has its own half-width, modulated by its own value of one low
+// frequency field, so the left edge and the right edge are independent curves. That is not decoration: a buoyant
+// flame's bulge is a detached toroidal vortex and it grows on one side of the flame sheet first, so a flame whose edges
+// are exact negations of each other is a drawing of a flame rather than a flame. The bulges' vertical spacing is the
+// puff spacing, `size / PUFF_WAVELENGTH` per unit of flame height, from the same law the flicker rate comes from
+// (`docs/research/flame-silhouette.md`). The measurement that made this a defect, and the one that judges the fix, is
+// left/right edge difference as a share of the flame's width: it was 0.00 %, every frame.
+//
 // The noise is a 2D simplex noise with the classic fbm over it; both are web sources home-still cannot index, so their
 // provenance is UNVERIFIED. Adapted here: the quad is billboarded by the vertex stage and sized in world units; the flame's
 // clock is the material's seconds (one shared material, written once a frame) plus the fire's own phase, and its
@@ -45,6 +53,27 @@ const PI: f32 = 3.14159265;
 const FLAME_HALF_WIDTH: f32 = 0.20;
 const FLAME_TIP: f32 = 0.90;
 const PROFILE_PEAK: f32 = 1.172;
+// The silhouette's own two numbers, both from the puff law (`docs/research/flame-silhouette.md`). A puff is a detached
+// toroidal vortex, and successive puffs sit `lambda = 2.09 D` apart for a fuel bed `D` across; the crate's own two fire
+// sizes give 0.40 m (a 0.19 m torch bed) and 0.71 m (a 0.34 m brazier bed), so one constant at their mean is the spacing
+// the shader runs at. A flame's *height* then decides how many bulges it shows: 1.1 m of brazier is two, 0.35 m of torch
+// is most of one. `model::flame::puff_wavelength` and `flame_bulges` are the same two numbers on the CPU, so the shader
+// and the crate's model cannot disagree.
+const PUFF_WAVELENGTH: f32 = 0.55;
+// How far a bulge pushes the silhouette's half-width, as a share of that half-width: +-22 %, so the widest point of a
+// bulge and the waist above it differ by 44 %, which is what a puff's own size looks like on a flame.
+const EDGE_BULGE: f32 = 0.22;
+// The edge field's frequency across the flame, in cycles per flame width: one, so the silhouette reads as a leaning
+// tongue with a lump in it rather than as a torn rag.
+const EDGE_ACROSS: f32 = 1.1;
+// How fast the edge field climbs the flame, in flame-heights per second: slow, because a bulge is a large eddy and it
+// takes most of a flicker period to travel the flame. On the shape's clock (`material.params.x`), like the silhouette's
+// other noise, so a paused world's fire holds its shape.
+const EDGE_RISE: f32 = 0.65;
+// How far apart the two sides sample their field. Large enough that no two columns of the noise lattice are shared, so
+// the left and right edges are independent curves; odd, so the two sides never land on mirror-image lattice cells.
+const EDGE_SPLIT: f32 = 17.3;
+
 // The ramp: the cool rim and tip, then the host's fire colour, then the hot core.
 const EDGE_RED: vec3<f32> = vec3<f32>(0.70, 0.06, 0.005);
 const CORE_YELLOW: vec3<f32> = vec3<f32>(1.0, 0.78, 0.30);
@@ -65,6 +94,10 @@ struct FlameVertexOutput {
     // The fire's flicker this frame (0.70..1.00 of its base), read from the tag: the same number the light's intensity
     // was multiplied by, so the drawn fire and the light it casts are one fire. Flat, for the same reason as `took`.
     @location(3) @interpolate(flat) brightness: f32,
+    // The flame's height in world units, from the tag's height fraction and the material's `max_height`. The silhouette's
+    // puff spacing is a *world* distance, so the number of bulges up the flame is its height over that spacing, and a
+    // torch's flame shows a fraction of a bulge where a brazier's shows two. Flat: one number for the whole flame.
+    @location(4) @interpolate(flat) height: f32,
 }
 
 // ---- 2D simplex noise and the classic fbm over it (provenance UNVERIFIED, see header) ---------------------------------
@@ -142,6 +175,7 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     out.phase = f32((raw >> 8u) & 0xffu) / 255.0 * TAU;
     out.took = took;
     out.brightness = f32(raw & 0xffu) / 255.0;
+    out.height = size;
     return out;
 }
 
@@ -164,13 +198,32 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     let u = clamp(dy / FLAME_TIP, 0.0, 1.0);
     // `max(sin(..), 0.0)`: `sin(PI)` is slightly negative in f32, and `pow` of a negative base is undefined in WGSL.
     let profile = (0.25 * (1.0 - u) + pow(max(sin(PI * pow(u, 0.62)), 0.0), 0.9)) / PROFILE_PEAK;
-    let half_width = FLAME_HALF_WIDTH * profile + 1e-4;
+    // How many puffs fit up THIS flame: its own height over the puff spacing, both in world units, so a brazier shows
+    // two and a torch most of one. A tiny flame is floored so its edges still move rather than freezing.
+    let puffs = max(in.height / PUFF_WAVELENGTH, 0.35);
+    // The two edges are independent curves. Each side samples one low-frequency field at its own lateral offset, so no
+    // column of the flame is the mirror of another; the field climbs the flame on the shape's clock and its amplitude
+    // grows with height, so the foot stays seated on its fire and the lumps shed off the tip. `puffs` is the field's
+    // vertical frequency, which is the whole point: the bulges are the puffs the flicker law already knows about.
+    let side = select(1.0, -1.0, dx < 0.0);
+    // Its vertical coordinate is the height along the flame in *world* units over the puff spacing, less the distance
+    // the field has climbed: `EDGE_RISE` is metres per second, so a bulge travels the same distance up a torch's flame
+    // and a brazier's, and each flame shows the bulges its own height allows.
+    let edge_field = fbm(vec2<f32>(
+        (in.uv.x - 0.5) * FLAME_ASPECT * EDGE_ACROSS + side * EDGE_SPLIT,
+        (u * max(in.height, 1e-4) - t * EDGE_RISE) / PUFF_WAVELENGTH,
+    ));
+    let bulge = 1.0 + EDGE_BULGE * (2.0 * edge_field - 1.0) * pow(u, 0.7);
+    // The width this side of the flame uses, so the left edge and the right edge are two different widths and the
+    // silhouette has no mirror plane. Continuous at the axis (both sides are 1.0 there): `profile` is the same curve.
+    let half_width = FLAME_HALF_WIDTH * profile * bulge + 1e-4;
     var body = 1.0 - abs(dx) / half_width;
     // Noise eats into the upper flame, so its top licks instead of ending in a smooth point.
     body -= (1.0 - n3) * 0.9 * pow(u, 1.8);
     body = select(body, -1.0, dy < 0.0);
     let mask = smoothstep(0.0, 0.30, body) * smoothstep(0.0, 0.06, y);
-    // Hottest along the axis and low down: red rim and tip, the host's fire, a yellow core.
+    // Hottest along the axis and low down: red rim and tip, the host's fire, a yellow core. Off `body`, which is now
+    // per side, so a row across the flame can carry more than one bright patch and the core leans with the edge.
     let heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);
     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));
