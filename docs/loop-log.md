@@ -1554,3 +1554,122 @@ it is again **left uncommitted**: a tracked change this pass did not write is th
 to commit. Its guidance is right and was followed — verify and finish the killed pass's work rather than
 beginning another, commit the research note alone, then the implementation, then docs and media, then this
 log.
+
+## Iteration 16 — 2026-10-26 — the flame's silhouette: researched, attempted, reverted
+
+Outcome first: **nothing shipped.** The research note, the puff law as a tested model module, and the
+blocker analysis landed; the shader change was implemented, captured, measured against three
+alternative amplitudes and a lean term, and **reverted** because it did not reach GREAT on the crate's
+own camera. The tree is back at `578ddac` for `src/`.
+
+### What ranked first, and the runner-up
+
+1. **The flame's silhouette is one analytic curve mirrored about its axis** (`body = 1 - abs(dx)/half_width`
+   with a height-only `half_width`), so a bulge is a bulge on both edges at once. Picked: it is the
+   crate's most-shown feature, the README GIF's subject, and the one place the shader is structurally
+   incapable of the thing its own note asks for.
+2. A torch's flame saturates into a shard at close range (8 % of its pixels ≥ 254 DN at 5 m; the whole
+   flame is a shard at 3 m). Real, deferred: its fix is a ramp change that would fight the ramp an
+   asymmetry redesign already needs.
+3. **Downgraded from iteration 15's #1**: the bright vertical column above the near brazier. Measured
+   with `LIGHTS_POOL=0` and found *identical*, and traced to pillar x915–923 lit by the moon fill — a
+   scene artefact, not a crate one. Struck, with the evidence in `findings.md`.
+4. The flicker amplitude stays uncited (blocked 15 iterations; Maynard 2013 unobtainable).
+5. `Rank::Weighted`, and the flagstones' 256 draw calls.
+
+### Sources
+
+- craft: `10.7456_tojdac.1674124` (Doğaner, the narrational role of lighting design — visible sources
+  "manage the viewer's perception, allowing them to logically find where the light comes from"), and
+  `10.32657_10220_48312` (Doyle's "small single source … to emulate the practical lighting source").
+- production: `s2011-advances-pdf-slides` ("Spawn lots of high velocity particles, pick up nice motion
+  from fluid sim"), `s2007-advances-course-notes-0-4-mb` (TF2, legibility), and **GPU Gems ch. 6 §6.1,
+  now in the corpus and read in full** — which narrows rather than widens `flame.md`'s claim about it.
+- technical: `10.1017_jfm.2018.707` (Xia & Zhang: toroidal vortices, "pairing and merging of the flame
+  bulge", and `H = U₀·τ` giving `λ = U₀/f`), `eth-cgl-sim_anim-Kim08` (enforce Navier-Stokes low, a
+  turbulence spectrum high), `book_real_time_rendering_4th_akenine` §6.3.
+- Note: `docs/research/flame-silhouette.md`, committed alone as `1a8cef6`.
+
+### The work, and the measurements that ended it
+
+`model::flame::{puff_wavelength, flame_bulges}` (`λ = (√g/1.5)·D`) is sound and kept in the note as the
+law any future attempt needs. In the shader: a per-side half-width from one field at `±17.3`, a vertical
+frequency of `size / PUFF_WAVELENGTH`, the heat ramp moved onto the per-side `body`, then an axial lean.
+
+| line | baseline | attempt (0.70) |
+|---|---|---|
+| close camera, brazier width variation about its own trend | 3.67 px sd (6.2 % of mean width) | **7.01 px sd (11.7 %)** |
+| width-profile bulges, close camera | 1 | **2** |
+| hero camera, torch axis wander | 0.33× its own width | 0.32× — **no gain** |
+| warm pixels ≥ 254 DN, default camera | 0.180 % | 0.177 % |
+| silhouette area modulation, 40 frames | 14.9 % p2p | 14.5 % p2p |
+| key-to-fill | 2.00 : 1 | 2.00 : 1 |
+
+Three findings worth the next pass's time, all in the note's `Deviations`:
+
+1. **A bigger amplitude is not the answer.** 0.22 was invisible (`fbm`'s spread is sd 0.12, so `2·fbm−1`
+   arrives at a fifth of its name), 0.50 gave a visible waist, 1.00 left the flame gaunt, 4.00 tore it.
+   The usable window is narrow and near 0.70.
+2. **A vertical phase split between the two sides makes it worse** (bulges 1 → 0): it is equivalent to
+   scrolling the field, so both sides keep the same bulge pattern, offset in time.
+3. **The blocker is the missing per-flame `D`.** A 0.35 m torch flame is shorter than one puff
+   (`flame_bulges(0.35, 0.19) = 0.88`), so a constant `PUFF_WAVELENGTH` gives it a fraction of a lobe and
+   no amplitude rescues that. Getting `D` to the fragment stage needs a wider `MeshTag` (its 32 bits are
+   spent: height 16 | phase 8 | brightness 8) or a second instance attribute — an allocation decision.
+
+### The metric correction — recorded because it invalidates a tempting shortcut
+
+The first draft of the note claimed the baseline was "exactly symmetric: 0.00 px left/right difference on
+every frame". **That was a tautology**: the axis was `mean(left + right)`, which makes the two half-widths
+equal for *any* picture, so the statistic is identically zero whatever is rendered. Re-measured honestly,
+the baseline is already asymmetric — **16.5 % per-row mirror residual, 5.1 % half-width difference** —
+because the existing `n1` fbm already perturbs `dx` per pixel. What the crate ships is a mirror *envelope*
+with a noisy outline: a much narrower defect than the draft claimed, and the reason a per-side envelope
+change bought so little. Both the note and this log carry the correction rather than the original claim.
+
+### The critique and the verdict
+
+Full critique: `/home/ladvien/l16/critique.md`. **NOT YET**, and therefore reverted. Round 5 of the
+allowed five. Against the note's `## What great looks like`: "no mirror plane" PARTLY, "bulges that shed"
+PARTLY (no visible detachment at the tip), "a hot core that is not a stripe" improved by construction but
+unmeasured, "an unbroken silhouette" PASS only at 0.70 with 1.0 already gaunt, "the same fire as before"
+PASS, "cheap" PASS as far as a CPU bench can see.
+
+### The gate, on the reverted tree
+
+`cargo build --release`, `cargo build`, `cargo test` (37 lib + 8/3/28 behaviour + 1 readme + 15 doctests),
+`cargo test --features serde`, `cargo build --examples --all-features`,
+`cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`, `cargo fmt --check`,
+`cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass on the reverted tree.
+Bench (base `578ddac` in its own worktree and target dir, three interleaved rounds): whole frame base
+`p50` 472–564 µs against after 465–507 µs, `pool_p50_us` 334–393 against 327–368, `flicker_p50_us`
+148–206 against 149–206 — inside the same noise, as expected for a GPU-side change the bench cannot see.
+
+### Environment
+
+`/tmp` was **100 % full (1.7 MB free)** again, so every build and capture ran with `TMPDIR=/home/ladvien/tmp`
+and the base worktree kept its `target/` off `/tmp`. GPU was idle (476/24576 MiB, no tenant). One Xvfb
+capture failed with `XOpenDisplayFailed` on the display `-a` picked, the documented trap; re-run on a
+fresh `-n`.
+
+### Top 5 remaining, ranked
+
+1. **A per-flame fuel-bed diameter in the fragment stage**, which is the blocker above: a wider `MeshTag`
+   or a second instance attribute, then the silhouette attempt retried with each fire's own `λ`. This is
+   the item that makes the flame's shape legible at gameplay distance, and it is an allocation decision
+   first.
+2. **The tip must actually pinch and shed**, which the note asks for and no attempt has delivered. With a
+   per-flame `λ` this is the same mechanism, not a new one.
+3. **A torch's flame saturates into a shard at close range** (carried from iteration 15): 8 % of its
+   pixels at ≥ 254 DN, the whole flame at 3 m.
+4. The flicker amplitude, still uncited (blocked 15 iterations).
+5. `Rank::Weighted` for gameplay priority.
+
+### One tracked change this pass did not make
+
+`.omp/skills/bevy-lights-build-loop/SKILL.md` still carries the unstaged edit adding *"Your work is saved
+even if you are killed"*, in the working tree when this pass began, as iterations 14 and 15 also logged.
+It is again **left uncommitted**: a tracked change this pass did not write belongs to its author. Its
+guidance was followed — the research note was committed alone before any code, and the attempt was
+finished and measured rather than abandoned half-done.

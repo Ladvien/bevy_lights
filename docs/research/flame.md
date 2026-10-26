@@ -11,7 +11,7 @@ and its height — riding on the mesh's tag.
 |---|---|---|
 | Sanctuary decision 0228 | one teardrop distorted by scrolling fbm, replacing a five-column tile of tongues | the silhouette |
 | Sanctuary report 1792016494 | "Torches and braziers need a shader flame of some sort. Right now they just glow." | why it exists |
-| Nguyen, *Fire in the Vulcan Demo*, **GPU Gems** ch. 6 §6.1 | the 2D-distortion flame, "perfect for creating candle-like flames" | the shape and its noise |
+| Nguyen, *Fire in the Vulcan Demo*, **GPU Gems** ch. 6 §6.1 (corpus stem `GPU Gems … Anna's Archive`, indexed 2026-10-26) | the 2D-distortion flame, "perfect for creating candle-like flames" | the shape; see `flame-silhouette.md` — the chapter's verdict is candle-*scale*, and it does not document this shader's noise |
 | `book_real_time_rendering_4th_akenine` §6.3 | turbulence (the octave sum over noise) | the fbm |
 | Sanctuary `assets/shaders/flame.wesl` | the shader this crate ships, comments retargeted | the code |
 | home-still `s2007-advances-pdf-slides-2-8-mb` | Mitchell, Francke & Eng 2007, *Illustrative rendering in Team Fortress 2* | the warm ramp the flame sits in |
@@ -209,3 +209,13 @@ envelope's shape; the corpus has none (Maynard 2013 measures light and is unobta
 The two noise sources (the simplex formula and the integer gradient hash) are not in the corpus and
 cannot be indexed: they are web references. Jarzynski & Olano 2020 (JCGT 9(2)) is the paper that
 would settle the hash if it can be imported; it is not present today.
+
+**GPU Gems ch. 6 itself is now in the corpus and indexed** (stem `GPU Gems … Anna's Archive`, read live
+2026-10-26 in iteration 16). Its §6.1 has been read in full, and it supports less than this note's
+`Sources` row used to imply: it describes "2D distortion-based flames" perturbed by "a GPU-generated
+perturbation function that altered a flame shape to give it a realistic motion", calls that class
+"perfect for creating candle-like flames", and records that the Vulcan demo itself abandoned it —
+"Both procedural techniques have strong advantages, but they didn't meet our goal of creating a
+believable raging fire with smoke". So it is the source for the *technique* and for the puff-motion
+principle, and **not** for the noise in `src/flame.wesl`, whose provenance stays UNVERIFIED.
+`flame-silhouette.md` carries the same correction.
