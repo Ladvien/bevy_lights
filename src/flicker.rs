@@ -27,8 +27,10 @@ impl Plugin for FlickerPlugin {
 /// A light's mean intensity and the clock phase its flicker runs at.
 ///
 /// The light's intensity is written every frame (while it is visible) as
-/// `base · flicker_factor(t, phase) · kindle_gain(…)`: see [`flicker_factor`]. Put it on a
-/// [`PointLight`] or a [`SpotLight`]. Two fires given different phases never fall into step.
+/// `base · flicker_swing(diameter, t, phase) · kindle_gain(…)`: see [`flicker_swing`]. Put it on a
+/// [`PointLight`] or a [`SpotLight`]. Two fires given different phases never fall into step, and the
+/// `diameter` here is the same number the flame drawn on the fire should be given, so the two breathe
+/// together.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[reflect(Component)]

@@ -107,10 +107,20 @@ swing(phase, diameter, t)  = flicker_factor_of(diameter, t, phase)   if diameter
   same value as the `Flicker::diameter` on the light this flame motivates. A host that gives the light a
   size and the flame none would reintroduce this iteration's defect, so the field is documented as a
   pair with `Flicker::diameter`.
+- `PoolCandidate` gains **`phase: Option<f32>`** and **`diameter: Option<f32>`**: the same two numbers
+  for a prop whose light is handed to it. Without them the second half of the same defect survives one
+  level up — the 48 torch-bearers' pooled lights flicker at `1.3 · slot`, the slot's clock, while the
+  flames drawn on them flicker at each torch's own phase. `assign_pool` now writes the candidate's phase
+  and diameter onto the slot whenever it has one, so a light handed to a torch breathes on that torch's
+  clock. `None` is the crate's old behaviour, so a host that models no per-prop phases is unchanged.
 - `Flame`'s tag gains the flame's brightness: **height 16 bits (unchanged) | phase 8 | brightness 8**.
   The height keeps its full 16 bits because it is the number a host chooses and can see; the phase loses
   8 bits to 2π/256 ≈ 0.025 rad, which is 4 ms of clock at 6 Hz and invisible; brightness gets
   1/255 ≈ 0.4 % of the light's full intensity, against a swing of 0.30, so 1.3 % of the swing's range.
+- **The pool's own phase spread is now a default a candidate can override.** `1.3 · slot` still
+  decorrelates a pool whose props have no fire of their own; a prop that does have one overrides it,
+  which is the point. Design default: a host that says nothing gets exactly what it got before.
+
 - **Brightness is on virtual `Time`; the silhouette is on `Time<Real>`.** That is the crate's existing
   split, applied one level finer: the brightness *is* the light, so a paused world's fires hold still;
   the drawn shape *is* the drawing, so its noise keeps climbing. `docs/research/fire-light.md`'s
@@ -140,6 +150,8 @@ swing(phase, diameter, t)  = flicker_factor_of(diameter, t, phase)   if diameter
   `diameter` and `phase`, at the virtual clock, and the value stays inside 0.70..1.00.
 - In a headless app: two sites with the same `diameter` and `phase` but different heights get the same
   brightness byte; a site with `Some(0.34)` and one with `None` do not.
+- A pooled light takes its candidate's `phase` and `diameter`; a candidate that gives neither leaves the
+  slot's own `1.3 · slot` phase alone (`tests/pool.rs`).
 - In the courtyard capture: the flame region's peak-to-peak luminance rises to within a few percent of
   its pool's, and the correlation between the flame's mean and its pool's mean goes from ≈ 0 to
   **above 0.8**. (The +0.07 measured before this change is the number this iteration must move.)
