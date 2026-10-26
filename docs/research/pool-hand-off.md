@@ -69,21 +69,41 @@ threshold for a smaller one, so a light's own falloff masks the last frames of i
 ## Model adopted
 
 Two engine-free functions in `src/model/pool.rs` (the pool's own model module) plus one ECS change, and
-**a cross-fade on top of them** (added in iteration 4; see *Iteration 4's findings*):
+**a cross-fade on top of them** (added in iteration 4; see *Iteration 4's findings*). Iteration 13 added
+**`preferred`** and the three **set rules** below it, and rewrote the ECS pass to decide every slot's
+owner before writing any of them:
 
-1. **`hand_off(held, challenger, hysteresis)`** — the assignment rule. A slot keeps the candidate it
+1. **`hand_off(held, challenger, hysteresis)`** — the overlap rule on distances. A slot keeps the candidate it
    holds unless a challenger is nearer by more than `1 / hysteresis`, i.e. the challenger must be
    closer by a margin before it wins. `hysteresis = 1.0` is the current behaviour (nearest wins
    outright); the crate's default is 1.15, so a challenger must be ~13 % nearer.
-2. **`fade_factor(since_hand_off, fade_seconds)`** — the intensity multiplier of a light that has just
+2. **`preferred(held, challenger, hysteresis)`** — the same overlap rule on any "smaller is better"
+   quantity; `hand_off` is `preferred` on distances. A pool that ranks its candidates by the light each
+   puts on the subject compares *that* quantity here, so ranking and holding are one rule rather than two
+   that can disagree (see *Iteration 13's findings*, consequence 3).
+3. **`fade_factor(since_hand_off, fade_seconds)`** — the intensity multiplier of a light that has just
    changed owner: `0` at the instant of the hand-off, rising smoothly to `1` over `fade_seconds`,
    with a smoothstep so the derivative is zero at both ends. The light *darkens* at the new owner and
    comes back over a third of a second; the frame's total is held by the hysteresis, not by two lights
    both being on at once (the pool has a fixed size, and two on at once would break its budget).
-3. **The ECS change**: `assign_pool` remembers each slot's held candidate in a `Local`, applies
-   `hand_off` against it, and writes `Flicker::base = intensity · gain · fade_factor(...)`. The slot's
-   position still steps once (a light cannot be in two places), but its brightness dips through the
-   step, which is what makes the step read as a change of brightness rather than a teleport.
+4. **The ECS change**: `assign_pool` remembers each slot's held candidate in a `Local` and writes
+   `Flicker::base = intensity · gain · fade_factor(...)`. The slot's position still steps once (a light
+   cannot be in two places), but its brightness moves through the step, which is what keeps it from
+   reading as a teleport. Since iteration 13 every slot's owner for the frame is decided in **one map
+   before a single slot is written**, because a decision that depended on the order the slots happen to
+   be written in is how a slot came to take a candidate another slot was keeping.
+
+The set rules, in the order they matter:
+
+- **A candidate another slot holds is never a challenger.** It belongs to its holder; nothing else may
+  compare against it.
+- **A challenger displaces the worst-ranked light the pool holds**, not "the slot that happens to
+  compare first". The assignment is the best *set* of lights the pool can hold, so a newcomer costs one
+  light rather than re-sorting the pool.
+- **At most as many lights move per frame as there are free reserve lights.** A hand-off the pool cannot
+  cross-fade is a hand-off that dims its subject, and a reserve is busy for the whole fade it carries. A
+  scene needing more moves gets them on the following frames; the next frame recomputes the same
+  challengers, so the pool catches up without ever blacking out a street for one frame.
 
 A slot that keeps its candidate fades nothing: a steady light is exactly as before, which is what the
 benchmark and the existing tests check.
@@ -92,7 +112,9 @@ benchmark and the existing tests check.
 
 | parameter | value | source |
 |---|---|---|
-| hysteresis ratio | 1.15 (a challenger must be 13 % nearer) | design default: "overlapping keys", `10.58709_niujhu.v8i3.1694`; large enough to stop chatter between two props, small enough that the nearest torch still gets the light |
+| hysteresis ratio | 1.15 (a challenger must be 13 % better) | design default: "overlapping keys", `10.58709_niujhu.v8i3.1694`; large enough to stop chatter between two props, small enough that the best torch still gets the light |
+| hysteresis quantity | the rank's own value: `distance² / intensity` under `Rank::Illuminance`, the squared distance under `Rank::Distance` | one quantity for ranking and holding; the illuminance form is the inverse square `fire_lumens` inverts |
+| lights moved per frame | the number of free reserve lights (unthrottled when `reserve` is 0) | design default: masking is local (Luebke §8), so a mass reshuffle is the one change the eye cannot miss; a move the pool cannot cross-fade must not happen |
 | fade | 0.35 s, smoothstep | design default: below the eye's fusion threshold (`10.1109_tvcg.2019.2898741`), long enough to read as a change rather than a cut (20 frames at 60 Hz); masked by the light's own falloff (Luebke) |
 | fade curve | smoothstep | design default: zero derivative at both ends, so no flicker at either boundary |
 | reserve lights | 1 | design default: one cross-faded hand-off per frame; two lights on one subject for 0.35 s is the craft's overlap rule, and one is the cheapest form of it |
@@ -113,8 +135,17 @@ benchmark and the existing tests check.
 - In `tests/pool.rs`: a slot that keeps its candidate has the same `Flicker::base` for two frames; a
   slot that changes owner has a smaller base on the frame it changes and recovers within the fade; and
   a slot whose new owner is the same entity (re-inserted) does not fade.
+- `preferred` is `hand_off`'s rule on a general quantity: a challenger 16 % better wins, one 10 %
+  better does not. Both `NaN`s are answered before the clamp, so a broken distance never becomes a zero
+  (`f32::max` returns the other operand when one is `NaN`).
+- **One new candidate displaces one light and no more** (`one_new_candidate_displaces_one_light_and_no_more`):
+  four steady slots and one far brighter newcomer, and exactly one slot moves while the other three keep
+  their position and full brightness. Reverted to the old rule it fails, with two slots moving and one of
+  them taking a candidate another slot had.
+- **Four times the light at twice the distance is an exact tie**, and the tie breaks on `Entity`. The rank
+  value must not be inserted before `Entity` in the sort tuple: doing so silently replaces the tie-break.
 - In a frame sequence of the courtyard, the largest single-frame change in mean luminance falls against
-  the pre-change capture (the measurement the loop log has wanted since iteration 0).
+  the pre-change capture, and no frame loses most of the pool.
 
 ## Deviations
 
@@ -173,6 +204,35 @@ Adopted as written, with four things the implementation taught:
   which is how the first, wrong measurement (it read the pool's first filling frame) was caught: a
   switch that turns a feature off has to change what you measured, or you measured something else.
 
+## Iteration 13's findings: the reshuffle
+
+The rule "every slot keeps its candidate unless a challenger is better by the hysteresis" was applied
+per slot, each against one global best free candidate. Three consequences, all measured:
+
+1. **One newcomer displaced every slot at once.** In the courtyard's `LIGHTS_POOL_LOG` the pool's total
+   fell 17 % in a single frame (mean 951 678 lm; −162 899 lm at frame 94) and up to **7 of 8 slots read
+   zero** in that frame. `before/pop/frame0007.png` shows it: every torch-lit pool gone, only the
+   braziers burning, then a twenty-frame fade back.
+2. **A displaced slot's fallback stole a held candidate.** The second pass took "the best candidate no
+   slot has been *written* yet", so a slot written earlier could claim a candidate a later slot was
+   still keeper of. Instrumented: `DBG STOLEN slot 6 took Some(1057v0) held by another keeper`.
+3. **The overlap rule and the rank disagreed.** Iteration 12 ranked by illuminance but held by distance,
+   so a bright far lantern could be starved by a dim near torch the rank would never have chosen.
+
+Fixed by the three set rules above and by `preferred`. Same capture, same camera, 400 frames:
+
+| | before | after |
+|---|---|---|
+| mean pool total | 951 678 lm | 1 032 425 lm (+8.5 %) |
+| mean per-frame change | 10 396 lm (1.09 %) | 2 492 lm (0.24 %) |
+| largest per-frame change | 162 899 lm (17.1 %) | 14 902 lm (1.4 %) |
+| frames changing more than 2 % | 13 of 259 | **0** |
+| most slots dark in one frame | 7 of 8 | 2 of 8 (a hand-off's own fade) |
+| mean frame luminance, frames 88–110 | two 0.69 DN drops, each recovering over ~10 frames | smooth; largest step 0.07 DN |
+
+The "+8.5 % mean total" is consequence 3 fixed: the bright lanterns now hold their lights instead of
+being starved by dim near torches.
+
 ## Pending index
 
 Nothing in this note is unindexed: every stem in *Sources* was read live from the running library on
@@ -190,3 +250,10 @@ notes and RTR4 rather than the original paper.
   distance of the held one must take the light, within one frame.
 - **Steady is steady.** With nothing moving near the focus, `Flicker::base` is unchanged frame to frame
   (the pool must not introduce its own chatter).
+- **One move is one move.** A newcomer takes one light from the pool, not a share of every light: the
+  other slots keep their candidates, and no frame changes by more than the flicker's own swing. (Added in
+  iteration 13, where the pool was measured changing 17 % in a frame.)
+- **The best set, not the best slot.** The lights the pool holds are the best *set* it can afford, so a
+  bright far lantern keeps a light that a dim near torch would starve under a per-slot rule.
+- **No light is ever sourceless and no source has two lights.** A frame sequence shows a flame at the
+  foot of every pool and a pool under every flame, in every frame.
