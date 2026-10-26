@@ -117,6 +117,43 @@ not the tags, so it is documented as set-once.
   set-once restriction is the honest consequence of packing the height in 16 bits against a shared
   scale.
 
+## Iteration 7: the flame's own kindle
+
+**The defect.** A fire that a host lights (a `Kindle` on its light) flares its *light* up over
+`KINDLE_SECONDS` (0.6 s) — and its *flame* appeared at full height, full brightness, on the first frame.
+Measured on the courtyard: a brazier's flame mesh is spawned whole, so the frame the fire is lit shows a
+full-size flame over a light at 0 % of its base. The craft's own line in `fire-light.md` says the two are
+one event ("that overshoot is the sound cue's visual half"), and a flame that is already there when its
+light arrives is the opposite: the source precedes the light it motivates, which is the one thing
+`lighting-look.md`'s motivated-source rule forbids.
+
+**What the craft says.** The same ignition envelope the light uses, applied to the flame:
+`fire-light.md` — "a fire that is being lit flares *past* its running brightness and settles, because the
+kindling catches unevenly before the fuel is alight". A flame grows from a coal's glow to its full height
+as the fuel catches; it does not blink into existence.
+
+**Model adopted.** `FlameSite` gains `kindle: Option<Timeline>` — no, a *duration* is enough: the same
+`Kindle` the light carries, read once. The flame's **height and brightness** are scaled by
+`kindle_gain`:
+- `src/model/fire.rs` already has `kindle_gain(t)`, which is 0 at ignition, peaks a little over 1 at 85 %
+  of the way, and is exactly 1 after `KINDLE_SECONDS`. It is the envelope the light already uses, so the
+  flame and the light share one curve rather than two that could drift apart.
+- The site's height is packed into the `MeshTag` as a fraction of `max_height`, and a packed tag cannot
+  be re-scaled — so the *scale* is not in the tag. It goes in the flame's `Transform`, which is free: the
+  child's transform is `IDENTITY` today. `update_flames` writes each flame's scale from its site's kindle,
+  and the shader's own tip/noise animation is untouched.
+- A site with no kindle (the common case: a fire that has been burning all along) is left at scale 1 and
+  costs nothing.
+
+**Deviations.** The flame's *width* scales with its height, because a fire that is catching is smaller in
+both; a flame that grew tall but stayed wide would read as a sheet. No separate flame-only curve: sharing
+`kindle_gain` is the point.
+
+**Pending index.** Nothing new to index: this is the existing `kindle_gain` applied to the second half of
+the same event. A source that measured a *flame's* height against time after ignition would replace the
+envelope's shape; the corpus has none (Maynard 2013 measures light and is unobtainable, per
+`fire-light.md`).
+
 ## Pending index
 
 The two noise sources (the simplex formula and the integer gradient hash) are not in the corpus and
