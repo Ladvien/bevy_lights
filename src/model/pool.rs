@@ -70,6 +70,23 @@ pub fn hand_off(held_distance: f32, challenger_distance: f32, hysteresis: f32) -
     challenger * margin < held
 }
 
+/// The brightness multiplier of a light that is **leaving** a hand-off `since` seconds after it: 1 at
+/// the instant of the hand-off, falling to exactly 0 over `fade_seconds`, and 0 from then on.
+///
+/// The complement of [`fade_factor`], so a cross-fade's departing and arriving lights sum to exactly
+/// one at every point: the subject neither brightens nor darkens as the light changes hands, which is
+/// what "overlapping key lights" buys.
+///
+/// ```
+/// # use bevy_lights::model::pool::*;
+/// for since in [0.0, 0.05, 0.1, 0.2, 0.35] {
+///     assert!((fade_out_factor(since, FADE_SECONDS) + fade_factor(since, FADE_SECONDS) - 1.0).abs() < 1e-6);
+/// }
+/// ```
+pub fn fade_out_factor(since: f32, fade_seconds: f32) -> f32 {
+    1.0 - fade_factor(since, fade_seconds)
+}
+
 /// The brightness multiplier of a light `since` seconds after it changed owner: 0 at the instant of
 /// the hand-off, rising to exactly 1 over [`FADE_SECONDS`], and exactly 1 from then on.
 ///
@@ -119,6 +136,20 @@ mod tests {
         assert!(hand_off(16.0, 15.99, 1.0), "any nearer challenger wins at 1.0");
         assert!(!hand_off(16.0, 16.01, 1.0), "a further one never does");
         assert!(hand_off(16.0, 15.99, 0.5), "below 1.0 clamps to the nearest-wins rule");
+    }
+
+    #[test]
+    fn a_cross_fade_sums_to_one_at_every_point() {
+        let mut since = 0.0;
+        while since <= FADE_SECONDS {
+            let out = fade_out_factor(since, FADE_SECONDS);
+            let incoming = fade_factor(since, FADE_SECONDS);
+            assert!((out + incoming - 1.0).abs() < 1e-6, "at {since}: {out} + {incoming}");
+            assert!((0.0..=1.0).contains(&out), "{out} at {since}");
+            since += 0.005;
+        }
+        assert_eq!(fade_out_factor(0.0, FADE_SECONDS), 1.0, "a departing light starts whole");
+        assert_eq!(fade_out_factor(FADE_SECONDS, FADE_SECONDS), 0.0, "and ends gone");
     }
 
     #[test]
