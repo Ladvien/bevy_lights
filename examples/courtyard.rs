@@ -489,7 +489,14 @@ fn spawn_scene(
                 // it is not. Both sit at the same lift, so the hand-off is invisible.
                 bearer.spawn((
                     Name::new("Torch light"),
-                    PoolCandidate { offset: Vec3::Y * TORCH_LIFT, intensity: torch_intensity() * burn },
+                    PoolCandidate {
+                        offset: Vec3::Y * TORCH_LIFT,
+                        intensity: torch_intensity() * burn,
+                        // The handed-out light breathes on this torch's own clock, so it matches the
+                        // flame drawn on it instead of the pool slot's phase.
+                        phase: Some(phase),
+                        diameter: None,
+                    },
                     Transform::from_xyz(0.0, TORCH_LIFT - 0.85, 0.0),
                 ));
                 bearer.spawn((

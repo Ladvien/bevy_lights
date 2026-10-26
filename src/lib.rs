@@ -39,7 +39,7 @@
 //!             // `diameter` matches the `Flicker`'s, so the drawn flame breathes with the light.
 //!             FlameSite { height: 0.9, phase: 0.0, kindle: 0.0, diameter: Some(0.34) }));
 //!         commands.spawn((MyFocus, Transform::default()));
-//!         commands.spawn((PoolCandidate { offset: Vec3::Y * 1.8, intensity: 8_000.0 },
+//!         commands.spawn((PoolCandidate { offset: Vec3::Y * 1.8, intensity: 8_000.0, ..default() },
 //!             Transform::from_xyz(4.0, 0.0, 2.0)));
 //!     });
 //! # }

@@ -42,10 +42,13 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
   the change rather than dipping, which is the craft's "overlapping key lights" — and caps how many lights
   change owner in one frame, so a hand-off is never made without a cross-fade to hide it.
 - **Shader flames** (`FlamePlugin`). An additive billboard fire (`src/flame.wesl`) is drawn on every
-  `FlameSite`, out of one material and one draw per flame, with each fire's phase and height packed
-  into its `MeshTag` so two fires never burn in step. One shared clock, written once a frame, on
-  `Time<Real>` — a paused world's fires still move. A site with a `kindle` grows its flame from nothing
-  on the same curve its light kindles by, so the two arrive together.
+  `FlameSite`, out of one material and one draw per flame, with each fire's phase, height and
+  brightness packed into its `MeshTag` so two fires never burn in step. One shared shape clock, written
+  once a frame, on `Time<Real>` — a paused world's shape still moves. A site with a `kindle` grows its
+  flame from nothing on the same curve its light kindles by, so the two arrive together; and
+  `FlameSite::diameter` given the same value as the light's `Flicker::diameter` makes the flame **breathe
+  at the light's own rate and phase**, so the fire and the ground it lights are one fire rather than a
+  still flame over a moving pool.
 - **The lighting look** (`bevy_lights::model::cinematography`). The numbers a cinematographer sets,
   as plain functions: `key_to_fill` and `stops` (with `LOW_KEY` 8:1, `MOON_KEY` 4:1 and `HIGH_KEY`
   2:1), `fill_for`, `fire_lumens` (the lumens a pool of a given size and brightness needs),
@@ -54,8 +57,9 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
   temperature it burns at, instead of picking lumens and an RGB by eye.
 - **Engine-free maths** (`bevy_lights::model`). Every curve the crate runs, as plain `f32` functions with
   no `bevy` in them, so a host can reuse them in its own systems: `flicker_factor` and
-  `flicker_factor_of` with `flicker_rate`, `kindle_gain`, `raised_light`, `pack_flame_tag` and their
-  inverses; the pool's `hand_off` and `preferred` (the overlap rule, on distances and on any "smaller is
+  `flicker_factor_of` with `flicker_rate`, `flicker_swing` (the sized-or-un-sized choice the light and
+  the flame both read), `kindle_gain`, `raised_light`, `pack_flame_tag` and its inverse; the pool's
+  `hand_off` and `preferred` (the overlap rule, on distances and on any "smaller is
   better" quantity) with its `fade_factor` / `fade_out_factor`; and the whole of `model::cinematography`
   above. `tests/leaf.rs` keeps them engine-free.
 
@@ -108,7 +112,14 @@ fn setup(mut commands: Commands) {
     // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
     // hand-held flame is smaller, so its pool is sized from its edge.
     commands.spawn((
-        PoolCandidate { offset: Vec3::Y * 1.8, intensity: fire_lumens(250.0, 2.0, 1.8) },
+        // `phase` is this torch's own fire clock: the real light it is handed later breathes with the
+        // flame drawn on it, not with the pool slot that happens to own it.
+        PoolCandidate {
+            offset: Vec3::Y * 1.8,
+            intensity: fire_lumens(250.0, 2.0, 1.8),
+            phase: Some(1.9),
+            ..default()
+        },
         // The pool's lights flicker at the un-sized rate, so this flame does too.
         FlameSite { height: 0.35, phase: 1.9, kindle: 0.0, diameter: None },
         Transform::from_xyz(4.0, 0.0, 2.0),
@@ -170,6 +181,7 @@ Every default is researched and cited, or marked a design default. The notes:
 | [`docs/research/fire-light.md`](docs/research/fire-light.md) | the flicker's rate and amplitude, the kindle's flare | Sanctuary decisions 0127/0148; Team Fortress 2's illustrative ramp (SIGGRAPH 2007 *Advances*); the fire-physics literature this crate is still missing |
 | [`docs/research/light-pool.md`](docs/research/light-pool.md) | the pool's budget, reach, sort and phases | Olsson, Billeter & Assarsson 2012 (clustered shading); Ghost of Tsushima (SIGGRAPH 2021 *Advances*); *Stochastic tile-based lighting* (SIGGRAPH 2025 *Advances*); RTR4's many-light chapter |
 | [`docs/research/flame.md`](docs/research/flame.md) | the flame's shape, noise, ramp and packing | Nguyen, *GPU Gems* ch. 6 §6.1; RTR4 §6.3; Sanctuary decision 0228 |
+| [`docs/research/flame-flicker.md`](docs/research/flame-flicker.md) | why a drawn flame breathes with the light it motivates, and how the two share one function | Xia & Zhang 2018; SIGGRAPH 2011 *Advances*' fire talk; Doğaner on motivated sources |
 | [`docs/research/corpus.md`](docs/research/corpus.md) | what the home-still library holds for cinematography, photography, CG lighting, game-lighting craft, many-light rendering, fire physics and perception — and what it does not | the live corpus |
 
 ## Bevy compatibility

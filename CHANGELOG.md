@@ -6,6 +6,20 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **A drawn flame breathes with the light it motivates.** `FlameSite::diameter` sizes the flame's own
+  flicker through the same puffing law the light's uses, and `FlamePlugin` rewrites each flame's
+  brightness every frame from **`model::fire::flicker_swing`** — the same function `flicker_lights` writes
+  the light's intensity with, so the flame and the ground under it cannot drift apart. The brightness
+  rides in the flame's `MeshTag` (low byte, 8 bits) beside its phase (next byte) and height (high 16).
+  Measured on `examples/courtyard`: the flame's own pixels moved ±3.5 % while its pool moved ±15-22 %,
+  and the two series correlated at **+0.07**; `docs/research/flame-flicker.md` is the note.
+
+- **`model::fire::flicker_swing`**, the sized-or-un-sized flicker choice in one place:
+  `Some(d)` is `flicker_factor_of` and `None` is `flicker_factor`.
+
+- **`model::tag::set_flame_brightness`**, a tag with only its brightness rewritten, so the per-frame
+  write does not round-trip the height and phase through their quantisation.
+
 - **`model::pool::preferred`**, the overlap rule on any "smaller is better" quantity: `true` when a
   challenger beats what is held by the `hysteresis` margin. `hand_off` is `preferred` on distances, and
   the pool's own holding decision uses it on its rank value, so ranking and holding are one rule.
@@ -75,6 +89,26 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
     crate root. Their sources and parameters are in `docs/research/lighting-look.md`.
 
 ### Fixed
+
+- **A flame held still while the light it cast moved.** Measured on `examples/courtyard`: over 400 frames
+  a brazier's pool on the ground swung ±15-22 % peak to peak while the flame's own pixels swung ±3.5 %,
+  and the two correlated at **+0.07** — the source that is supposed to motivate the light was not doing
+  the motivating. The flame's emission now carries the fire's own flicker, from the same function and the
+  same clock the light is written with.
+
+### Changed
+
+- **`pack_flame_tag` / `unpack_flame_tag` take and return the brightness**, and the tag's layout is now
+  height 16 | phase 8 | brightness 8 (was phase 16 | height 16). The 16-bit phase was 1e-4 rad of
+  resolution a fire cannot use; the byte it keeps is 2π/256 ≈ 0.025 rad, four milliseconds of clock at
+  6 Hz. A tag packed before this change reads its height correctly and its phase from a byte that used to
+  be part of the old phase, so a host that persisted tags across the upgrade would see its phases shift —
+  nothing in the crate persists one; `dress_flames` packs each flame's tag at spawn.
+
+- **The flame's brightness runs on virtual `Time`, its shape on `Time<Real>`.** The two were one clock
+  before. The split is the one `fire-light.md` already states for the light: a paused world's fires hold
+  still, and the drawing on them keeps moving. `flame.md`'s "a paused world's fires still flicker" is now
+  about the silhouette only.
 
 - **One newcomer reshuffled the whole pool, and up to seven of eight lights went dark for a frame.** The
   hand-off compared every slot against the *same* best free candidate, so a single bright prop displaced

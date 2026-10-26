@@ -116,6 +116,11 @@ not the tags, so it is documented as set-once.
   constant, because a foot-scale world and a metre-scale world need different ones. The
   set-once restriction is the honest consequence of packing the height in 16 bits against a shared
   scale.
+- **The flame's brightness is the fire's own flicker, on virtual time, and its shape stays on real
+  time.** This note used to say the whole flame ran on `Time<Real>`; only the silhouette's noise does
+  now. The brightness is the light, so it follows the light's clock; see
+  [`fire-light.md`](fire-light.md) and [`flame-flicker.md`](flame-flicker.md). The tag gained a
+  brightness byte, taking it from (phase 16 | height 16) to (height 16 | phase 8 | brightness 8).
 
 ## Iteration 7: the flame's own kindle
 

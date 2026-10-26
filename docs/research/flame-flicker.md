@@ -72,6 +72,24 @@ shipped renderer budgets for:
 The light and the thing the player sees are the same fire in both talks. Neither one decouples the
 drawn emission from the light's fluctuation, because a decoupled pair is a bug an artist files.
 
+## What great looks like
+
+- Stand 3 m from a brazier in `examples/courtyard` and watch only its flame: it should brighten as the
+  ground under it brightens, by about the same fraction (a swing of 0.70..1.00 of the mean), and it
+  should be **out of step with the brazier next to it** but in step with its own pool. A viewer who
+  cannot see the ground should still be able to tell the fire is alive from the flame alone.
+- The flame must not read as a strobe. The amplitude is the light's own (30 % peak to peak of a mean
+  0.85, so ±15 %), which the corpus's critical-flicker-fusion note says fuses in a glance and reads as
+  movement rather than as a lamp failing.
+- The flame must not pulse as a whole. Its silhouette has to keep licking while its brightness moves,
+  so the change is a fire breathing and not a decal being faded. The two clocks are what buy this: shape
+  on real time, brightness on the light's.
+- At 10 m — the default camera — the effect reads as the braziers' pools and their flames flaring
+  together, which is the whole frame's warm key moving as one thing against a static cool fill.
+- Frame to frame, no popping: the brightness is a smooth function of the virtual clock, quantised to
+  0.4 % of full intensity, so consecutive frames differ by ~2 % of the flame's brightness at 60 fps —
+  under a JPEG step.
+
 ## Model adopted
 
 One multiplier, computed once, used twice:

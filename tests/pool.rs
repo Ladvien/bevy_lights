@@ -57,7 +57,10 @@ fn slots(app: &mut App) -> Vec<(usize, Vec3, Visibility, f32)> {
 /// that spawns a candidate therefore updates once before asserting, which is also what a host sees.
 fn candidate(app: &mut App, at: Vec3, intensity: f32) -> Entity {
     app.world_mut()
-        .spawn((PoolCandidate { offset: Vec3::Y * 2.0, intensity }, Transform::from_translation(at)))
+        .spawn((
+            PoolCandidate { offset: Vec3::Y * 2.0, intensity, ..default() },
+            Transform::from_translation(at),
+        ))
         .id()
 }
 
@@ -552,7 +555,10 @@ fn a_child_candidate_moves_with_its_parent() {
     let bearer = app.world_mut().spawn(Transform::from_xyz(1.0, 0.85, 0.0)).id();
     let torch = app
         .world_mut()
-        .spawn((PoolCandidate { offset: Vec3::Y, intensity: 100.0 }, Transform::from_xyz(0.0, 1.0, 0.0)))
+        .spawn((
+            PoolCandidate { offset: Vec3::Y, intensity: 100.0, ..default() },
+            Transform::from_xyz(0.0, 1.0, 0.0),
+        ))
         .id();
     app.world_mut().entity_mut(torch).insert(ChildOf(bearer));
     settle(&mut app);
@@ -711,4 +717,62 @@ fn one_new_candidate_displaces_one_light_and_no_more() {
     let full =
         after.iter().filter(|(_, _, visibility, base)| *visibility == Visibility::Inherited && *base > 999.0);
     assert_eq!(full.count(), 3, "the three untouched lights stayed at full brightness: {after:?}");
+}
+
+/// A light handed to a prop must flicker on **that prop's** clock, not the slot's: otherwise the real
+/// light and the flame drawn on the torch beat against each other, which is the defect
+/// `docs/research/flame-flicker.md` measures for the braziers, one level up.
+#[test]
+fn a_handed_out_light_takes_the_props_own_fire_phase_and_size() {
+    let mut app = app(LightPool { size: 2, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    // One candidate near, one far, each with its own fire: different phases and one sized bed.
+    app.world_mut().spawn((
+        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, phase: Some(2.5), diameter: Some(0.34) },
+        Transform::from_translation(Vec3::new(1.0, 0.0, 0.0)),
+    ));
+    app.world_mut().spawn((
+        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, phase: Some(4.1), diameter: None },
+        Transform::from_translation(Vec3::new(9.0, 0.0, 0.0)),
+    ));
+    settle(&mut app);
+    let mut fires: Vec<(usize, f32, Option<f32>)> = app
+        .world_mut()
+        .query_filtered::<(&PoolLight, &Flicker), ()>()
+        .iter(app.world())
+        .map(|(light, flicker)| (light.slot, flicker.phase, flicker.diameter))
+        .collect();
+    fires.retain(|(slot, ..)| *slot < 2);
+    fires.sort_by_key(|(slot, ..)| *slot);
+    assert_eq!(fires.len(), 2);
+    // Ranked by illuminance: equal intensities, so the nearer one (2.5) takes slot 0.
+    assert!((fires[0].1 - 2.5).abs() < 1e-5, "slot 0 should burn at the near prop's phase: {fires:?}");
+    assert_eq!(fires[0].2, Some(0.34), "and at its fuel bed's size: {fires:?}");
+    assert!((fires[1].1 - 4.1).abs() < 1e-5, "slot 1 should burn at the far prop's phase: {fires:?}");
+    assert_eq!(fires[1].2, None, "a fire with no size given keeps the un-sized rate: {fires:?}");
+}
+
+/// A host that models no per-prop phases keeps the crate's spread, so the slots still never beat in
+/// step: the new field is an opt-in, not a change of default.
+#[test]
+fn a_candidate_with_no_fire_phase_leaves_the_slots_own_alone() {
+    let mut app = app(LightPool { size: 2, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    let mut phases: Vec<(usize, f32)> = app
+        .world_mut()
+        .query_filtered::<(&PoolLight, &Flicker), ()>()
+        .iter(app.world())
+        .map(|(light, flicker)| (light.slot, flicker.phase))
+        .collect();
+    phases.retain(|(slot, _)| *slot < 2);
+    phases.sort_by_key(|(slot, _)| *slot);
+    for (index, phase) in &phases {
+        assert!(
+            (phase - 1.3 * *index as f32).abs() < 1e-5,
+            "slot {index}'s own phase is {phase}: {phases:?}"
+        );
+    }
 }

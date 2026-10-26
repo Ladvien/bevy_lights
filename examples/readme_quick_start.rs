@@ -33,7 +33,14 @@ fn setup(mut commands: Commands) {
     // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
     // hand-held flame is smaller, so its pool is sized from its edge.
     commands.spawn((
-        PoolCandidate { offset: Vec3::Y * 1.8, intensity: fire_lumens(250.0, 2.0, 1.8) },
+        // `phase` is this torch's own fire clock: the real light it is handed later breathes with the
+        // flame drawn on it, not with the pool slot that happens to own it.
+        PoolCandidate {
+            offset: Vec3::Y * 1.8,
+            intensity: fire_lumens(250.0, 2.0, 1.8),
+            phase: Some(1.9),
+            ..default()
+        },
         // The pool's lights flicker at the un-sized rate, so this flame does too.
         FlameSite { height: 0.35, phase: 1.9, kindle: 0.0, diameter: None },
         Transform::from_xyz(4.0, 0.0, 2.0),

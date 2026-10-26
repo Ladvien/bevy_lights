@@ -68,7 +68,7 @@ fn main() {
         let x = (index as i32 % side) as f32;
         let z = (index as i32 / side) as f32;
         app.world_mut().spawn((
-            PoolCandidate { offset: Vec3::Y * 1.8, intensity: 8_000.0 },
+            PoolCandidate { offset: Vec3::Y * 1.8, intensity: 8_000.0, ..default() },
             Transform::from_xyz(x, 0.0, z),
         ));
     }
@@ -170,7 +170,7 @@ mod tests {
         .insert_resource(LightPool { size: 4, gain: 1.0, ..default() });
         for index in 0..candidates {
             app.world_mut().spawn((
-                PoolCandidate { offset: Vec3::Y, intensity: 8_000.0 },
+                PoolCandidate { offset: Vec3::Y, intensity: 8_000.0, ..default() },
                 Transform::from_xyz(index as f32, 0.0, 0.0),
             ));
         }

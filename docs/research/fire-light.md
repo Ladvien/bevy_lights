@@ -109,6 +109,7 @@ off screen.
 | `KINDLE_SECONDS` | 0.6 s | design default, Sanctuary decision 0127 |
 | kindle overshoot | 0.35 · sin(π s) | design default, Sanctuary decision 0127 |
 | flicker clock | `Time` (virtual) | Sanctuary's: a paused world's fires hold still |
+| who reads the swing | the light's intensity **and** the drawn flame's brightness, both from `flicker_swing` | [`flame-flicker.md`](flame-flicker.md): a flame that held still while its pool moved was a source not motivating its own light |
 | invisible lights | not written; kindle still advances | Sanctuary decision 0148 |
 
 ## Validation targets

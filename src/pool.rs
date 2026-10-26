@@ -165,9 +165,9 @@ pub enum Rank {
 /// the day is not a light — and so is one further from the focus than [`LightPool::reach`]. A
 /// candidate with no `Visibility` at all is not hidden: a host may pool a light on an entity that has
 /// no mesh.
-#[derive(Component, Clone, Copy, Debug, PartialEq, Reflect)]
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[reflect(Component)]
+#[reflect(Component, Default)]
 pub struct PoolCandidate {
     /// Where the light goes, in **world** axes, relative to the candidate's own translation. It is
     /// not rotated with the candidate: a torch swung by a walking arm still lights upward from its
@@ -175,6 +175,18 @@ pub struct PoolCandidate {
     pub offset: Vec3,
     /// The light's intensity at [`LightPool::gain`] 1, in lumens.
     pub intensity: f32,
+    /// The phase of this prop's own fire, in radians, when the host knows it: the same number on the
+    /// prop's `Flicker` (or `FlameSite`) the fire burns at.
+    ///
+    /// A slot keeps its own phase while it is between owners, so without this a light handed to a torch
+    /// flickers at the *slot's* phase while the flame on that torch flickers at the torch's — two clocks
+    /// on one fire, which is the defect `docs/research/flame-flicker.md` measures for the braziers.
+    /// `None` (the default) leaves the slot's own phase alone, which is what a host that does not
+    /// model per-prop fire phases wants.
+    pub phase: Option<f32>,
+    /// The fire's fuel-bed diameter, in the host's world units, when the host knows it: the same value
+    /// the flame on this prop is given, so the handed-out light breathes at the flame's own rate.
+    pub diameter: Option<f32>,
 }
 
 /// One of the crate's spawned real lights. Marks an entity the pool owns and drives.
@@ -238,7 +250,7 @@ impl SlotLook {
 ///
 /// The key and the distance are separate because they are different questions: *which* lights should be
 /// real is about what arrives at the subject, while the overlap rule is about how far it has to travel.
-type Assignment = (f32, f32, f32, Entity, Vec3, f32);
+type Assignment = (f32, f32, f32, Entity, Vec3, f32, Option<f32>, Option<f32>);
 
 /// What `assign_pool` reads of a candidate: its entity, its propagated position, its own `Transform`
 /// when it has one (the freshest truth in the frame the host moved it), whether it is hidden, and how
@@ -402,7 +414,16 @@ fn assign_pool<F: Component>(
                     Rank::Distance => distance_squared.sqrt(),
                 };
                 let key = value;
-                (key, distance_squared, value, entity, position + candidate.offset, candidate.intensity)
+                (
+                    key,
+                    distance_squared,
+                    value,
+                    entity,
+                    position + candidate.offset,
+                    candidate.intensity,
+                    candidate.phase,
+                    candidate.diameter,
+                )
             })
             .filter(|(_, distance_squared, ..)| *distance_squared <= pool.reach * pool.reach)
             .collect(),
@@ -602,11 +623,19 @@ fn assign_pool<F: Component>(
             if holding.is_none() && chosen.is_some() { 1.0 } else { fade_factor(*age, pool.fade_seconds) };
 
         let assigned = chosen.and_then(|entity| {
-            lit.iter().find(|(_, _, _, candidate, ..)| *candidate == entity).map(|(.., at, i)| (*at, *i))
+            lit.iter()
+                .find(|(_, _, _, candidate, ..)| *candidate == entity)
+                .map(|(.., at, i, phase, diameter)| (*at, *i, *phase, *diameter))
         });
         match assigned {
-            Some((at, intensity)) => {
+            Some((at, intensity, phase, diameter)) => {
                 transform.translation = at;
+                // The slot keeps its own phase until a candidate says otherwise: the light handed to a
+                // prop must breathe on that prop's clock, or it beats against the flame drawn on it.
+                if let Some(phase) = phase {
+                    flicker.phase = phase;
+                }
+                flicker.diameter = diameter;
                 flicker.base = intensity * pool.gain * fade;
                 visibility.set_if_neq(Visibility::Inherited);
             }
@@ -625,7 +654,7 @@ fn assign_pool<F: Component>(
             }
         }
         // Remember where this slot's light now is, so a departure next frame knows where to fade out.
-        if let Some((at, intensity)) = assigned {
+        if let Some((at, intensity, ..)) = assigned {
             old_look.insert(chosen.unwrap_or(Entity::PLACEHOLDER), (at, intensity, flicker.phase));
         }
     }
