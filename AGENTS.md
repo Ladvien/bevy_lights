@@ -179,6 +179,8 @@ is an art decision, so it needs the same treatment as a physics constant.
   change-detection edge for no pixels. `flicker_lights` skips the write and still advances the kindle.
 - **A duplicated plugin panics.** `LightPoolPlugin` therefore cannot add `FlickerPlugin` for the host;
   it reports the missing one in `finish()`.
+- **A parent of a visible entity needs the visibility components.** A `FlameSite` gained `#[require(Visibility, InheritedVisibility, ViewVisibility)]` because `dress_flames` spawns a `Flame` under it: without them Bevy warns (B0004) and the child's visibility is not inherited, so a torch's flame does not go out with the torch.
+- **Replacing a component leaves its `added` tick alone.** `entity.insert(Kindle::default())` over an existing `Kindle` updates only the *changed* tick (`Column::replace`), so `Added<Kindle>` never reports a re-lit fire. `Kindled` is announced from `elapsed == 0.0` instead, and `modulate` floors the advance at `f32::MIN_POSITIVE` so a zero-delta frame (the first of a fixed-step run) cannot announce the same fire twice.
 - **`MeshTag::new` is the only constructor** (`type_id` is a private debug-only field), and a
   billboarded quad needs `NoFrustumCulling`: the CPU `Aabb` of the unit square does not cover what the
   vertex stage draws.

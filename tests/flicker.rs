@@ -20,12 +20,20 @@ use bevy_lights::*;
 #[derive(Resource, Default)]
 struct Heard(Vec<Entity>);
 
-fn app() -> App {
+/// The app with no frame run yet: a light spawned into it is present on the very first update, whose
+/// delta is zero (a clock has no previous instant to measure from).
+fn bare_app() -> App {
     let mut app = App::new();
     app.add_plugins((MinimalPlugins, FlickerPlugin))
         .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(1.0 / 60.0)))
         .init_resource::<Heard>()
         .add_systems(Update, (hear_kindled.after(LightsSystems::Flicker),));
+    app
+}
+
+/// [`bare_app`] after one frame, so a light spawned into it meets a clock that has a delta.
+fn app() -> App {
+    let mut app = bare_app();
     app.update();
     app
 }
@@ -70,6 +78,23 @@ fn a_kindling_light_is_heard_once_and_settles_inside_its_flicker_window() {
         (700.0..=1000.0).contains(&intensity),
         "settled intensity {intensity} is outside the flicker window 700..1000"
     );
+}
+
+#[test]
+fn a_light_present_on_the_very_first_frame_is_heard_once() {
+    // The first update of a fixed-step run has a delta of zero, so a kindle's `elapsed` is still 0
+    // after it. Announcing from `elapsed == 0.0` alone announced the same fire again on frame two:
+    // the courtyard printed `kindled` twice for each of its four braziers.
+    let mut app = bare_app();
+    app.world_mut().spawn((
+        PointLight { intensity: 0.0, ..default() },
+        Flicker { base: 1000.0, phase: 0.0 },
+        Kindle::default(),
+    ));
+    for _ in 0..30 {
+        app.update();
+    }
+    assert_eq!(heard(&app).len(), 1, "one fire, one `Kindled`: {:?}", heard(&app));
 }
 
 #[test]

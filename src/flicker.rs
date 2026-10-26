@@ -89,7 +89,7 @@ impl Emits for SpotLight {
 }
 
 /// A point light's frame of work: the entity, the light, and the components that shape its frame.
-type PointLightFrame<'w, 's> = (
+type PointLightFrame<'w> = (
     Entity,
     &'w mut PointLight,
     &'w Flicker,
@@ -133,50 +133,62 @@ fn flicker_lights(
     // only culled when there is a camera to cull it from.
     let watched = !cameras.is_empty();
     for (entity, mut light, flicker, kindle, seen, visibility) in &mut points {
-        modulate(entity, &mut *light, *flicker, kindle, seen, visibility, watched, t, dt, &mut kindled);
+        let hidden = is_hidden(visibility, seen, watched);
+        if modulate(&mut *light, *flicker, kindle, hidden, t, dt) {
+            kindled.write(Kindled { entity });
+        }
     }
     for (entity, mut light, flicker, kindle, seen, visibility) in &mut spots {
-        modulate(entity, &mut *light, *flicker, kindle, seen, visibility, watched, t, dt, &mut kindled);
+        let hidden = is_hidden(visibility, seen, watched);
+        if modulate(&mut *light, *flicker, kindle, hidden, t, dt) {
+            kindled.write(Kindled { entity });
+        }
     }
 }
 
-/// One light's frame: hear it if it has just been lit, advance its kindle, and write its intensity.
+/// Whether a light's intensity is left alone this frame.
+///
+/// A light the host put out (`Visibility::Hidden`) is not written, and neither is one a camera culled,
+/// because nothing is extracted for it. The culling test is skipped with no camera, where
+/// `ViewVisibility` says false for everything and there is nothing to cull from.
+fn is_hidden(visibility: Option<&Visibility>, seen: Option<&ViewVisibility>, watched: bool) -> bool {
+    visibility.is_some_and(|visibility| *visibility == Visibility::Hidden)
+        || (watched && seen.is_some_and(|seen| !seen.get()))
+}
+
+/// One light's frame: advance its kindle and write its intensity. Answers whether the fire was lit
+/// this frame, so the caller can announce it.
 ///
 /// The one place either light type's intensity is written, so a point light and a spot light cannot
 /// drift apart.
-#[allow(clippy::too_many_arguments)]
+///
+/// **A kindle that has been heard never reads exactly 0 again.** `Kindle::default()` (elapsed 0) is
+/// how a host lights a fire, and `elapsed == 0.0` is how this system knows the fire has not been
+/// announced. A frame whose delta is zero — the first frame of a fixed-step run — would otherwise
+/// leave it at 0 and announce the same fire twice, so the advance is floored at the smallest positive
+/// float. (Bevy's `Added<Kindle>` is no substitute: replacing a component leaves its added tick
+/// alone, so a re-lit fire would never be heard again.)
 fn modulate<L: Emits>(
-    entity: Entity,
     light: &mut L,
     flicker: Flicker,
     kindle: Option<Mut<Kindle>>,
-    seen: Option<&ViewVisibility>,
-    visibility: Option<&Visibility>,
-    watched: bool,
+    hidden: bool,
     t: f32,
     dt: f32,
-    kindled: &mut MessageWriter<Kindled>,
-) {
+) -> bool {
+    let mut lit = false;
     let gain = match kindle {
         Some(mut kindle) => {
-            if kindle.elapsed == 0.0 {
-                kindled.write(Kindled { entity });
-            }
+            lit = kindle.elapsed == 0.0;
             if kindle.elapsed < KINDLE_SECONDS {
-                kindle.elapsed += dt;
+                kindle.elapsed = (kindle.elapsed + dt).max(f32::MIN_POSITIVE);
             }
             kindle_gain(kindle.elapsed)
         }
         None => 1.0,
     };
-    // A light the host put out is not written; one that is merely culled by a camera is not written
-    // either, because nothing is extracted for it. Both checks are skipped entirely with no camera,
-    // where `ViewVisibility` says false for everything and culling does not apply.
-    if visibility.is_some_and(|visibility| *visibility == Visibility::Hidden) {
-        return;
+    if !hidden {
+        *light.intensity() = flicker.base * flicker_factor(t, flicker.phase) * gain;
     }
-    if watched && seen.is_some_and(|seen| !seen.get()) {
-        return;
-    }
-    *light.intensity() = flicker.base * flicker_factor(t, flicker.phase) * gain;
+    lit
 }

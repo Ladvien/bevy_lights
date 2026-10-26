@@ -108,8 +108,12 @@ impl Material for FlameMaterial {
 /// the local offset the flame's foot belongs. [`FlamePlugin`] gives it a [`Flame`] child the first
 /// frame it sees it; nothing else is needed. Two sites with different [`FlameSite::phase`] values
 /// burn out of step forever.
+// `Visibility` (which pulls in `InheritedVisibility` and `ViewVisibility`), because a site always becomes a parent: `dress_flames` spawns
+// the `Flame` under it, and Bevy's propagation warns (B0004) and culls wrongly when a parent of a
+// visible entity has no visibility of its own.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[require(Visibility)]
 #[reflect(Component)]
 pub struct FlameSite {
     /// How tall the flame is, in world units.
