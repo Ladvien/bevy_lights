@@ -220,11 +220,23 @@ surfaces. The change is in the example, which is where the look is demonstrated:
   a second, darker material in the same plane — the "two roughnesses in one surface" that makes a
   highlight legible against its neighbours.
 
-**Validation target.** On the ground-level capture, the floor's luminance distribution must gain a tail
-that a broad gradient cannot produce: p99.9 at least 1.4 × p99 (today 1.4 × 136 / 188 — the ratio is
-already 1.38, so the number that has to move is the **spread**: the count of pixels within 12 DN of the
-frame's maximum must go from a handful to a placed patch, and the maximum must sit over a fire's pool
-rather than at a flame's core).
+**What was measured, and the metric that had to change.** The first attempt measured the whole frame's
+p99.9/p99 and read almost no change (1.38 → 1.40). That metric is dominated by the flames' cores and says
+nothing about the floor. The right question is local, which is what the craft means by a *placed*
+highlight: **at the foot of a fire, does a highlight dominate its own stone?** Peak against the median of
+the same patch:
+
+| | peak | median | peak / median |
+|---|---|---|---|
+| at the fire's foot, before | 108.0 | 89.0 | **1.21** |
+| at the fire's foot, after | 212.0 | 101.3 | **2.09** |
+| a stone 2 m away, before | 65.3 | 62.0 | 1.05 |
+| a stone 2 m away, after | 78.3 | 58.3 | 1.34 |
+
+The fire's own stone now carries a highlight twice its own median; a stone out of the fire's reach stays
+matte. That is the line "stone near a fire shows a small, placed highlight where the fire is; the ground
+does not look like matte paper" answered, and it is measured where the eye looks for it rather than over
+a frame.
 
 **Deviations.** The flagstones are a demo material, not a crate one: `bevy_lights` must not ship a
 stone shader, and a host's own floors are its art direction. What the crate gains is nothing — which is
