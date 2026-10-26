@@ -1319,3 +1319,12 @@ at 30 fps, 640 px, 3.3 MB).
    work (a division, a sort of a larger tuple) that the whole-frame p50 cannot see past the flicker's cost.
 5. **A `Rank::Weighted`** for a host that wants gameplay priority (a carried torch matters more than a
    brazier): the rank key would take a per-candidate multiplier.
+
+### One uncommitted change this pass did not make
+
+`.omp/skills/bevy-lights-build-loop/SKILL.md` carries an unstaged edit adding the section *"Your work is
+committed even if you are killed"* — the rule this pass opened by obeying. It was already in the working
+tree when the pass began, its content matches how the loop actually behaves, and it is **left uncommitted**
+rather than adopted: a tracked change this pass did not write is the driver's or a previous pass's to
+commit. Its guidance is right and was followed: the note was committed alone (`1db0af7`), then the
+implementation, then the docs and media, then this log.
