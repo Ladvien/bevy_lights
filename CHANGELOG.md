@@ -27,8 +27,11 @@ First release: the practical lights extracted from Sanctuary, generalised to car
   - The `size` nearest visible candidates within `reach` of the one entity carrying the host's focus
     marker get the lights, sorted by distance and then by `Entity`, so the assignment is the same on
     every machine and never swaps between two equidistant props.
-  - `gain` dims or puts out the whole pool in one write; a `LightPool` change recolours or re-ranges
-    every slot. Two slots never share a flicker phase (`1.3 · slot`).
+  - `gain` dims or puts out the whole pool in one write. A change to the template light's colour,
+    range, radius or shadow setting recolours or re-ranges every slot; a change to `gain`, `size` or
+    `reach` leaves the slots' looks alone, so a host that tints its own fire lights keeps its tint
+    through a night glide that writes `gain` every frame. Two slots never share a flicker phase
+    (`1.3 · slot`).
   - A missing `FlickerPlugin` is reported with an `error!` in `finish()`, not fixed by adding the
     plugin (which would panic a host that adds it afterwards).
 - **`FlamePlugin`: the billboarded shader flame.**
