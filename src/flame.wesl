@@ -48,6 +48,11 @@ const PROFILE_PEAK: f32 = 1.172;
 // The ramp: the cool rim and tip, then the host's fire colour, then the hot core.
 const EDGE_RED: vec3<f32> = vec3<f32>(0.70, 0.06, 0.005);
 const CORE_YELLOW: vec3<f32> = vec3<f32>(1.0, 0.78, 0.30);
+// What a flame's colour tends to while its fire is still catching. A flame fed on volatiles with little soot is
+// cool and blue; a young, small fire is redder and dimmer than the steady one, and the hot yellow core only arrives
+// once the fuel is alight. Planck's law is why this is a *temperature*: cooler emission is redder (the crate's
+// `blackbody_colour`), so the catch pulls the ramp towards the red end and lets it go as the fire takes.
+const EMBER_RED: vec3<f32> = vec3<f32>(0.95, 0.20, 0.02);
 
 // The flame's own stage IO: only the quad's uv and the fire's phase cross to the fragment.
 struct FlameVertexOutput {
@@ -155,6 +160,11 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     let heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);
     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));
+    // A fire that is still catching is redder. `params.z` is how far the scene's catch has run — 1 for a fire that
+    // took long ago — so the steady ramp is pulled towards the ember at the start and released as the fuel catches.
+    // The whole flame goes, not only its core: a catching fire has no yellow core at all yet.
+    let took = clamp(material.params.z, 0.0, 1.0);
+    colour = mix(EMBER_RED * max(heat, 0.35), colour, took);
     // Alpha 0 makes `AlphaMode::Add`'s blend state (`PREMULTIPLIED_ALPHA_BLENDING`, src + (1 - src.a) * dst) purely
     // additive: the same trick as `premultiply_alpha` in `bevy_pbr`'s `pbr_functions.wesl`. Any alpha above 0 would
     // darken what stands behind the flame.

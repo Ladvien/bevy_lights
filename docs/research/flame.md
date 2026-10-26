@@ -149,6 +149,27 @@ as the fuel catches; it does not blink into existence.
 both; a flame that grew tall but stayed wide would read as a sheet. No separate flame-only curve: sharing
 `kindle_gain` is the point.
 
+### Iteration 9: the flame's colour while it catches
+
+**The gap.** Iteration 7 made a flame *grow* with its light, but its colour stayed the steady ramp from
+the first frame: a catching fire showed the same host fire-colour and yellow core it has when fully alight.
+A young, small fire is redder — Planck's law is why: a cooler emitter is redder, which is the crate's own
+`blackbody_colour` argument, cited in `lighting-look.md` from *Physically Based Rendering* ch. 12.
+
+**Model adopted.** The shader's ramp is pulled towards an ember red while the fire catches. `params.z`
+carries **how far the scene's catch has run** (1 for a flame that took long ago), written by
+`update_flames` from the *youngest* fire in the frame; the fragment mixes `EMBER_RED * max(heat, 0.35)`
+towards the steady ramp by that number. One shared material means one number for the scene, which is
+honest for the courtyard (its four braziers light together) and is stated rather than hidden.
+
+**Measured on the courtyard's catch.** The flame core's blue channel — the number that says redder — is
+**34–42 while catching (frames 15–17) against 65–69 once settled (frames 27–35)**, roughly half. The
+signal the shader reads is pinned by `the_shader_is_told_when_a_fire_is_still_catching` (`params.z` < 0.2
+mid-catch, exactly 1 after) and `a_scene_with_no_catch_keeps_the_steady_ramp`.
+
+**A trap worth recording:** `catch` is a **reserved WGSL word**, and `tools/wesl-check` failed on it —
+which is exactly the class of error `AGENTS.md` warns is silent at build time and loud only in a capture.
+
 **Pending index.** Nothing new to index: this is the existing `kindle_gain` applied to the second half of
 the same event. A source that measured a *flame's* height against time after ignition would replace the
 envelope's shape; the corpus has none (Maynard 2013 measures light and is unobtainable, per
