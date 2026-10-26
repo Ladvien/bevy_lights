@@ -1104,3 +1104,47 @@ both say the README is checked before every push and the GIF re-encoded whenever
 5. **The validator's other stubs are still identities** — `position_world_to_clip` and `view` return
    placeholder values, so a shader that misuses *those* is checked no further than its types. The same fix
    as this iteration's, applied to the rest of the stub set.
+
+## Iteration 11 — 2026-10-26 — the README was broken, and cannot be again
+
+### What changed, and why it ranked first
+
+The user made keeping the README current a standing duty, so the first thing this iteration did was check
+it — and the README's **quick start did not compile**. `FlameSite::kindle` (iteration 7) and
+`Flicker::diameter` (iteration 3) were both missing from it. A new user's first `cargo build` would have
+met three errors, which is the worst possible first impression and exactly the staleness the user named.
+
+Proved rather than assumed: the snippet was extracted into a scratch crate and built, failing with
+`missing field \`diameter\`` and two `missing field \`kindle\``.
+
+### The fix, and the ratchet
+
+- The example is corrected: `Flicker { diameter: Some(0.34) }`, `FlameSite { kindle: KINDLE_SECONDS }`, and
+  `night_fill()` is now actually **called** — it was defined and never used, which clippy caught, and an
+  example function nobody calls teaches nothing.
+- **`tests/readme.rs` compiles it**, so it cannot rot again: it extracts the `## Quick start` block, writes
+  it to `examples/readme_quick_start.rs` behind a `readme-example` feature that nothing else enables (so
+  `cargo build --examples` and the published package never see it), formats it the way the repository's own
+  files are, and builds it with `cargo build --example`. Reverted to the stale text, the test fails with the
+  same missing-field error.
+- The README's API list was also missing `PoolLight`, `FlameLook`, `flicker_rate`, `hand_off` and
+  `fade_out_factor`; it now has a **What a host touches** section naming every component and resource a game
+  spawns, marks, reads or styles, and every engine-free function.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (**70 tests**, the README's among them), `cargo test
+--features serde`, `cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D
+warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
+wasm32-unknown-unknown`, `tools/wesl-check` — all pass. CI runs `cargo test`, so the README test runs there.
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+2. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+3. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared only
+   by distance, so the pool can hold the dim one.
+4. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
+   an atlas.
+5. **The validator's other stubs are still identities** — `position_world_to_clip` and `view` return
+   placeholder values, so a shader that misuses *those* is checked no further than its types.
