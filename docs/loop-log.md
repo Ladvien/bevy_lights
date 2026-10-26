@@ -1364,10 +1364,16 @@ no smoothness; recorded in the note's `Deviations`.
 
 ### Benchmark
 
-`bench_lights` (candidates 5000, lights 2000, pool 16), interleaved, three rounds each:
+`bench_lights` (candidates 5000, lights 2000, pool 16), three rounds each, whole frame:
 before `mean_us` 489 / 523 / 495, p50 473 / 490 / 478; after 466 / 477 / 480, p50 469 / 471 / 465. Flat
-within the run-to-run spread; no regression. CPU-only, so it says nothing about GPU cost — the change
-touches no shader, and the capture's frame time was unchanged (400 frames in the same wall time).
+within the run-to-run spread.
+
+Iteration 13 landed the per-system line while this pass was running, so the work this iteration added is
+now attributable instead of merely "flat": on the merged tree, `pool_p50_us` **322 / 322 / 314** against
+the same instrument on `origin/main` (which has no set rules) at **328 / 355 / 344**. The pool's own cost
+is if anything a little lower, which is what moving the decision from a per-slot search to one map should
+look like; `flicker_p50_us` is unchanged at 130-132. CPU-only, so it says nothing about GPU cost — the
+change touches no shader, and the capture's wall time per 400 frames did not move.
 
 ### The gate
 
