@@ -150,6 +150,38 @@ failed with ENOSPC; the GIF came out 308 KB and mostly undecodable ("chunk too b
 directories and `TMPDIR` to the NVMe (`/home/ladvien/tmp-lights`) and check `df -h /tmp` first.
 `docs/DEMOS.md` says so.
 
+### Published and adopted
+
+`0.1.0` is on crates.io, published from `b6e734c` (tag `v0.1.0`). CI on big's runners: lint 2.0 min, build and
+test 8.9 min cold, wasm 1.7 min, about 1.3 min warm.
+
+Sanctuary adopted it the same day (`Ladvien/sanctuary` `747461d`, decision 0307) and deleted its copies: 1208 tests
+green, the release build builds, and before/after captures of the walk-around town and of the siege night were
+reviewed by an agent that opened the images (both ACCEPTABLE: every fire in both builds at the same place, the
+sconce pools 1.5 to 2.7 grey levels darker on average). Nothing needed a crate change, so there is no `0.1.1`.
+
+What adopting it showed, for the next iteration:
+
+1. **A `FlameSite` spawned from a system against a light that despawns in the same frame leaves a parentless site
+   at the world's origin.** Bevy removes the invalid `ChildOf` and keeps the entity. Sanctuary dresses a fire from
+   the light's own queued command (`queue_silenced` + `with_children`) and has a test that fails against the
+   naive form. `FlameSite`'s docs should say so; so far they do not.
+2. **Every host has to write the system that decides which fires get a flame** (Sanctuary's `site_fire_lights`, 20
+   lines). If a second host wants the same, a marker the crate resolves into a site itself is the candidate.
+3. **Spot-light fires now flicker, swell and report `Kindled`**: Sanctuary's wall sconces never did, and the
+   kindle cue it plays from `Kindled` now sounds for them. It moved their pools darker by the mean flicker, which
+   their lumen budget had assumed.
+4. **A pool light that is out is hidden**, so a census of visible point lights (Sanctuary's `perf: … lights N`)
+   counts none of them while the town is unlit, and counts only what a camera sees: it fell from 15 to 3 for two
+   seconds while the view moved and came back to the same 15 [INFERENCE: the view moved; the lights that left
+   included ones that are not the pool's]. A sample every five seconds is not a regression signal on its own.
+5. **`tools/wesl-check` as first copied from `bevy_elements` never compiled a shader that imports Bevy**: a
+   Bevy import arrives as the sub-package `bevy_lights/bevy_pbr`, which a router mounted at `bevy_pbr` is never
+   asked about, and "module not found" was classed benign. The copy here mounts each namespace under both
+   spellings; a deliberately wrong call into a stubbed Bevy function now fails it (`incorrect number of
+   arguments … expected 1, got 2`). Upstream's own check prints "not checked" for 11 of its 44 modules, exactly
+   the ones that import Bevy: filed as `Ladvien/bevy_elements#37`.
+
 ### Not yet measured
 
 - Hand-off popping: no consecutive-frame difference at a pool boundary has been looked at yet.
