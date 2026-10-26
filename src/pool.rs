@@ -210,6 +210,7 @@ type CandidateRead<'w, 's> = Query<
         Entity,
         &'static GlobalTransform,
         Option<&'static Transform>,
+        Option<&'static ChildOf>,
         Option<&'static Visibility>,
         &'static PoolCandidate,
     ),
@@ -327,11 +328,17 @@ fn assign_pool<F: Component>(
             .iter()
             // Not `Visibility::Hidden`: a candidate with no `Visibility` at all is not hidden.
             .filter(|(.., visibility, _)| !visibility.is_some_and(|v| *v == Visibility::Hidden))
-            .map(|(entity, at, transform, _, candidate)| {
-                // The freshest position the frame has: a prop with its own `Transform` has just been
-                // moved by the host, and its `GlobalTransform` will not catch up until `PostUpdate`.
-                // A child (a torch in a hand) is placed by its parent, so it uses `GlobalTransform`.
-                let position = transform.map_or_else(|| at.translation(), |t| t.translation);
+            .map(|(entity, at, transform, parent, _, candidate)| {
+                // The freshest position the frame has. A **root** prop with its own `Transform` has just
+                // been moved by the host, and its `GlobalTransform` will not catch up until `PostUpdate`,
+                // so its local translation is the freshest truth. A **child** (a torch in a hand) is
+                // placed by its parent: its own `Transform` is a constant local offset, and reading it
+                // would put every torch at the same point — which is the bug this arity fixes — so a
+                // child always uses its `GlobalTransform`.
+                let position = match (parent, transform) {
+                    (None, Some(transform)) => transform.translation,
+                    _ => at.translation(),
+                };
                 (
                     position.distance_squared(focus_at),
                     entity,
@@ -380,23 +387,27 @@ fn assign_pool<F: Component>(
         }
     }
 
-    // A cross-fade's departing light: where the old owner was, at its intensity. It is handed to a free
-    // reserve light *before* the slots are written, so the departing light is on in the frame the
+    // A cross-fade's departing light: where a slot's *old* owner was, at its intensity. It is handed to
+    // a free reserve light before the slots are written, so the departing light is on in the frame the
     // hand-off happens. One reserve light takes one departure per frame; a second departure in the same
     // frame falls back to the dip, so the pool's budget is never exceeded.
+    //
+    // **The old owner need not have left the pool.** The common hand-off is a slot changing owner while
+    // the old one is still a candidate — it has simply been displaced by a nearer prop — and cross-fading
+    // only a *departed* owner left that case with the dip. So a departure here is "this slot's owner is
+    // about to change", which is known before the slots are written.
     let mut departure: Option<(Vec3, f32, f32)> = None;
     for (slot, holding) in held.iter() {
         if *slot >= pool.size {
             continue;
         }
-        let entity = *holding;
-        let still_there = lit.iter().any(|(_, candidate, ..)| *candidate == entity);
-        if still_there {
+        // The first pass already decided which slots keep what they hold.
+        if keepers.contains(slot) {
             continue;
         }
-        // It was a candidate last frame and is not one now: if its slot takes a new owner this frame,
-        // the reserve fades the old one out.
-        if let Some((at, intensity, phase)) = old_look.get(&entity).copied()
+        // This slot is about to lose its owner — to a nearer candidate, or to the owner leaving the
+        // pool. Either way the light it had is handed to a reserve to fade out.
+        if let Some((at, intensity, phase)) = old_look.get(holding).copied()
             && departure.is_none()
         {
             departure = Some((at, intensity, phase));

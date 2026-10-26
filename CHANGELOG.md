@@ -50,6 +50,15 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Fixed
 
+- **A child candidate sat at its own local offset, not at its parent's place.** The pool preferred a
+  candidate's own `Transform` (to read a root prop the frame the host moves it), but for a child that is
+  the constant local offset — so every torch, which is a child of its bearer, collapsed to one point. The
+  assignment therefore never changed: the same lights held forever and no candidate ever left the pool.
+  A local `Transform` is now read only for a candidate with no `ChildOf`.
+- **The pool's cross-fade only fired when an owner left the pool.** The common hand-off is a slot
+  changing owner while the old one is still a candidate, displaced by a nearer prop; that case kept the
+  dip. It now cross-fades on any change of owner.
+
 - **Both ends of a pool cross-fade now keep the same flicker.** A reserve light that was fading a
   departing owner out carried its own flicker phase, so the two ends of the cross-fade beat against
   each other and their sum wobbled. It now keeps the phase of the light that left.

@@ -364,10 +364,11 @@ fn a_held_candidate_that_goes_hands_the_light_on_at_once() {
 
 #[test]
 fn a_hand_off_costs_less_than_a_pop_and_recovers_within_the_fade() {
-    // The craft checklist's own line, isolated: the pool's total brightness across a hand-off. The
-    // slot keeps its intensity and gains a fade factor, so the total dips by that one light's share
-    // and is whole again by the end of the fade. A pop would keep the total and move the light.
-    let mut app = app(LightPool { size: 2, reach: 100.0, gain: 1.0, ..default() });
+    // The craft checklist's own line, isolated, **with no reserve**: the slot keeps its intensity and
+    // gains a fade factor, so the total dips by that one light's share and is whole again by the end of
+    // the fade. A pop would keep the total and move the light. (With a reserve the same hand-off
+    // cross-fades instead — that is `a_cross_faded_hand_off_holds_the_subject_and_a_dip_does_not`.)
+    let mut app = app(LightPool { size: 2, reach: 100.0, gain: 1.0, reserve: 0, ..default() });
     focus_at(&mut app, Vec3::ZERO);
     let walker = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
     candidate(&mut app, Vec3::new(1.5, 0.0, 0.0), 100.0);
@@ -538,4 +539,33 @@ fn a_departure_is_detected_at_all() {
         reserve_after > 0.0,
         "a departure with no replacement must still fade out through the reserve: {reserve_after}"
     );
+}
+
+#[test]
+fn a_child_candidate_moves_with_its_parent() {
+    // A torch is a child of its bearer: it has its own `Transform` (a constant lift) and a
+    // `GlobalTransform` the parent places. Reading its local translation instead of its world position
+    // puts every child candidate at the same point, so the pool never re-sorts and nothing ever leaves —
+    // which is the bug this test is for.
+    let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let bearer = app.world_mut().spawn(Transform::from_xyz(1.0, 0.85, 0.0)).id();
+    let torch = app
+        .world_mut()
+        .spawn((PoolCandidate { offset: Vec3::Y, intensity: 100.0 }, Transform::from_xyz(0.0, 1.0, 0.0)))
+        .id();
+    app.world_mut().entity_mut(torch).insert(ChildOf(bearer));
+    settle(&mut app);
+    let first = assigned(&mut app, 1)[0].1;
+    assert!(
+        (first.x - 1.0).abs() < 1e-4,
+        "the child's light is at its parent's place, not the origin: {first}"
+    );
+
+    // The bearer walks, and the child's light follows it.
+    app.world_mut().entity_mut(bearer).insert(Transform::from_xyz(7.0, 0.85, 0.0));
+    app.update();
+    app.update();
+    let moved = assigned(&mut app, 1)[0].1;
+    assert!((moved.x - 7.0).abs() < 1e-4, "the child's light followed its parent to {moved}");
 }
