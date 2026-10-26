@@ -457,3 +457,108 @@ became one `HandOffState`), and the candidate query's type (factored into `Candi
 5. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared
    only by distance today, so the pool can hold the dim one. Whether that is right is a host's call;
    a `weight` on `PoolCandidate` would let it say.
+
+## Iteration 3 — 2026-10-26 — a fire's flicker sized by its fuel bed
+
+### What changed, and why it ranked first
+
+Every fire in the crate flickered at one pair of rates (1.16 and 2.08 Hz) whatever its size, because
+the rates were tuned by eye in a foot-scale game. A candle and a pyre moved alike, which is the
+cheapest tell that a fire is a lamp with a wobble. Backlog item 1 for three iterations, and the item
+was blocked each time on the fire-physics literature the corpus did not hold.
+
+### The research, first
+
+Imported, converted and indexed this iteration: **`10.1017_jfm.2018.707`** (Xia & Zhang 2018,
+*J. Fluid Mech.*, open access). It states the law every earlier study found and then derives it:
+
+> "Early researchers [14-19] experimentally found that `f` is related to the fuel source dimension
+> `D` as `f ∝ D^{-1/2}` with a proportionality factor of around 1.5 given by Trefethen and Panton [20]
+> and Cetegen and Ahmed [21]."
+
+and its own fit to six experimental studies' pool-fire data:
+
+> "…in good agreement with the trend line, `f_p = 0.48 √(g/D)` … which is equivalent to the scaling
+> relation, `f = 1.5 √(1/D)`, given by Cetegen and Ahmed [21]."
+
+Cetegen & Ahmed 1993 is not open access — `paper_download` found no copy across seven providers — so
+the note cites the accessible paper that carries its result and says so. Also read: `GPU Gems` ch. 6
+(Nguyen's shipped-fire chapter) for how a production fire is animated, and Huttunen 2022 + Lazar for
+the craft frame. `docs/research/corpus.md`'s fire-physics gap is now closed.
+
+### The model
+
+```
+flicker_rate(D)                = 1.5 / √D                Hz
+flicker_factor_of(D, t, phase) = 0.85 + 0.15 · (½ sin(ωt + phase) + ½ sin(1.7ωt + 1.7 phase))
+                                 ω = 2π · flicker_rate(D)
+```
+
+`Flicker { diameter: Option<f32> }`: `Some(0.34)` for a brazier's coals (2.57 Hz), `Some(4.0)` for a
+pyre (0.75 Hz), `None` for the inherited rate. The window, the mean 0.85 and the amplitude are
+untouched, because a lumen budget divides by that mean.
+
+### The measurement, and three wrong ones
+
+I got this wrong three times before the number was real, and each time it was the measurement:
+
+1. **The whole frame's mean luminance cannot see this.** A ±15 % flicker on four lights in a
+   1 280 × 720 frame moves the mean by less than a tenth of a DN. Both sequences read as identical.
+2. **My shell passed the switch to both runs.** `LIGHTS_UNSIZED=$([ $2 = 1 ] && echo yes)` under
+   `set --` came out empty for both, so I captured the same thing twice and "proved" no difference.
+3. **The first `Flicker` in query order is a pool light, not a brazier.** The intensity log's
+   12 593 lm against 182 074 lm was two pool lights, not the braziers the feature is about.
+
+The demo now prints `flicker frame N: <lumens>`, which is the honest way to read it. On two captures
+that really did differ, a 70 × 70 patch under a brazier's flame:
+
+| | mean DN | sd | up-crossings |
+|---|---|---|---|
+| sized (0.34 m bed) | 76.652 | 1.449 | **3.98 Hz** |
+| unsized (inherited) | 76.665 | 1.394 | **1.66 Hz** |
+
+The mean is unchanged (the window and mean do their job) and the rate more than doubles. The law says
+2.57 Hz; the crossing count sees the second sine and the flame's own animation too, so it bounds the
+change rather than calibrating it.
+
+### The critique
+
+`/tmp/l3/critique.md`. Remaining, and honest rather than defects:
+
+1. **Only the rate is sourced.** The amplitude, the two-sine shape and the 1.7 coupling are still
+   design defaults: the papers give the frequency, not the light's modulation depth.
+2. **Gravity is unmodelled** (`f ∝ √g`): a host on another gravity gets Earth's rate.
+3. **A fire's diameter is a guess in every host.** The courtyard's 0.34 m is its coal bed's mesh size,
+   which is the fuel bed only by assumption; Sanctuary's torches have no size, so they keep the
+   inherited rate and still flicker like its braziers.
+4. **A capture cannot cleanly confirm 2.57 Hz** — the patch sees a sum — so only the model test does.
+
+### Verdict
+
+**GREAT.** The law is cited to a converted, indexed paper, tested at its boundaries (four diameters
+over 20 s inside the window and mean 0.85), the un-sized path is behaviourally identical (its own
+test), and the visible result is a fire that moves at its own rate. Bench p50 210 µs against 211, i.e.
+unchanged (the new work is a square root per light per frame, when a diameter is present).
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (58 tests: 22 lib, 8 flicker, 3 leaf, 15 pool, 10
+doc), `cargo test --features serde`, `cargo build --examples --all-features`, `cargo clippy
+--all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt
+--check`, `cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+Two things the gate caught: a doctest in the crate root still built `Flicker` without the new field
+(the public example, which is exactly what a doctest is for), and clippy's `manual_is_multiple_of` in
+the new frame counter.
+
+### Top 5 remaining, ranked
+
+1. **A sourced flicker amplitude**: the rate is the literature's, the ±15 % is not. The flames'
+   brightness fluctuation is a different measurement from the light's, and one paper that reports it
+   would replace the last uncited number in this system.
+2. **A cross-fade in the pool** (iteration 2's deferred item): overlap two lights for the fade with a
+   spare slot, which is "overlapping keys" done literally.
+3. **`flicker_rate_under(diameter, gravity)`**: the law is `f ∝ √(g/D)` and only Earth's `g` is baked
+   in. Three lines, and a host with another gravity needs it.
+4. **A placed specular highlight** (iteration 1's open beauty line).
+5. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
