@@ -208,6 +208,13 @@ call.
    (`Added`, `Changed`, `Fixed`, `Removed`).
 2. Regenerate the GIF and still in `docs/media/` that this change affects, from the new build
    (`docs/DEMOS.md` has the recipe).
+2b. **The README is checked before every push, and `docs/media/showcase.gif` is re-encoded whenever the
+   look it shows has moved.** Its hero GIF is what makes someone try the crate: two seconds, 30 fps, under
+   ~2 MB, showing as many of the top features as one clip can (the catch, the flicker, a hand-off). Its
+   recipe and the two encoding traps — the encoded `FPS` must match the capture's content rate, and
+   `dither=bayer` crawls on a dark scene — are in `docs/DEMOS.md`. Verify the flicker survives the encode by
+   measuring a *single* pool (four pools at different phases cancel and read ~1.5 Hz whatever the truth is).
+
 3. Log: append `## Iteration N — <date> — <title>` to `docs/loop-log.md`:
    - what changed and why it ranked first (and the runner-up)
    - the sources used: the craft, production and technical stems, by stem

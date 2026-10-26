@@ -11,7 +11,11 @@ lights placed over thousands of virtual ones, and billboard shader flames.
 > researched and every default is cited or marked a design default; the code is tested, gated in CI
 > and reviewed against captures. It is still code an agent wrote, and you should treat it as such.
 
-![Four braziers, 48 torches, an 8-light pool](docs/media/courtyard.gif)
+![Fires that catch, flicker at their own rate, and a pool of real lights](docs/media/showcase.gif)
+
+*Two seconds of `examples/courtyard`: the braziers catch (0.6 s, light and flame together), then the
+fires breathe at the rate the puffing law gives their fuel bed — 2.6 Hz for a 0.34 m coal bed — and the
+pool hands its real lights between torches without a pop. Longer run: [`courtyard.gif`](docs/media/courtyard.gif).*
 
 ## What you get
 

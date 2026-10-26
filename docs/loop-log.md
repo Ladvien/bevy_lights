@@ -1072,6 +1072,27 @@ is now read from each flame's own transform, so a host lighting one fire cannot 
 `RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
 wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
 
+### The README hero GIF, and a bug in my own demo
+
+The user asked for a succinct README GIF that showcases the top features, kept current with every commit.
+Built one: two seconds, 30 fps, 480 px, 2.0 MB, opening on the catch and then the fires breathing. Two
+encoding bugs of mine had to be fixed first, and the second is the interesting one:
+
+- **The encoded frame rate did not match the capture's.** `LIGHTS_SHOT_EVERY=3` saves one frame per three
+  simulated frames, so the content is 20 fps; I encoded at `FPS=48 STRIDE=2` = 24 fps of content, **1.2× too
+  fast**. A 2.6 Hz flicker read as 3.1 Hz, and the user asked whether the *flicker* was wrong. It was the
+  GIF. Re-captured at `EVERY=2` (30 fps of content) and encoded at `FPS=30`.
+- **`dither=bayer` crawls on a dark scene.** The ordered pattern moves every frame on a slow luminance
+  gradient, so it reads as noise laid over the flicker — the thing the demo exists to show. `tools/gif.sh`
+  now uses 256 colours with `dither=none`: slight banding, stable, the right trade.
+
+Verified in the encoded file: one brazier's pool reads **2.50 Hz** against the law's 2.57, peak-to-peak 74 %
+of its mean. (Measure a *single* pool — four at different phases cancel and read ~1.5 Hz whatever the
+truth is.)
+
+The policy is now written where it will be enforced: `AGENTS.md`'s rules and the loop skill's ship section
+both say the README is checked before every push and the GIF re-encoded whenever the look it shows moves.
+
 ### Top 5 remaining, ranked
 
 1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).

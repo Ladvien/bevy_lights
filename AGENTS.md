@@ -143,6 +143,12 @@ is an art decision, so it needs the same treatment as a physics constant.
 - Do not hard-wrap markdown.
 - Close any Bevy app you launch.
 - Every dependency gets a GitHub link comment in `Cargo.toml` and a row in README's `Built on` table.
+- **The README is kept current with every commit, push and publish.** Its hero GIF
+  (`docs/media/showcase.gif`) is how someone decides to try the crate: two seconds, 30 fps, under ~2 MB, and
+  it must show the top features the crate actually has (the catch, the flicker at its own rate, a pool
+  hand-off). Re-encode it whenever a change alters what it shows; `docs/DEMOS.md` has the recipe and the two
+  encoding traps (the encoded `FPS` must match the capture's content rate, and `dither=bayer` crawls on a
+  dark scene).
 - Changing a default changes its research note and the CHANGELOG in the same commit.
 - **Judge images yourself as a hostile art director:** critique first (file, region, severity), then
   the verdict GREAT / NOT YET / FAIL. "Fine", "acceptable" and "good" are NOT YET.
