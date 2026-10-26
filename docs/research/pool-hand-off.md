@@ -68,7 +68,8 @@ threshold for a smaller one, so a light's own falloff masks the last frames of i
 
 ## Model adopted
 
-Two engine-free functions in `src/model/pool.rs` (the pool's own model module) plus one ECS change:
+Two engine-free functions in `src/model/pool.rs` (the pool's own model module) plus one ECS change, and
+**a cross-fade on top of them** (added in iteration 4; see *Iteration 4's findings*):
 
 1. **`hand_off(held, challenger, hysteresis)`** — the assignment rule. A slot keeps the candidate it
    holds unless a challenger is nearer by more than `1 / hysteresis`, i.e. the challenger must be
@@ -94,6 +95,7 @@ benchmark and the existing tests check.
 | hysteresis ratio | 1.15 (a challenger must be 13 % nearer) | design default: "overlapping keys", `10.58709_niujhu.v8i3.1694`; large enough to stop chatter between two props, small enough that the nearest torch still gets the light |
 | fade | 0.35 s, smoothstep | design default: below the eye's fusion threshold (`10.1109_tvcg.2019.2898741`), long enough to read as a change rather than a cut (20 frames at 60 Hz); masked by the light's own falloff (Luebke) |
 | fade curve | smoothstep | design default: zero derivative at both ends, so no flicker at either boundary |
+| reserve lights | 1 | design default: one cross-faded hand-off per frame; two lights on one subject for 0.35 s is the craft's overlap rule, and one is the cheapest form of it |
 | who fades | only the light that changed owner | a light that keeps its candidate is untouched, so the frame is unchanged when nothing moves |
 
 ## Validation targets
@@ -104,6 +106,10 @@ benchmark and the existing tests check.
 - A held candidate that is no longer a candidate (out of reach, hidden, despawned) is always dropped,
   whatever its distance.
 - `fade_factor(0) == 0`, `fade_factor(0.35) == 1`, monotone in between, and exactly 1 after.
+- `fade_out_factor(since, fade) + fade_factor(since, fade) == 1` at every point of the fade, so a
+  cross-faded hand-off neither brightens nor darkens the subject.
+- With a reserve, a hand-off leaves the subject's total at what it was, within the flicker's own swing:
+  the departing light's base plus the arriving light's, summed over the fade, is continuous.
 - In `tests/pool.rs`: a slot that keeps its candidate has the same `Flicker::base` for two frames; a
   slot that changes owner has a smaller base on the frame it changes and recovers within the fade; and
   a slot whose new owner is the same entity (re-inserted) does not fade.
@@ -119,6 +125,27 @@ benchmark and the existing tests check.
 - **No hysteresis on the focus.** The focus moving is the host's camera; it is not this note's problem.
 - **The fade is on `Time` (virtual), like the flicker**, so a paused world's hand-off holds still
   rather than resolving while nobody is looking.
+
+## Iteration 4's findings: the cross-fade
+
+The craft's own rule — "by overlapping different key lights, the filmmaker can maintain a constant
+intensity as actors move around the set" — was only half done: iteration 2's fade *dips* the total by
+one light's share for a third of a second, which is a soft pop rather than a pop. A cross-fade needs
+two lights on the subject for the length of the fade, which a fixed pool cannot afford per slot.
+
+Adopted: a small **reserve** (`LightPool::reserve`, default 1) of lights the pool spawns and owns but
+never assigns. When a slot changes owner the pool takes a free reserve light, puts it at the *old*
+owner's last position and intensity, and fades it out over `fade_seconds` while the slot fades in. The
+frame's total is then continuous across the hand-off, which is the overlap rule done literally.
+
+- **The reserve is a budget, not a promise.** With one reserve light, the first hand-off in a frame
+  cross-fades and any other that frame falls back to the dip. A host that hands over often can raise
+  `reserve`; a host that cannot afford the lights keeps the dip.
+- **`fade_out_factor(since, fade) = 1 - fade_factor(since, fade)`**, so the departing and arriving
+  lights sum to exactly one for the whole fade: no brightness is invented at either end.
+- **The reserve light's own flicker is kept.** It carries a `Flicker` at the old owner's base and
+  phase, so the departing light still moves as a fire while it leaves; a light that stopped flickering
+  to fade out would read as a lamp being turned down.
 
 ## Iteration 2's findings
 
