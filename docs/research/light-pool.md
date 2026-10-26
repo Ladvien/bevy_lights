@@ -78,6 +78,44 @@ The craft corollaries that decide whether the illusion holds:
   copied onto every slot, so a host can recolour the whole pool with one write. A change to `gain`,
   `size` or `reach` does not touch the slots' looks (see Deviations).
 
+## Iteration 12: a light's rank is its contribution, not its distance
+
+**The defect.** The pool sorts candidates by distance alone, so a 2 m torch displaces a 3 m brazier from a
+real light — even though the brazier's pool is 25× the torch's lumens and the ground under the torch reads
+fine from the brazier's falloff. The craft line this note quotes is "proximity to the subject is the rule
+the eye uses", and the eye is reading **how much light arrives**, which is proximity *and* output together.
+Ranking by distance alone is the rule with half of it missing.
+
+**The model.** Rank by the illuminance a candidate would put on the subject, which for a point light is
+`intensity / distance²` — the same inverse square `fire_lumens` inverts, read the other way. In the pool's
+own units the rank key becomes `intensity / distance²`, so:
+
+- a candidate twice as far needs four times the lumens to rank equal (which is the inverse square, exactly);
+- an infinite intensity does not give a free pass — it is divided by the squared distance like everything
+  else, so the nearest light still wins when the outputs are comparable;
+- the sort is still over finite numbers, and ties still break on `Entity`, so determinism is unchanged.
+
+`LightPool::rank` chooses the rule: `Rank::Illuminance` (the default, new) or `Rank::Distance` (the old
+behaviour, kept because a host whose candidates are all one intensity may prefer the simpler sort and
+because a behaviour change in a released crate should be switchable).
+
+**Validation targets.**
+
+- With a torch at 2 m burning 8 000 lm and a brazier at 3 m burning 60 000 lm, the **brazier** ranks first
+  under `Illuminance` and the torch first under `Distance`. (`tests/pool.rs`.)
+- A candidate at twice the distance with four times the intensity ranks equal within 1e-3, and the tie
+  then breaks on `Entity`.
+- Every existing test in `tests/pool.rs` that is about *assignment* (gather, hide, gain, hysteresis, the
+  hand-off, the reserve) keeps passing with the new default, because those candidates all have one
+  intensity.
+- `gain` still multiplies the written intensity and never the rank: a dimmer night does not reshuffle which
+  lights are real.
+
+**Deviations.** The rank is per candidate and per frame, so the pool's cost gains a division per candidate
+per frame — the bench measures it. A host that wants a different weighting (size, colour, a gameplay
+priority) has `Rank::Distance` plus its own candidate intensities to scale by; a third variant is not
+added until someone asks.
+
 ## Parameters
 
 | parameter | crate default | courtyard | source |
