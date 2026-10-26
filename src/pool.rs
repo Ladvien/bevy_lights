@@ -100,6 +100,9 @@ pub struct LightPool {
     /// How long, in seconds, a light takes to come back to full brightness after it changes owner.
     /// [`FADE_SECONDS`] by default; `0.0` snaps it back at once (the pre-fade behaviour).
     pub fade_seconds: f32,
+    /// How the pool ranks its candidates: by the illuminance each would put on the subject (the default)
+    /// or by distance alone.
+    pub rank: Rank,
     /// How many extra lights the pool keeps beyond the ones it assigns, so a hand-off can be a
     /// **cross-fade**: the departing owner's light fades out while the arriving one fades in, and the
     /// subject never brightens or darkens. One by default, which cross-fades one hand-off per frame;
@@ -114,11 +117,31 @@ impl Default for LightPool {
             reach: 60.0,
             gain: 1.0,
             light: PointLight { intensity: 0.0, range: 10.0, shadow_maps_enabled: false, ..default() },
+            rank: Rank::Illuminance,
             hysteresis: HYSTERESIS,
             fade_seconds: FADE_SECONDS,
             reserve: 1,
         }
     }
+}
+
+/// How [`LightPool`] ranks its candidates.
+///
+/// The craft's rule is that the eye reads the light that matters, and what arrives at the subject is a
+/// light's output over the square of its distance: [`Rank::Illuminance`] is that sum, and
+/// [`Rank::Distance`] is the old rule (the nearest prop wins however dim it is).
+///
+/// [`Rank::Distance`] is kept for a host whose candidates all burn alike, and because a behaviour change
+/// in a released crate should be something a host can switch off.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Rank {
+    /// Highest illuminance on the subject first: `intensity / distance²`, so a prop four times as bright
+    /// wins at twice the distance.
+    #[default]
+    Illuminance,
+    /// Nearest first, whatever it burns: the rule before [`Rank::Illuminance`] existed.
+    Distance,
 }
 
 /// A prop that would like one of the pool's real lights: how bright it burns, and where its light
@@ -198,7 +221,13 @@ impl SlotLook {
 
 /// One candidate's light assignment: its distance from the focus (squared), its entity, its world
 /// position and its intensity.
-type Assignment = (f32, Entity, Vec3, f32);
+/// One candidate's light assignment: its **rank key** (ascending, so the best is first), its distance
+/// from the focus (squared, for [`hand_off`](crate::model::pool::hand_off) and the reach test), its
+/// entity, its world position and its intensity.
+///
+/// The key and the distance are separate because they are different questions: *which* lights should be
+/// real is about what arrives at the subject, while the overlap rule is about how far it has to travel.
+type Assignment = (f32, f32, Entity, Vec3, f32);
 
 /// What `assign_pool` reads of a candidate: its entity, its propagated position, its own `Transform`
 /// when it has one (the freshest truth in the frame the host moved it), whether it is hidden, and how
@@ -322,7 +351,8 @@ fn assign_pool<F: Component>(
         }
     };
 
-    // 3. Candidates: visible, in reach, nearest first, ties by entity.
+    // 3. Candidates: visible, in reach, and ranked by the pool's rule — highest illuminance on the subject
+    //    first (or nearest first), ties by entity.
     let mut lit: Vec<Assignment> = match focus_at {
         Some(focus_at) if pool.gain > 0.0 => candidates
             .iter()
@@ -339,18 +369,22 @@ fn assign_pool<F: Component>(
                     (None, Some(transform)) => transform.translation,
                     _ => at.translation(),
                 };
-                (
-                    position.distance_squared(focus_at),
-                    entity,
-                    position + candidate.offset,
-                    candidate.intensity,
-                )
+                let distance_squared = position.distance_squared(focus_at);
+                // The rank key. `Illuminance` is `intensity / distance²`, which is the inverse square the
+                // crate's `fire_lumens` inverts: a prop four times as bright ranks equal at twice the
+                // distance. Negated, so ascending order puts the most light first. `Distance` is the key
+                // the pool used before that rule existed.
+                let key = match pool.rank {
+                    Rank::Illuminance => -(candidate.intensity / distance_squared.max(1e-6)),
+                    Rank::Distance => distance_squared,
+                };
+                (key, distance_squared, entity, position + candidate.offset, candidate.intensity)
             })
-            .filter(|(distance_squared, ..)| *distance_squared <= pool.reach * pool.reach)
+            .filter(|(_, distance_squared, ..)| *distance_squared <= pool.reach * pool.reach)
             .collect(),
         _ => Vec::new(),
     };
-    lit.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.1.to_bits().cmp(&b.1.to_bits())));
+    lit.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.2.to_bits().cmp(&b.2.to_bits())));
 
     // 4. Hold or hand over. A slot keeps the candidate it held while that candidate is still a
     //    candidate and no challenger is nearer by the hysteresis; a slot with nothing held takes the
@@ -367,12 +401,12 @@ fn assign_pool<F: Component>(
         let mut claimed: Vec<Entity> = Vec::new();
         for (slot, holding) in &order {
             let held_distance = holding.and_then(|entity| {
-                lit.iter().find(|(_, candidate, ..)| *candidate == entity).map(|(d, ..)| *d)
+                lit.iter().find(|(_, _, candidate, ..)| *candidate == entity).map(|(_, d, ..)| *d)
             });
             let nearest_free = lit
                 .iter()
-                .find(|(_, entity, ..)| !claimed.contains(entity) && Some(*entity) != *holding)
-                .map(|(distance, ..)| *distance);
+                .find(|(_, _, entity, ..)| !claimed.contains(entity) && Some(*entity) != *holding)
+                .map(|(_, distance, ..)| *distance);
             let keep = match (holding, held_distance) {
                 (Some(entity), Some(distance)) => {
                     (nearest_free == held_distance && !claimed.contains(entity))
@@ -451,7 +485,7 @@ fn assign_pool<F: Component>(
         let chosen = if keep {
             holding
         } else {
-            lit.iter().find(|(_, entity, ..)| !taken.contains(entity)).map(|(_, entity, ..)| *entity)
+            lit.iter().find(|(_, _, entity, ..)| !taken.contains(entity)).map(|(_, _, entity, ..)| *entity)
         };
         // A slot's first light is not a hand-off; only a change from one owner to another fades.
         let changed = holding.is_some() && chosen != holding;
@@ -466,7 +500,7 @@ fn assign_pool<F: Component>(
             if holding.is_none() && chosen.is_some() { 1.0 } else { fade_factor(*age, pool.fade_seconds) };
 
         let assigned = chosen.and_then(|entity| {
-            lit.iter().find(|(_, candidate, ..)| *candidate == entity).map(|(_, _, at, i)| (*at, *i))
+            lit.iter().find(|(_, _, candidate, ..)| *candidate == entity).map(|(.., at, i)| (*at, *i))
         });
         match assigned {
             Some((at, intensity)) => {
@@ -498,6 +532,7 @@ fn assign_pool<F: Component>(
     // list and the ones a slot holds. Keyed by `Entity`, this map would otherwise grow by one entry for
     // every candidate ever pooled, which is a leak in a library that runs for hours.
     old_look.retain(|entity, _| {
-        lit.iter().any(|(_, candidate, ..)| candidate == entity) || held.values().any(|held| held == entity)
+        lit.iter().any(|(_, _, candidate, ..)| candidate == entity)
+            || held.values().any(|held| held == entity)
     });
 }

@@ -77,7 +77,7 @@ pub use model::{
     fade_factor, fill_for, fire_lumens, flicker_factor, hand_off, key_to_fill, kindle_gain, pack_flame_tag,
     raised_light, stops, unpack_flame_tag, white_balanced,
 };
-pub use pool::{LightPool, LightPoolPlugin, PoolCandidate, PoolLight};
+pub use pool::{LightPool, LightPoolPlugin, PoolCandidate, PoolLight, Rank};
 
 use bevy::prelude::*;
 
