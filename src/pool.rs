@@ -233,11 +233,14 @@ struct HandOffState {
     fade_at: std::collections::HashMap<usize, f32>,
     /// The template's shared fields as they were last written onto the slots.
     applied: Option<SlotLook>,
-    /// Where each candidate's light last stood, and how bright: a departing owner's position for a
-    /// cross-fade, which by the frame of the hand-off is no longer in the candidate list.
-    old_look: std::collections::HashMap<Entity, (Vec3, f32)>,
-    /// Which reserve light is fading out which departure, by slot index.
-    departure_release: std::collections::HashMap<usize, (Vec3, f32)>,
+    /// Where each candidate's light last stood, how bright, and with what flicker: a departing owner's
+    /// position for a cross-fade, which by the frame of the hand-off is no longer in the candidate
+    /// list. The phase is kept so the light that fades out keeps moving exactly as the one that left
+    /// did — otherwise the departing and arriving lights swing out of step and their sum wobbles.
+    old_look: std::collections::HashMap<Entity, (Vec3, f32, f32)>,
+    /// Which reserve light is fading out which departure, by slot index: its position, its intensity
+    /// and the phase of the light that left.
+    departure_release: std::collections::HashMap<usize, (Vec3, f32, f32)>,
 }
 
 /// Spawns, resizes and assigns the pool's real lights.
@@ -381,7 +384,7 @@ fn assign_pool<F: Component>(
     // reserve light *before* the slots are written, so the departing light is on in the frame the
     // hand-off happens. One reserve light takes one departure per frame; a second departure in the same
     // frame falls back to the dip, so the pool's budget is never exceeded.
-    let mut departure: Option<(Vec3, f32)> = None;
+    let mut departure: Option<(Vec3, f32, f32)> = None;
     for (slot, holding) in held.iter() {
         if *slot >= pool.size {
             continue;
@@ -393,16 +396,16 @@ fn assign_pool<F: Component>(
         }
         // It was a candidate last frame and is not one now: if its slot takes a new owner this frame,
         // the reserve fades the old one out.
-        if let Some((at, intensity)) = old_look.get(&entity).copied()
+        if let Some((at, intensity, phase)) = old_look.get(&entity).copied()
             && departure.is_none()
         {
-            departure = Some((at, intensity));
+            departure = Some((at, intensity, phase));
         }
     }
-    if let Some((at, intensity)) = departure {
+    if let Some(look) = departure {
         let free = (pool.size..pool.size + pool.reserve).find(|slot| !departure_release.contains_key(slot));
         if let Some(slot) = free {
-            departure_release.insert(slot, (at, intensity));
+            departure_release.insert(slot, look);
             fade_at.insert(slot, 0.0);
         }
     }
@@ -416,9 +419,12 @@ fn assign_pool<F: Component>(
             let out = fade_out_factor(*age, pool.fade_seconds);
             let live = departure_release.get(&slot.slot).copied();
             if out < 1.0
-                && let Some((at, intensity)) = live
+                && let Some((at, intensity, phase)) = live
             {
                 transform.translation = at;
+                // The departing light keeps the flicker it had: the same phase as the light that left,
+                // so the two ends of the cross-fade move together instead of beating against each other.
+                flicker.phase = phase;
                 flicker.base = intensity * pool.gain * out;
                 visibility.set_if_neq(Visibility::Inherited);
             } else {
@@ -474,7 +480,7 @@ fn assign_pool<F: Component>(
         }
         // Remember where this slot's light now is, so a departure next frame knows where to fade out.
         if let Some((at, intensity)) = assigned {
-            old_look.insert(chosen.unwrap_or(Entity::PLACEHOLDER), (at, intensity));
+            old_look.insert(chosen.unwrap_or(Entity::PLACEHOLDER), (at, intensity, flicker.phase));
         }
     }
     // Prune the remembered positions to what the pool can still need: the candidates in this frame's

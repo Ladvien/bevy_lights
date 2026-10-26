@@ -50,6 +50,15 @@ a frame's mean luminance cannot see a ±15 % flicker on four lights. If the two 
 check that the switch reached the process — a shell that passes `LIGHTS_UNSIZED=` on both sides
 captures the same thing twice.
 
+## The bench, and the host
+
+`cargo run --release --example bench_lights` is CPU-only, so it measures the host as much as the crate.
+On a machine with other work on it (this Mac has read load averages near 20 from other agents) the same
+binary reports p50 495, then 856, then 865 µs — that is the load, not the code. A change is compared by
+building the base commit and the change into **separate target directories** and running the two
+binaries **interleaved**, three rounds each; a reading whose repeat moves by more than 10 % is thrown
+away.
+
 ## Seeing a cross-faded hand-off
 
 The pool's `reserve` light is what makes a hand-off cross-fade rather than dip. The example takes
