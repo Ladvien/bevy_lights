@@ -259,7 +259,7 @@ fn assign_pool<F: Component>(
                 Name::new(format!("Pool light {slot}")),
                 PoolLight { slot },
                 PointLight { intensity: 0.0, ..pool.light },
-                Flicker { base: 0.0, phase: 1.3 * slot as f32 },
+                Flicker { base: 0.0, phase: 1.3 * slot as f32, diameter: None },
                 Transform::default(),
                 Visibility::Hidden,
             ));

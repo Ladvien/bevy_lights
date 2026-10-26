@@ -6,6 +6,16 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **A fire's flicker sized by its fuel bed**, from the measured puffing law.
+  - `Flicker { diameter: Option<f32> }`: a fire's fuel-bed diameter in the host's world units. A
+    brazier's 0.34 m coals flicker at 2.6 Hz, a 4 m pyre at 0.75 Hz.
+  - `model::fire::flicker_rate(diameter)` = `1.5/√D` Hz, and `flicker_factor_of(diameter, t, phase)`
+    running the same two-sine shape at that rate. The window (`0.70..1.00`), the mean (0.85) and the
+    amplitude are unchanged, so a lumen budget written against the mean still holds.
+  - The law is Cetegen & Ahmed 1993's `f ∝ D^-1/2` with the factor 1.5, as restated and fitted by
+    Xia & Zhang 2018 (*J. Fluid Mech.*) to six experimental studies: `f = 0.48√(g/D)`. `flicker_factor`
+    and the old rates stay for a host with no size to give.
+
 - **The pool's hand-off: an overlap rule and a fade**, so a light that changes owner does not pop.
   - `LightPool::hysteresis` (default `HYSTERESIS` = 1.15): a slot keeps the candidate it holds until a
     challenger is about 13 % nearer. `1.0` is the old nearest-wins rule.

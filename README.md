@@ -17,7 +17,10 @@ lights placed over thousands of virtual ones, and billboard shader flames.
 
 - **`Flicker` + `Kindle`** (`FlickerPlugin`). Every `PointLight` and `SpotLight` carrying `Flicker` is
   modulated around its base intensity by a summed sine (0.70–1.00 of base, mean 0.85), and a light
-  with `Kindle` flares up over 0.6 s instead of switching on. `Kindled { entity }` is the message a
+  with `Kindle` flares up over 0.6 s instead of switching on. Give a fire its fuel-bed size
+  (`Flicker { diameter: Some(0.34) }`) and its flicker runs at the measured puffing rate,
+  `1.5/√D` Hz — a brazier at 2.6 Hz, a pyre at 0.75 — so a large fire breathes more slowly than a
+  small one. `Kindled { entity }` is the message a
   host hears on the frame a fire catches, for the sound of it. An invisible light is not rewritten
   (nothing is extracted for it) but its kindle still counts.
 - **The light pool** (`LightPoolPlugin::<YourFocusMarker>`). A fixed number of real point lights

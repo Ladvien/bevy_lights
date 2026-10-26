@@ -30,6 +30,26 @@ xvfb-run -a -s "-screen 0 1920x1080x24" env LIGHTS_FRAMES=300 \
   LIGHTS_SHOT_DIR=/tmp/lights-frames LIGHTS_SHOT_FROM=20 ./target/release/examples/courtyard
 ```
 
+## Seeing a fire's size
+
+A brazier's coal bed is 0.34 m, so the puffing law gives its light 2.6 Hz; the crate's inherited rate
+is 1.16/2.08 Hz. The example takes the bed and can be told to ignore it:
+
+```sh
+# sized (the default): a brazier breathes at the law's rate
+LIGHTS_FRAMES=200 LIGHTS_SHOT_DIR=/tmp/lights-sized LIGHTS_SHOT_FROM=20 \
+  ./target/release/examples/courtyard
+
+# unsized: the same fires at the crate's inherited rate
+LIGHTS_UNSIZED=1 LIGHTS_FRAMES=200 LIGHTS_SHOT_DIR=/tmp/lights-plain LIGHTS_SHOT_FROM=20 \
+  ./target/release/examples/courtyard
+```
+
+The run prints `flicker frame N: <lumens>` every 30 frames, which is the honest way to read the rate:
+a frame's mean luminance cannot see a ±15 % flicker on four lights. If the two runs are identical,
+check that the switch reached the process — a shell that passes `LIGHTS_UNSIZED=` on both sides
+captures the same thing twice.
+
 ## Seeing a hand-off
 
 The pool hands a real light to a nearer torch when one is `hysteresis` times nearer than the torch
