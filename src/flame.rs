@@ -287,8 +287,10 @@ fn dress_flames(
 /// together and both hold still when the world is paused. That split is the crate's existing one —
 /// see `docs/research/fire-light.md` and `docs/research/flame-flicker.md`.
 ///
-/// The shared clock is one write a frame whatever the number of flames; a flame's brightness is one
-/// tag write per flame, and skipped entirely for a flame whose site has no `FlameSite` parent.
+/// The shared clock is one write a frame whatever the number of flames; a flame's brightness is a tag
+/// write only on the frames its quantised byte changes, and skipped entirely for a flame whose site has
+/// no `FlameSite` parent. `MeshTag` is in `bevy_pbr`'s `Changed<MeshTag>` re-extraction set, so a write
+/// past the change is a render-world re-extract for that flame.
 fn update_flames(
     real: Res<Time<Real>>,
     time: Res<Time>,
@@ -309,7 +311,15 @@ fn update_flames(
     for (mut flame, mut transform, mut tag, parent) in &mut flames {
         let site = sites.get(parent.parent()).ok();
         if let Some(site) = site {
-            tag.value = set_flame_brightness(tag.value, flicker_swing(site.diameter, t, site.phase));
+            // Only when the brightness byte actually changes: `MeshTag` is in `bevy_pbr`'s
+            // `Changed<MeshTag>` re-extraction set, so a write here costs a render-world re-extract for
+            // that flame. The byte holds 1/255 of the swing, so at 60 fps a 2.6 Hz fire skips some
+            // frames; a fire that never changes costs nothing at all.
+            let brightness = flicker_swing(site.diameter, t, site.phase);
+            let packed = set_flame_brightness(tag.value, brightness);
+            if packed != tag.value {
+                tag.value = packed;
+            }
         }
         if flame.kindled >= f32::MAX {
             continue;
@@ -391,6 +401,39 @@ mod tests {
         assert_eq!(children[0].0, site, "a child of the site");
         app.update();
         assert_eq!(flame_children(&mut app).len(), 1, "still one flame");
+    }
+
+    /// A flame whose quantised brightness does not change must not write its tag: `MeshTag` is in
+    /// `bevy_pbr`'s `Changed<MeshTag>` re-extraction set, so an unchanged write costs a render-world
+    /// re-extract for that flame every frame. Detected through the change tick, which is what that set
+    /// keys on — comparing `value` would pass an always-write loop that rewrote the same bytes.
+    #[test]
+    fn an_unchanged_brightness_leaves_the_tag_unwritten() {
+        let mut app = dressing_app();
+        app.world_mut().spawn((
+            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: Some(0.34) },
+            Transform::default(),
+        ));
+        app.update();
+        let flame =
+            app.world_mut().query_filtered::<Entity, With<Flame>>().single(app.world()).expect("one flame");
+        // 30 frames is half a second: 1.3 cycles of a 2.6 Hz fire, over a swing of 256 byte steps. The
+        // byte moves on most frames but not all, so an always-write loop's 30 ticks are distinguishable
+        // from a write-on-change loop's fewer.
+        let mut changed = 0;
+        let mut last = app.world().entity(flame).get_ref::<MeshTag>().expect("a tag").last_changed();
+        for _ in 0..30 {
+            app.update();
+            // Read-only: a `get_mut` would itself bump the changed tick, which is the thing under test.
+            let tag = app.world().entity(flame).get_ref::<MeshTag>().expect("a tag");
+            let tick = tag.last_changed();
+            if tick != last {
+                changed += 1;
+                last = tick;
+            }
+        }
+        assert!(changed > 0, "the tag never changed, so the flame is not breathing at all");
+        assert!(changed < 30, "the tag changed on all 30 frames: an unchanged byte still re-extracts");
     }
 
     #[test]

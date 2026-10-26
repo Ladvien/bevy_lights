@@ -157,6 +157,20 @@ swing(phase, diameter, t)  = flicker_factor_of(diameter, t, phase)   if diameter
   **above 0.8**. (The +0.07 measured before this change is the number this iteration must move.)
 - A paused world still shows a moving silhouette and a still brightness (`Time<Real>` vs `Time`).
 
+### Measured, 2026-10-26 (`docs/loop-log.md`, iteration 15)
+
+| target | result |
+|---|---|
+| flame region vs its pool, correlation | **−0.003 → +0.748**, and +0.994 over the flat tail of one cycle |
+| flame region's own swing, peak to peak | 2.4 % → 9.1 % (its pool's 11.4 % unchanged) |
+| frame-to-frame flame step | max 2.88 DN over 70 frames, 13 sign changes in 96 → a 2.5 Hz breath, no strobe |
+| core vs rim of the same flame, bright frame / dim frame | 1.074 / 1.132 — the brightness is a multiplier on the whole flame, and the rim moves slightly more because the silhouette's noise has not changed |
+| cost | the pool's own frame is unchanged and the flame's write is skipped on the frames its byte holds (`bench_lights`'s total is flat within the run-to-run spread) |
+
+The +0.8 target was not reached on the 70-frame sample as a whole (+0.748) because the sample spans more
+than one cycle of a 2.6 Hz fire and the pool's own 1.2 Hz component; over a single cycle's flat tail it is
++0.994. Recorded rather than rounded up.
+
 ## Deviations
 
 - **The drawn emission tracks the light instead of being a constant.** Before, the shader's output was
