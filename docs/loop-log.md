@@ -745,3 +745,78 @@ wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
 5. **A bench that controls for host load** — build base and head into separate target dirs and run them
    interleaved, refusing a reading whose repeat differs by more than 10 %. The script this iteration
    used is in `docs/DEMOS.md`'s bench section from now on.
+
+## Iteration 6 — 2026-10-26 — the child-position bug, and a cross-fade that finally fires
+
+### What changed, and why
+
+Iteration 5's blocked item had a plan: a focus that walks away, so torches leave the pool. Building it
+found a **library bug that had been there since iteration 2**, and fixing it forced two more corrections
+in iteration 4's feature.
+
+### The bug: a child candidate sat at its own local offset
+
+Iteration 2 fixed "the pool reads a stale `GlobalTransform`" by preferring a candidate's own `Transform`.
+That is right for a **root** prop the host moves, and **wrong for a child**: a torch is a child of its
+bearer, its own `Transform` is a constant `(0, 0.95, 0)`, so every torch candidate collapsed to the same
+point. The pool's sort therefore never changed, the same four lights stayed where they were for the whole
+run, and no candidate ever left. `a_child_candidate_moves_with_its_parent` is the test: reverted, it fails
+with the child's light at `[0, 2, 0]` instead of its parent's place.
+
+The fix reads a local `Transform` only when the candidate has **no `ChildOf`**, and `GlobalTransform`
+otherwise. On the demo this changed the pool's per-frame total from 2 jumps over 20k in 400 frames to 14:
+the pool had been frozen for four iterations and every capture before this one was of a frozen pool.
+
+### Two corrections to iteration 4's cross-fade
+
+1. **It only cross-faded a *departed* owner.** The common hand-off is a slot changing owner while the old
+   one is still a candidate — simply displaced by a nearer prop — and that case kept the dip. The
+   departure is now "this slot is about to lose its owner", from the first pass's own keep decision, not
+   "the owner left the pool". `a_steady_pool_keeps_its_candidates_and_its_brightness` caught my first
+   attempt at this, which re-derived the decision without the first pass's slot claiming and so
+   manufactured phantom hand-offs in a steady pool.
+2. **The dip test needed `reserve: 0`.** With a reserve by default, that pool no longer dips, so its test
+   was measuring the wrong thing until it pinned the old behaviour.
+
+### The capture this time
+
+With `LIGHTS_FOCUS_WALK=18` and `LIGHTS_POOL_LOG=1`, on 400 frames at pool 4:
+
+| | reserve 1 | reserve 0 |
+|---|---|---|
+| mean pool total | 763 501 | 763 224 |
+| frames where the two differ by >1000 lm | 16 of 400 | — |
+| the first hand-off's frames (11 → 19) | +12 507, +11 989, +11 344, +10 601, +9 790, +8 938, +8 066, +7 192, +6 330 | reference |
+
+The reserve run carries up to 12 507 lm more light through the hand-off, decaying frame by frame as the
+departing light fades out. That is the evidence iterations 4 and 5 could not produce, and it took a
+per-frame log to see: a 0.35 s fade is invisible in a 30-frame sample and far below a frame's mean
+luminance.
+
+### The benchmark
+
+Base against head, interleaved on big (the method iteration 5 wrote down): three rounds each. The change
+adds an `Option<&ChildOf>` to the candidate query and moves the departure test before the slot loop.
+
+### Verdict
+
+**GREAT.** A four-iteration-old bug in the pool's own candidate position is fixed with a test that fails
+without it; the cross-fade now covers the common hand-off rather than only a departure; and the capture
+finally shows the feature working, with numbers rather than a claim.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (65 tests), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
+wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+2. **A placed specular highlight** (iteration 1's open beauty line).
+3. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+4. **The demo still has no hand-off in its default capture.** The walking focus is a knob, not the
+   default; whether the showcase should ship with torches visibly changing hands is an art call.
+5. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared
+   only by distance, so the pool can hold the dim one.

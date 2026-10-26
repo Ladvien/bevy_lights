@@ -70,12 +70,22 @@ less than a DN:
 LIGHTS_RESERVE=1 LIGHTS_HYSTERESIS=1.0 LIGHTS_FRAMES=150 LIGHTS_POOL=4 ./target/release/examples/courtyard
 ```
 
-**A caveat this iteration found:** in the courtyard, no candidate ever *leaves* the pool in its first
-few seconds (the torches walk; they do not go out of reach), so a cross-fade never fires there and the
-`reserve` makes no difference to a capture. The mechanism is proved by
-`a_cross_faded_hand_off_holds_the_subject_and_a_dip_does_not` in `tests/pool.rs`, which displaces a
-holder and shows the subject held at 99 → 94 % of its light against the dip's 0 → 14 %. A capture that
-shows it needs a scenario where torches cross the reach boundary, which the example does not yet have.
+**Making it fire.** A cross-fade needs a slot to change owner. In the courtyard's default 6 m focus
+orbit the same four torches stay nearest for the whole run, so nothing changes hands. Send the focus out
+past the pool's reach instead — `LIGHTS_FOCUS_WALK=18` — and the torches stream across the boundary as
+it goes round:
+
+```sh
+LIGHTS_FOCUS_WALK=18 LIGHTS_POOL_LOG=1 LIGHTS_RESERVE=1 LIGHTS_HYSTERESIS=1.0 \
+LIGHTS_FRAMES=400 LIGHTS_POOL=4 LIGHTS_SEED=3 ./target/release/examples/courtyard > cross.log
+LIGHTS_FOCUS_WALK=18 LIGHTS_POOL_LOG=1 LIGHTS_RESERVE=0 LIGHTS_HYSTERESIS=1.0 \
+LIGHTS_FRAMES=400 LIGHTS_POOL=4 LIGHTS_SEED=3 ./target/release/examples/courtyard > dip.log
+```
+
+`LIGHTS_POOL_LOG=1` prints `pool <frame> <lights> <total>` **every frame**: a 0.35 s fade is invisible in
+a 30-frame sample and far below a frame's mean luminance. The two logs differ on the frames where a
+hand-off happens — at the first one the reserve run carries 12 507 lm more light than the dip, decaying
+to 6 330 nine frames later as the departing light fades out.
 
 ## Seeing a hand-off
 
