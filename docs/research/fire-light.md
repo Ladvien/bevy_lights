@@ -15,11 +15,29 @@ what they are, what the literature says they should be, and what the gap costs.
 | Sanctuary `src/prototype/town.rs:102-106` | `WALL_LIGHT_LUMENS`' budget, which divides by the mean flicker 0.85 | why the mean is fixed at 0.85 |
 | home-still `book_real_time_rendering_4th_akenine` §? | RTR4 on light animation and emissive variation | survey |
 | home-still `s2007-advances-pdf-slides-2-8-mb` | Mitchell, Francke & Eng 2007, *Illustrative rendering in Team Fortress 2*: warm/cool shift by Lambert term | the look a fire's light is doing at the shading level |
+| `10.1017_jfm.2018.707` | Xia & Zhang 2018, *A vortex-dynamical scaling theory for flickering buoyant diffusion flames*, J. Fluid Mech. | **the rate law**: `f_p = 0.48 √(g/D)`, i.e. `f = 1.5/√D` Hz |
+| `10.1017_jfm.2018.707` (its references) | Cetegen & Ahmed 1993, *Experiments on the periodic instability of buoyant plumes and pool fires*, Combustion and Flame — the `f ∝ D^-1/2` law and its factor 1.5 | the same law, the primary experimental source |
+| `GPU Gems` ch. 6 (Nguyen, *Fire in the Vulcan Demo*) | the shipped-fire chapter: 2D-flow flames "perfect for creating candle-like flames" | how a production fire is animated |
 
-Nothing in the corpus measures a fire's flicker rate. Searching `puffing frequency`, `flame
-oscillation` and `candle` returns no fire-physics paper: the corpus's combustion hits are biomass
-and atmospheric chemistry, and the plume-instability literature (Cetegen & Ahmed 1993; Kitahata et
-al. 2005) is not in it. `docs/research/corpus.md` records that gap under *Fire and flicker physics*.
+**The rate is measured, and it is one law.** Imported for this iteration: Xia & Zhang 2018 (J. Fluid
+Mech., open access, converted through scribe) states the experimental finding every earlier study
+reported and then derives it from toroidal-vortex shedding:
+
+> "Early researchers [14-19] experimentally found that `f` is related to the fuel source dimension `D`
+> as `f ∝ D^{-1/2}` with a proportionality factor of around 1.5 given by Trefethen and Panton [20] and
+> Cetegen and Ahmed [21]."
+
+and its own fit to the pool-fire data of six experimental studies:
+
+> "In general, Fig. 3 confirms that the existing experimental data together the current result are in
+> good agreement with the trend line, `f_p = 0.48 √(g/D)` with `g` being 9.8 m/s², which is equivalent
+> to the scaling relation, `f = 1.5 √(1/D)`, given by Cetegen and Ahmed [21]."
+
+So the frequency of a fire's light is **`1.5 / √D` Hz for a fuel bed of diameter `D` metres**, and the
+amplitude is a separate matter the flame-shape literature owns. The primary paper (Cetegen & Ahmed
+1993) is not open access and `paper_download` could not get it; Xia & Zhang is, and quotes the same
+law with the same constant, so the note cites the accessible source and records the primary as read
+through it.
 
 ## Craft principle
 
@@ -59,11 +77,14 @@ The craft's numbers, as published in lighting texts and repeated on set:
 
 ## Model adopted
 
-Two engine-free functions, `src/model/fire.rs`:
+Three engine-free functions, `src/model/fire.rs`:
 
 ```
-flicker_factor(t, phase) = 0.85 + 0.15 · (0.5 sin(7.3t + phase) + 0.5 sin(13.1t + 1.7 phase))
-kindle_gain(t)           = smoothstep(t / 0.6) + 0.35 sin(π · smoothstep(t / 0.6))
+flicker_rate(D)                  = 1.5 / √D                       Hz, for a fuel bed D m across
+flicker_factor_of(D, t, phase)   = 0.85 + 0.15 · (0.5 sin(ωt + phase) + 0.5 sin(1.7ωt + 1.7 phase))
+                                   with ω = 2π · flicker_rate(D)
+flicker_factor(t, phase)         = the same shape at Sanctuary's fixed 7.3 and 13.1 rad/s
+kindle_gain(t)                   = smoothstep(t / 0.6) + 0.35 sin(π · smoothstep(t / 0.6))
 ```
 
 `flicker_factor` is bounded by construction to `[0.70, 1.00]`, mean 0.85, and the second sine runs
@@ -80,7 +101,9 @@ off screen.
 
 | parameter | value | source |
 |---|---|---|
-| flicker rates | 7.3 and 13.1 rad/s (1.16 and 2.08 Hz) | design default, Sanctuary's |
+| flicker rate law | `f = 1.5 / √D` Hz for a fuel bed `D` m across | `10.1017_jfm.2018.707` (Xia & Zhang 2018), quoting Cetegen & Ahmed 1993 |
+| flicker rates (a diameter) | `ω = 2π·f` and `1.7·ω`, so `f` and 1.7`f` Hz | the law's `f`, in the two-sine shape Sanctuary used |
+| flicker rates (no diameter) | 7.3 and 13.1 rad/s (1.16 and 2.08 Hz) | design default, Sanctuary's; kept for a host with no size to give |
 | flicker amplitude | ±0.15 about a 0.85 mean | design default; the mean is load-bearing for Sanctuary's lumen budget |
 | phase coupling | second sine at 1.7 × phase | design default |
 | `KINDLE_SECONDS` | 0.6 s | design default, Sanctuary decision 0127 |
@@ -92,6 +115,11 @@ off screen.
 
 - `flicker_factor` stays inside `[0.70, 1.00]` for t ∈ [0, 100] at 0.01 steps and phase 0..6.
   (`src/model/fire.rs`'s own test.)
+- `flicker_rate(D)` is `1.5/√D` Hz within 1e-3 for 0.1, 0.34, 1 and 4 m (4.74, 2.57, 1.5 and 0.75 Hz),
+  monotone falling in `D`, and a degenerate diameter clamps rather than dividing by zero.
+- `flicker_factor_of(D, t, phase)` stays inside `[0.70, 1.00]`, has the same mean 0.85 and the same
+  amplitude as `flicker_factor`, and at `D = 0.34` completes more cycles in 10 s than the diameter-less
+  form does (the sourced rate is faster than the inherited one).
 - `kindle_gain(0) == 0`, `kindle_gain(0.3) ≈ 0.85`, `kindle_gain(0.6) ≈ 1`, `kindle_gain(t > 0.6) == 1`.
 - A kindling light writes exactly one `Kindled` over two seconds and settles inside its window.
   (`tests/flicker.rs`.)
@@ -106,10 +134,13 @@ off screen.
   `&mut PointLight`, while the wall sconces that carry `Flicker` are spots: they were meant to
   flicker (their lumen budget divides by 0.85) and never did. Applying it here is the fix the
   budget already assumed, and Sanctuary's decision record records it.
-- **No fire-size parameter yet.** The literature says a larger fire puffs more slowly, so a brazier
-  and a candle should not flicker at one rate. This crate has one rate for every fire. That is the
-  first item on `docs/loop-log.md`'s backlog, and it is where the missing fire-physics literature
-  has to land.
+- **The rate is now sized, and it is faster than the inherited one.** `flicker_rate(diameter)` returns
+  `1.5/√D` Hz, and `flicker_factor_of(diameter, t, phase)` runs its two sines at that rate and 1.7
+  times it, keeping the `[0.70, 1.00]` window and the 0.85 mean that the lumen budgets divide by.
+  A 0.34 m coal bed gives **2.57 Hz** against the inherited 1.16 and 2.08: the old pair was tuned by
+  eye on a foot-scale world and is slow for a brazier, which is why a fire used to read as a lamp with
+  a wobble. `flicker_factor(t, phase)` stays, unchanged, as the diameter-less form the existing hosts
+  use.
 
 ## Pending index
 
