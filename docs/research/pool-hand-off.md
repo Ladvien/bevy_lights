@@ -69,7 +69,7 @@ threshold for a smaller one, so a light's own falloff masks the last frames of i
 ## Model adopted
 
 Two engine-free functions in `src/model/pool.rs` (the pool's own model module) plus one ECS change, and
-**a cross-fade on top of them** (added in iteration 4; see *Iteration 4's findings*). Iteration 13 added
+**a cross-fade on top of them** (added in iteration 4; see *Iteration 4's findings*). Iteration 14 added
 **`preferred`** and the three **set rules** below it, and rewrote the ECS pass to decide every slot's
 owner before writing any of them:
 
@@ -80,7 +80,7 @@ owner before writing any of them:
 2. **`preferred(held, challenger, hysteresis)`** — the same overlap rule on any "smaller is better"
    quantity; `hand_off` is `preferred` on distances. A pool that ranks its candidates by the light each
    puts on the subject compares *that* quantity here, so ranking and holding are one rule rather than two
-   that can disagree (see *Iteration 13's findings*, consequence 3).
+   that can disagree (see *Iteration 14's findings*, consequence 3).
 3. **`fade_factor(since_hand_off, fade_seconds)`** — the intensity multiplier of a light that has just
    changed owner: `0` at the instant of the hand-off, rising smoothly to `1` over `fade_seconds`,
    with a smoothstep so the derivative is zero at both ends. The light *darkens* at the new owner and
@@ -89,7 +89,7 @@ owner before writing any of them:
 4. **The ECS change**: `assign_pool` remembers each slot's held candidate in a `Local` and writes
    `Flicker::base = intensity · gain · fade_factor(...)`. The slot's position still steps once (a light
    cannot be in two places), but its brightness moves through the step, which is what keeps it from
-   reading as a teleport. Since iteration 13 every slot's owner for the frame is decided in **one map
+   reading as a teleport. Since iteration 14 every slot's owner for the frame is decided in **one map
    before a single slot is written**, because a decision that depended on the order the slots happen to
    be written in is how a slot came to take a candidate another slot was keeping.
 
@@ -219,7 +219,7 @@ Adopted as written, with four things the implementation taught:
   which is how the first, wrong measurement (it read the pool's first filling frame) was caught: a
   switch that turns a feature off has to change what you measured, or you measured something else.
 
-## Iteration 13's findings: the reshuffle
+## Iteration 14's findings: the reshuffle
 
 The rule "every slot keeps its candidate unless a challenger is better by the hysteresis" was applied
 per slot, each against one global best free candidate. Three consequences, all measured:
@@ -267,7 +267,7 @@ notes and RTR4 rather than the original paper.
   (the pool must not introduce its own chatter).
 - **One move is one move.** A newcomer takes one light from the pool, not a share of every light: the
   other slots keep their candidates, and no frame changes by more than the flicker's own swing. (Added in
-  iteration 13, where the pool was measured changing 17 % in a frame.)
+  iteration 14, where the pool was measured changing 17 % in a frame.)
 - **The best set, not the best slot.** The lights the pool holds are the best *set* it can afford, so a
   bright far lantern keeps a light that a dim near torch would starve under a per-slot rule.
 - **No light is ever sourceless and no source has two lights.** A frame sequence shows a flame at the

@@ -650,7 +650,7 @@ fn the_pools_default_rank_is_illuminance() {
 
 #[test]
 fn the_pools_hand_off_budget_is_its_free_reserves() {
-    // The rule iteration 13 added: a hand-off the pool cannot cross-fade is a hand-off that dims its
+    // The rule iteration 14 added: a hand-off the pool cannot cross-fade is a hand-off that dims its
     // subject, so at most as many lights change owner in a frame as there are free reserves. The rule
     // had no test of its own, and its wrong form is silent — it looks exactly like a pool that is
     // merely slow to respond. Measured: four steady slots, then four challengers nearer the focus in

@@ -1190,6 +1190,14 @@ lantern — four times the lumens, a taller flame, the case the old rule got wro
 different frames (RMSE 2 %, mean 58.17 against 57.44), and the illuminance rule puts the real lights where
 the bright sources are.
 
+### The benchmark, measured late
+
+Iteration 12 added a division per candidate per frame to the pool and **shipped without running the bench**
+— a hole in that iteration's own verification, found here. Measured now, base `9d3abf0` against head,
+interleaved on big: base p50 **434, 528, 449** against head **462, 466, 461**. The medians sit inside each
+other's spread; the change costs nothing the bench can see. Recorded because "I did not measure it" is a
+worse answer than a number, even when the number is dull.
+
 ### The gate
 
 `cargo build --release`, `cargo build`, `cargo test` (**74 tests**), `cargo test --features serde`,
@@ -1208,11 +1216,78 @@ wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
 5. **A `Rank::Weighted`** for a host that wants gameplay priority (a carried torch matters more than a
    brazier): the rank key would take a per-candidate multiplier.
 
-## Iteration 13 — 2026-10-26 — the pool's hand-off is a set decision
+## Iteration 13 — 2026-10-26 — the bench says which system cost what
+
+### What changed, and why
+
+Backlog item 4: "the bench should report the pool's work, not only the total". Iteration 12 added a
+division per candidate per frame to the pool's sort and **shipped without running the bench at all** — a
+hole in that iteration's verification, found while orienting here. So this iteration did two things: filled
+the hole, then built the instrument that makes the hole visible next time.
+
+### The hole, filled
+
+Base `9d3abf0` (before the rank change) against head, interleaved on big, three rounds:
+
+| round | base p50 | head p50 |
+|---|---|---|
+| 1 | 434 | 462 |
+| 2 | 528 | 466 |
+| 3 | 449 | 461 |
+
+The medians sit inside each other's spread: the rank change costs nothing the bench can see. Recorded
+because "I did not measure it" is a worse answer than a dull number.
+
+### The instrument
+
+`bench_lights` now prints a second line, `bench_lights_systems flicker_p50_us=… pool_p50_us=…`, by re-running
+the same app with a resource switch that leaves one of `LightsSystems::{Flicker, Pool}` enabled. The systems
+are private (internals); the crate's public boundary is the system set, so that is what is driven, and the
+switch is a run condition that is an `Option<Res<…>>` — a bare `Res` in a run condition panics when absent,
+which is one of the crate's own recorded traps.
+
+At 5 000 candidates and 2 000 lights, over three runs: **flicker 157–182 µs, pool 302–394 µs**. The pool is
+the expensive half, which is what any change to its sort or its hysteresis should move.
+
+### Proving the instrument is not a lie
+
+A per-system line from a switch that does nothing would be the frame measured twice.
+`the_switch_really_isolates_the_two_sets` runs both ways and asserts the *other* set did not run — with
+`Only::Flicker` the pool spawns no slots, with `Only::Pool` the flicker writes no intensity. Removing the
+pool's run condition makes it fail (`and the pool did not run: no slots were spawned`, 5 against 0).
+
+That test also caught a fact I had forgotten: a pool of 4 spawns **5** slots, because the cross-fade keeps a
+reserve. The expectation was wrong, not the code.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (74 tests, plus the example's own
+`cargo test --release --example bench_lights`), `cargo test --features serde`, `cargo build --examples
+--all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS="-D warnings"
+cargo doc`, `cargo fmt --check`, `cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` —
+all pass.
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+2. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+3. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
+   an atlas.
+4. **The pool's 310 µs is unexamined**: the bench can now name it, and the next pool change should say
+   whether the sort, the hysteresis pass or the cross-fade's bookkeeping is the share. A candidate worth
+   taking is sorting only the candidates within reach rather than all of them.
+5. **A `Rank::Weighted`** for a host that wants gameplay priority (a carried torch matters more than a
+   brazier): the rank key would take a per-candidate multiplier.
+
+## Iteration 14 — 2026-10-26 — the pool's hand-off is a set decision
 
 ### First, the ungated work
 
-This pass opened on a **dirty tree with iteration 13's implementation staged but never committed** — the
+The pass that was killed had claimed iteration 13; a concurrent pass on another branch pushed its own
+iteration 13 ("the bench says which system cost what") while this one was running, so this entry is
+renumbered **14** and every reference in the note, `docs/DEMOS.md` and `tests/pool.rs` follows it.
+
+This pass opened on a **dirty tree with this iteration's implementation staged but never committed** — the
 previous pass was killed before its gate. Nothing was built on it blind: the whole gate was run on it
 first, and it failed twice.
 

@@ -10,6 +10,11 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
   challenger beats what is held by the `hysteresis` margin. `hand_off` is `preferred` on distances, and
   the pool's own holding decision uses it on its rank value, so ranking and holding are one rule.
 
+- **`bench_lights` reports each hot system set separately.** A second line,
+  `bench_lights_systems flicker_p50_us=… pool_p50_us=…`, times `LightsSystems::Flicker` and
+  `LightsSystems::Pool` on their own by re-running the same app with a switch that leaves one enabled — so a
+  change can be attributed to the system it moved rather than to "the frame".
+
 - **The pool ranks a candidate by the light it contributes, not by its distance.** `LightPool::rank`
   defaults to `Rank::Illuminance`, which orders candidates by `intensity / distance²` — so a brazier at
   3 m burning 60 000 lm takes a real light from a torch at 2 m burning 8 000, where the old rule gave it to

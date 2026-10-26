@@ -92,6 +92,24 @@ Measured on those frames, the count of saturated flame pixels runs **0 → 4 430
 frames 5, 10, 20 and 40, then holds at about 19 000: the flame grows into its fire rather than appearing
 whole.
 
+## The bench's two lines
+
+`bench_lights` prints two lines now. The first is the whole frame; the second separates the crate's two hot
+system sets, because a total tells you a change cost something and not *what*:
+
+```text
+bench_lights candidates=5000 lights=2000 pool=16 frames=600 mean_us=… p50_us=… min_us=… max_us=…
+bench_lights_systems flicker_p50_us=170 pool_p50_us=306
+```
+
+The per-system pass re-runs the same app with a resource switch (`Only`) that leaves one of
+`LightsSystems::{Flicker, Pool}` enabled. `the_switch_really_isolates_the_two_sets` in the example's tests
+proves the switch works — with `Only::Flicker` the pool spawns no slots, with `Only::Pool` the flicker writes
+no intensity — because a per-system line from a switch that does nothing would just be the frame twice.
+
+At 5 000 candidates and 2 000 lights the split is roughly **170 µs flicker, 310 µs pool**: the pool is the
+expensive half, which is what a change to the pool's sort should move.
+
 ## The bench, and the host
 
 `cargo run --release --example bench_lights` is CPU-only, so it measures the host as much as the crate.
@@ -168,7 +186,7 @@ awk '$1=="pool" && $2>=25 {print $2, $4}' pool.log   # frame, pool total
 
 Two things to check, both measured on the courtyard's 400-frame default:
 
-- **No single frame may lose a light's worth of the pool.** Before iteration 13 the total fell **19 % in one
+- **No single frame may lose a light's worth of the pool.** Before iteration 14 the total fell **19 % in one
   frame** (frame 303, 972 505 → 787 358 lm) with **8 of 13 lights reading zero** and faded back over
   twenty frames. With the set rules the worst steady-state frame moves **1.2 %** and no frame exceeds 2 %.
 - **The pool's per-slot line must not show a mass extinction.** The bracket carries every light's
