@@ -88,10 +88,70 @@ a steady-state number; `p50` is the number to compare between iterations.
 5. **A colour-temperature helper** (Kelvin → `LinearRgba`) for warm practicals against cool moonlight,
    which is the one number every night scene needs and every host re-derives.
 
+### The first capture, judged (V3)
+
+`LIGHTS_FRAMES=600 LIGHTS_SHOT=… ./target/release/examples/courtyard` under Xvfb on big (RTX 3090),
+1280 × 720, the default camera `(0, 9, 16)` looking at the origin. `kindled` printed **4** times, one
+per brazier, with no `B0004` warning. `Exposure::ev100` stays at the plan's 3.0: its V3 rule moves it
+only if the pool reads above 250 or below 60.
+
+| region (40 × 40 px, grey DN) | DN |
+|---|---|
+| ground beside the near-left brazier | 198.5 |
+| ground beside the near-right brazier | 190.5 |
+| the shadow cross between the two near pillars | 18.7 |
+| ground in a pillar's shadow, right | 31.4 |
+
+The pool mean (194.5) is inside 120–200 and **10.4 ×** the dark patch (target: at least 4 ×). The
+mean of the whole frame breathes between 75.1 and 75.6 DN over twelve consecutive GIF frames, which is
+four ±15 % fires and nothing else moving the exposure.
+
+The pool is real: the difference of the 8-light and the 2-light captures lights only the left of the
+frame, where the orbiting focus is at frame 600, and is exactly the six extra torches' glow
+(`/tmp/pool-diff.png`, amplified 4 ×).
+
+**Critique, as a hostile art director** (every item is a candidate for iteration 1):
+
+1. *The pool is nearly invisible in the beauty shot* (major). At the plan's 8 000 lm a torch is a
+   fifth of a 60 000 lm brazier, and within 12 m of one the braziers' warm wash buries it: the eye
+   cannot tell 2 pooled torches from 8. The difference image proves they are there; the hero GIF does
+   not show it. Either the torches are raised, the courtyard is darkened away from the braziers, or the
+   camera is moved in on the focus. The plan's numbers are design defaults and were left alone here.
+2. *The ground's falloff is a single broad warm plateau* (noticeable). There is no visible
+   inverse-square shoulder between "lit" and "dark" within the courtyard: the four 12 m ranges overlap
+   everywhere inside the pillars. The key-to-fill ratio reads well at the edges and flat in the middle.
+3. *No sky and no horizon* (noticeable). The 40 × 40 m ground ends in a hard edge against a near-black
+   clear colour. The default grey it replaced read as an unfinished viewport.
+4. *The braziers are boxes* (cosmetic). A 0.8 m cube of dark stone with a coal slab on top is a
+   motivated source, which is the point, but it reads as a cube.
+5. *Hard pillar shadows* (cosmetic): `shadow_maps_enabled` on the braziers gives crisp edges where a
+   real fire's large source would soften them; `PointLight::radius` is the knob and is 0.
+
+Defects found and fixed during the capture rather than logged:
+
+- **`kindled` printed twice per brazier.** The first frame of a fixed-step run has a delta of zero, so
+  `Kindle::elapsed` was still 0 on the second frame and the same fire was announced again. The
+  advance is now floored at `f32::MIN_POSITIVE`, so a heard kindle never reads exactly 0 again; the
+  regression test (`a_light_present_on_the_very_first_frame_is_heard_once`) fails without it
+  (`[15v0, 15v0]`). `Added<Kindle>` would have been wrong in the other direction: replacing a
+  component leaves its `added` tick alone, so a re-lit fire would never be heard again.
+- **A `Flame` under a parent with no `Visibility` warns (B0004)** and does not inherit its torch's
+  visibility. `FlameSite` now `#[require(Visibility)]`.
+- **A dark square under every brazier.** The light sat a hand's width over a 0.7 m box, so the box cast
+  a hard 2 m shadow across the ground around its own fire. The light is now at the flame's centre and
+  the bowl does not cast.
+- **The moon was 1000 × too bright** (300 lx, a transcription slip for the plan's 0.3 lx): the whole
+  courtyard read as an overcast afternoon, the brazier pool was 1.6 × the shadow, and V3's 4 × was
+  unreachable.
+
+Tooling note: **`/tmp` on big is a 16 GB tmpfs that other agents had filled to 100 %.** `LIGHTS_SHOT_DIR`
+into it wrote 241 frames of which most were truncated PNGs, and `tools/gif.sh` (which `mktemp`s there)
+failed with ENOSPC; the GIF came out 308 KB and mostly undecodable ("chunk too big"). Send frame
+directories and `TMPDIR` to the NVMe (`/home/ladvien/tmp-lights`) and check `df -h /tmp` first.
+`docs/DEMOS.md` says so.
+
 ### Not yet measured
 
-- No capture has been judged. The showcase's lighting numbers (`Exposure::ev100` 3.0, 60 000 lm
-  braziers, 8 000 lm torches, 300 lx moon) are design defaults, and iteration 1's first job is the
-  capture and the craft checklist.
-- `docs/media/courtyard.gif` and `courtyard.png` were made on mac_air; a capture from big's Xvfb is
-  the loop's baseline.
+- Hand-off popping: no consecutive-frame difference at a pool boundary has been looked at yet.
+- The flicker's rate against any source: the fire-physics papers are not in the corpus.
+- GPU cost of `FlameMaterial` (the bench is CPU only).

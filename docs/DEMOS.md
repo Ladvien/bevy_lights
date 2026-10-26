@@ -3,6 +3,14 @@
 How `docs/media/` is made, so two captures a month apart are comparable. Every capture is taken from
 the same build, the same frame count and the same camera as the one before it.
 
+## Before you capture: `/tmp`
+
+**Check `df -h /tmp` first.** On big `/tmp` is a 16 GB tmpfs that other agents fill to 100 %. A frame
+sequence written into it comes out as truncated PNGs (`LIGHTS_SHOT_DIR` does not notice), and
+`tools/gif.sh`, which `mktemp`s there, dies with ENOSPC or encodes a GIF of the frames that survived.
+Send both to disk: `export TMPDIR=/home/ladvien/tmp-lights` (it must exist) and put
+`LIGHTS_SHOT_DIR` under it. A 241-frame sequence is ~180 MB at 1280 x 720.
+
 ## The frame sequence
 
 `examples/courtyard.rs` writes PNGs itself, at a fixed 1/60 s step, and exits when it reaches
