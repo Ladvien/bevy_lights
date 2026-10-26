@@ -1,19 +1,26 @@
-# The flame's silhouette: it must not be a mirror
+# The flame's silhouette: its edges must not be one curve
 
-Every flame the crate draws is a mirror-symmetric wedge. That is not a tuning problem, it is arithmetic:
-`src/flame.wesl`'s `body = 1.0 - abs(dx) / half_width` with a `half_width` that is a function of height
-alone makes the left edge exactly the negation of the right edge. Measured on iteration 16's baseline:
-the left and right edge of an isolated torch flame differ by **0.00 px, on every sampled frame**, of a
-mean width of 12–83 px (`/home/ladvien/l16/findings.md`).
+A flame's silhouette should not be one analytic curve mirrored about its axis. The shader's
+`body = 1.0 - abs(dx) / half_width` gives every row the same shape on both sides of the axis, so whatever
+the noise does to `dx`, the *envelope* of the silhouette is a mirror: the widest point of a row and the
+widest point of the row below it are equally far from the axis, and a bulge is a bulge on both sides at
+once. A real buoyant flame's bulges are detached toroidal vortices, and a vortex sheds from one side of
+the flame sheet before the other.
 
-`docs/research/flame.md` opens by saying a shader that misses any of a flame's three qualities "reads
-as a decal". This note is the fourth quality, and it is the one the crate fails completely: **a flame
-has no mirror plane**. Its edges are independent curves, its bulges shed from one side, and its waist
-pinches off. A symmetrical flame is not a slightly-wrong flame; it is a drawing of a flame.
+**A correction to this iteration's own first draft, recorded because it matters.** The draft claimed the
+baseline silhouette was "exactly symmetric — 0.00 px left/right edge difference on every frame". That
+number came from a broken metric: the axis was computed as the mean of `(left + right)`, which makes each
+row's left and right half-widths equal by construction, so the statistic was identically zero for *any*
+picture. Re-measured honestly (mirroring each row's luminance about a fixed axis for the whole flame),
+the baseline is **already asymmetric: a per-row mirror residual of 16.5 % of the row's peak and a
+half-width difference of 5.1 % of the flame's width**. The existing `n1` fbm already perturbs `dx` per
+pixel, so the crate never shipped a perfect mirror; what it ships is a mirror *envelope* with a noisy
+outline. The defect is real but it is a narrower one than the draft claimed, and the numbers a fix must
+beat are the ones above.
 
-The claim needs care, because "irregular" is not a model. The physics says *what* the bumps are and
-*how big*: the bumps are puffs, and the puff's spacing follows from the same law the crate already uses
-for its flicker rate.
+The claim still needs care, because "irregular" is not a model. The physics says *what* the bumps are and
+*how big*: the bumps are puffs, and the puff's spacing follows from the same law the crate already uses for
+its flicker rate.
 
 ## Sources
 
@@ -156,7 +163,7 @@ field, no new resource, one path.
 | the shader's puff wavelength | 0.55 m, one constant for every flame | the mean of the two beds the example spawns (0.71 and 0.40 m); see `Deviations` |
 | bulge count, brazier (1.1 m flame, 0.34 m bed) | 1.55 at the law's own λ; 2.00 at the shader's 0.55 m | `flame_bulges(1.1, 0.34)` |
 | bulge count, torch (0.35 m flame, 0.19 m bed) | 0.88 at the law's own λ; 0.64 at the shader's 0.55 m | `flame_bulges(0.35, 0.19)` |
-| edge modulation amplitude | ±22 % of the analytic half-width, growing with height as `u^0.7` | design default: enough that the widest bulge and the narrowest waist differ by 44 % (a puff's visible size) and the base stays clean |
+| edge modulation amplitude | ±50 % of the analytic half-width, growing with height as `u^0.7`, from a field whose measured spread is sd 0.12 so `2·fbm−1` is stretched ×2 and clamped | design default, calibrated in the capture: 0.22 was invisible (a fifth of its name, because the fbm's spread is narrow), 0.5 gives a visible bulge and waist, 1.0 leaves the flame gaunt. The base stays clean because the amplitude is multiplied by `u^0.7` |
 | edge noise frequency, across the flame | 1.1 cycles per flame width | design default: one lateral feature per flame, so the silhouette reads as a leaning tongue and not as a torn rag |
 | edge scroll rate | 0.9 units/s up the flame | design default: the shape's own clock, the same choice the crate already makes for its noise (1.7 and 2.4 units/s); the *brightness* stays on the puffing law, unchanged |
 
@@ -168,9 +175,10 @@ field, no new resource, one path.
   negative height or bed is 0, and a `NaN` in either is 0.
 - `puff_wavelength(d)` is finite, positive and strictly increasing for `d` in 1e-3..1e6, and a `NaN` or
   a non-positive bed gives a finite positive number.
-- In a capture at the close camera: an isolated torch flame's **left/right edge difference is at least
-  8 % of its mean width** on every sampled frame (baseline: 0.00 %), and the same flame's width profile
-  is no longer mirror-symmetric about its own centroid.
+- In a capture at the close camera, the brazier's flame: the **width profile's variation about its own
+  quadratic trend rises from 6.2 % of the mean width to at least 9 %** (baseline measured 3.67 px sd of a
+  59 px mean width; with the per-side edge, 5.55 px), and its row-level mirror residual rises rather than
+  falls. The baseline is *not* zero on either line; see the correction above.
 - A flame's silhouette **area** still modulates (the flicker is not lost): 30–60 % peak-to-peak over 40
   frames, as the baseline's 44.5 %.
 - A flame row at mid-height carries **two or more luminance lobes** where the baseline carried one.
