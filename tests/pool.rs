@@ -210,6 +210,35 @@ fn the_pools_light_settings_follow_the_resource() {
 }
 
 #[test]
+fn a_change_of_gain_leaves_a_slots_own_colour_alone() {
+    // A host that tints its own fire lights (a palette recolouring everything carrying its marker)
+    // and writes `gain` every frame must keep its tint: only a change to the template's own look
+    // resets the slots.
+    let mut app = app(LightPool { size: 1, reach: 10.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    let tint = Color::srgb(0.9, 0.3, 0.1);
+    for mut light in
+        app.world_mut().query_filtered::<&mut PointLight, With<PoolLight>>().iter_mut(app.world_mut())
+    {
+        light.color = tint;
+    }
+    for gain in [0.9, 0.7, 0.4, 1.0] {
+        app.world_mut().resource_mut::<LightPool>().gain = gain;
+        app.update();
+        let colour = app
+            .world_mut()
+            .query_filtered::<&PointLight, With<PoolLight>>()
+            .iter(app.world())
+            .map(|light| light.color)
+            .next()
+            .expect("a pool light");
+        assert_eq!(colour, tint, "gain {gain} reset the slot's own colour");
+    }
+}
+
+#[test]
 fn two_slots_never_flicker_in_step() {
     let mut app = app(LightPool { size: 4, reach: 100.0, gain: 1.0, ..default() });
     focus_at(&mut app, Vec3::ZERO);

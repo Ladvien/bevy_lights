@@ -74,8 +74,9 @@ The craft corollaries that decide whether the illusion holds:
 - Ties break on `Entity`, so the assignment is identical on every machine and never swaps between
   two equidistant props from frame to frame. That is a determinism requirement, not a nicety: a
   tie-break on float equality would flicker.
-- The pool's `is_changed` copies `color`, `range`, `radius` and `shadow_maps_enabled` onto every
-  slot, so a host can recolour the whole pool for a palette change with one write.
+- When the template's `color`, `range`, `radius` or `shadow_maps_enabled` changes, the new values are
+  copied onto every slot, so a host can recolour the whole pool with one write. A change to `gain`,
+  `size` or `reach` does not touch the slots' looks (see Deviations).
 
 ## Parameters
 
@@ -109,6 +110,12 @@ The craft corollaries that decide whether the illusion holds:
   field makes that a decision the host states rather than a fact it has to know.
 - **The crate's lights are `Visibility::Hidden` when unused**, not `intensity = 0`. A hidden light
   is not extracted at all; an intensity-0 one is.
+- **The template is applied when *its* four shared fields change, not whenever the resource
+  does.** The first draft copied them on `pool.is_changed()`; Sanctuary's night glide writes `gain`
+  every frame, and its palette tints every `FireLight` itself, so the first draft would have reset
+  every slot to the template's colour on every frame and fought the palette. Found by reading
+  Sanctuary's `apply_palette` before publishing; `a_change_of_gain_leaves_a_slots_own_colour_alone`
+  is the test.
 - **`gain <= 0` hides the pool** rather than multiplying to zero, for the same reason.
 - **Known defect, logged:** the hand-off pops. A light that moves from one candidate to another
   jumps. Fading it over a few frames is the loop log's second item.

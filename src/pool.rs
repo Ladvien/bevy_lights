@@ -85,8 +85,12 @@ pub struct LightPool {
     /// out). Applied on top of each candidate's own intensity.
     pub gain: f32,
     /// The light every slot is made from: its `color`, `range`, `radius` and `shadow_maps_enabled`
-    /// are copied onto every pool light, and its `intensity` is ignored (each slot's is its
-    /// candidate's, times [`LightPool::gain`]).
+    /// are copied onto every pool light when one of them **changes**, and its `intensity` is ignored
+    /// (each slot's is its candidate's, times [`LightPool::gain`]).
+    ///
+    /// Changing `gain`, `size` or `reach` does not touch the slots' looks, so a host that tints its own
+    /// fire lights (a palette recolouring every light that carries its fire marker) keeps its tint
+    /// through the night's glide, which writes `gain` every frame.
     pub light: PointLight,
 }
 
@@ -138,6 +142,41 @@ pub struct PoolLight {
     pub slot: usize,
 }
 
+/// The four fields of [`LightPool::light`] that every pool light shares, as they were last written
+/// onto the slots.
+#[derive(Clone, Copy, PartialEq)]
+struct SlotLook {
+    color: Color,
+    range: f32,
+    radius: f32,
+    shadow_maps_enabled: bool,
+}
+
+impl SlotLook {
+    fn of(light: &PointLight) -> Self {
+        Self {
+            color: light.color,
+            range: light.range,
+            radius: light.radius,
+            shadow_maps_enabled: light.shadow_maps_enabled,
+        }
+    }
+
+    /// Writes the look onto a slot, touching it (and so its change detection) only if it differs.
+    fn apply(self, light: &mut PointLight) {
+        if light.color != self.color
+            || light.range != self.range
+            || light.radius != self.radius
+            || light.shadow_maps_enabled != self.shadow_maps_enabled
+        {
+            light.color = self.color;
+            light.range = self.range;
+            light.radius = self.radius;
+            light.shadow_maps_enabled = self.shadow_maps_enabled;
+        }
+    }
+}
+
 /// One candidate's light assignment: its distance from the focus (squared), its entity, its world
 /// position and its intensity.
 type Assignment = (f32, Entity, Vec3, f32);
@@ -147,7 +186,7 @@ type Assignment = (f32, Entity, Vec3, f32);
 /// One frame, in order:
 ///
 /// 1. **Slots.** Spawns the missing entities so slots `0..size` exist, and despawns those past
-///    `size`. When [`LightPool`] changed, the shared fields of its `light` are copied onto every
+///    `size`. When the shared fields of [`LightPool::light`] changed, they are copied onto every
 ///    slot; each slot's intensity is left to the assignment.
 /// 2. **Focus.** The one entity carrying `F`. None, or more than one, means no assignment this frame
 ///    (and a warning for the second case): a pool with two cameras has no single near.
@@ -163,6 +202,7 @@ fn assign_pool<F: Component>(
     focus: Query<&GlobalTransform, With<F>>,
     candidates: Query<(Entity, &GlobalTransform, Option<&Visibility>, &PoolCandidate), Without<PoolLight>>,
     mut slots: Query<(Entity, &PoolLight, &mut Transform, &mut Visibility, &mut Flicker, &mut PointLight)>,
+    mut applied: Local<Option<SlotLook>>,
 ) {
     let existing: Vec<(Entity, usize)> =
         slots.iter().map(|(entity, light, ..)| (entity, light.slot)).collect();
@@ -186,22 +226,17 @@ fn assign_pool<F: Component>(
         }
     }
 
-    // The shared light settings follow the resource, so a host can recolour or re-range the whole
-    // pool in one write. A slot's own intensity is the assignment's, never the resource's.
-    if pool.is_changed() {
+    // The shared light settings follow the template, so a host can recolour or re-range the whole pool
+    // in one write. They are applied when the *template's* four shared fields change, not whenever the
+    // resource does: a host that writes `gain` every frame (the night's glide) would otherwise reset
+    // every slot to the template's colour on every frame, undoing a palette that tints its own lights.
+    // A slot's own intensity is the assignment's, never the template's.
+    let look = SlotLook::of(&pool.light);
+    if *applied != Some(look) {
         for (_, _, _, _, _, mut light) in &mut slots {
-            let wanted = &pool.light;
-            if light.color != wanted.color
-                || light.range != wanted.range
-                || light.radius != wanted.radius
-                || light.shadow_maps_enabled != wanted.shadow_maps_enabled
-            {
-                light.color = wanted.color;
-                light.range = wanted.range;
-                light.radius = wanted.radius;
-                light.shadow_maps_enabled = wanted.shadow_maps_enabled;
-            }
+            look.apply(&mut light);
         }
+        *applied = Some(look);
     }
 
     // 2. Focus: exactly one entity, or none.
