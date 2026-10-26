@@ -12,6 +12,8 @@ plainly that it is a design default.
 - [`light-pool.md`](light-pool.md) — the budgeted pool of real lights, and why the hand-off must not
   pop.
 - [`flame.md`](flame.md) — the billboarded shader flame: one material, one draw, a tag per fire.
+- [`lighting-look.md`](lighting-look.md) — the composition: key against fill, a light's colour from its
+  temperature, and the lumens a fire needs for a pool of a given size.
 - [`corpus.md`](corpus.md) — what the home-still library actually holds for cinematography,
   photography, CG and animation lighting, game-lighting craft, many-light rendering, fire physics and
   perception, with the stems to read and the gaps to fill.

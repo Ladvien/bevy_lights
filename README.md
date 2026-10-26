@@ -29,6 +29,12 @@ lights placed over thousands of virtual ones, and billboard shader flames.
   `FlameSite`, out of one material and one draw per flame, with each fire's phase and height packed
   into its `MeshTag` so two fires never burn in step. One shared clock, written once a frame, on
   `Time<Real>` — a paused world's fires still move.
+- **The lighting look** (`bevy_lights::model::cinematography`). The numbers a cinematographer sets,
+  as plain functions: `key_to_fill` and `stops` (with `LOW_KEY` 8:1, `MOON_KEY` 4:1 and `HIGH_KEY`
+  2:1), `fill_for`, `fire_lumens` (the lumens a pool of a given size and brightness needs),
+  `blackbody_colour` (a light's colour from its temperature) and `white_balanced` (the same as a
+  camera balanced elsewhere records it). Size a fire by the pool it lights and colour it by the
+  temperature it burns at, instead of picking lumens and an RGB by eye.
 - **Engine-free maths** (`bevy_lights::model`). `flicker_factor`, `kindle_gain`, `raised_light`,
   `pack_flame_tag` and their inverses, as plain `f32` functions with no `bevy` in them, so a host can
   reuse them in its own systems.
@@ -56,22 +62,37 @@ fn main() {
 }
 
 fn setup(mut commands: Commands) {
-    // A brazier: a real light, that flickers, that kindles when you light it.
+    // A brazier: a real light, sized by the pool it lights (1000 lx at 4 m, from 0.9 m up) and
+    // coloured by the temperature it burns at.
+    let lumens = fire_lumens(1000.0, 4.0, 0.9);
+    let [r, g, b] = blackbody_colour(1900.0, 1.0);
     commands.spawn((
-        PointLight { intensity: 60_000.0, range: 12.0, shadow_maps_enabled: true, ..default() },
-        Flicker { base: 60_000.0, phase: 0.0 },
+        PointLight { color: LinearRgba::rgb(r, g, b).into(), intensity: lumens, range: 10.0, ..default() },
+        Flicker { base: lumens, phase: 0.0 },
         Kindle::default(),
-        FlameSite { height: 0.9, phase: 0.0 },
+        FlameSite { height: 1.1, phase: 0.0 },
     ));
 
-    // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near.
+    // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
+    // hand-held flame is smaller, so its pool is sized from its edge.
     commands.spawn((
-        PoolCandidate { offset: Vec3::Y * 1.8, intensity: 8_000.0 },
+        PoolCandidate { offset: Vec3::Y * 1.8, intensity: fire_lumens(250.0, 2.0, 1.8) },
         FlameSite { height: 0.35, phase: 1.9 },
         Transform::from_xyz(4.0, 0.0, 2.0),
     ));
 
     commands.spawn((MyFocus, Transform::default()));
+}
+
+/// The night's fill: two stops under the fire. The crate does not own the moon, so the host adds it
+/// and asks the crate for the illuminance.
+fn night_fill() -> DirectionalLight {
+    let [r, g, b] = white_balanced(8000.0, 2856.0, 1.0);
+    DirectionalLight {
+        color: LinearRgba::rgb(r, g, b).into(),
+        illuminance: fill_for(1000.0, MOON_KEY),
+        ..default()
+    }
 }
 ```
 

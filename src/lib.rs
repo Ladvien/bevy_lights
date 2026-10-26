@@ -14,6 +14,12 @@
 //! - [`FlameMaterial`], [`FlameSite`] — [`FlamePlugin`] draws a billboarded, additive shader flame
 //!   standing on every [`FlameSite`], out of one material and one draw per flame: `src/flame.wesl`.
 //!
+//! Under those three is the cinematographer's half, [`model::cinematography`]: [`key_to_fill`] and
+//! [`stops`] for a scene's key against its fill, [`fill_for`] for the sky that makes a night,
+//! [`fire_lumens`] for the size of a pool, and [`blackbody_colour`] and [`white_balanced`] for a
+//! light's colour from the temperature it burns at. They touch no light: the same numbers a director
+//! of photography sets before a lamp is hung, for a host to size and colour its practicals with.
+//!
 //! Every plugin is independent; adding some and not others is supported, and
 //! [`LightPoolPlugin`] warns (it does not panic) when [`FlickerPlugin`] is missing.
 //!
@@ -65,7 +71,9 @@ mod pool;
 pub use flame::{Flame, FlameLook, FlameMaterial, FlamePlugin, FlameSite};
 pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled};
 pub use model::{
-    KINDLE_SECONDS, RANGE_MARGIN, flicker_factor, kindle_gain, pack_flame_tag, raised_light, unpack_flame_tag,
+    HIGH_KEY, KINDLE_SECONDS, LOW_KEY, MOON_KEY, RANGE_MARGIN, blackbody_colour, fill_for, fire_lumens,
+    flicker_factor, key_to_fill, kindle_gain, pack_flame_tag, raised_light, stops, unpack_flame_tag,
+    white_balanced,
 };
 pub use pool::{LightPool, LightPoolPlugin, PoolCandidate, PoolLight};
 

@@ -4,6 +4,25 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **`model::cinematography`: a scene's lighting as the numbers a cinematographer sets**, so a host can
+  size and colour its practicals instead of picking them by eye.
+  - `key_to_fill(key_lux, fill_lux)` and `stops(ratio)`: the ratio of a scene's key to its fill, with the
+    craft's three conventional ratios as constants — `LOW_KEY` (8:1, a night exterior), `MOON_KEY`
+    (4:1) and `HIGH_KEY` (2:1, a lit interior).
+  - `fill_for(key_lux, ratio)`: the inverse, so a host that knows what its fire puts on the ground asks
+    for the sky that makes a night of it.
+  - `fire_lumens(lux, reach, over)`: the lumens a practical needs for the ground `reach` out and `over`
+    below it to receive `lux`. Bevy maps a point light's lumens to Φ/4π candela, so this is the inverse
+    square solved for the light: a pool gets a *size* instead of an arbitrary number.
+  - `blackbody_colour(kelvin, strength)`: a light's linear RGB from its colour temperature (Planck's law
+    against the CIE 1931 observer), so a fire is coloured by the temperature it burns at.
+  - `white_balanced(kelvin, balance_kelvin, strength)`: the same colour as a camera balanced to
+    `balance_kelvin` records it, which is how one balance turns a fire orange and the sky blue.
+  - All five are engine-free (in `src/model/`, covered by `tests/leaf.rs`) and re-exported flat from the
+    crate root. Their sources and parameters are in `docs/research/lighting-look.md`.
+
 ## [0.1.0] - 2026-10-25
 
 First release: the practical lights extracted from Sanctuary, generalised to carry no game knowledge.
