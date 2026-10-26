@@ -594,29 +594,36 @@ at the pool's edge {:.2}:1",
 /// Prints one brazier light's intensity every 30 frames, so a capture's flicker can be read off the
 /// log rather than guessed at from a frame's mean.
 fn report_flicker(
-    lights: Query<&PointLight, With<Flicker>>,
+    flames: Query<&GlobalTransform, With<Flame>>,
+    lights: Query<(&PointLight, &GlobalTransform), (With<PoolLight>, Without<Flame>)>,
     candidates: Query<(), With<PoolCandidate>>,
     mut frame: Local<u32>,
 ) {
     *frame += 1;
     // The pool's total, which is the number a cross-fade is meant to hold: the sum of every light the
     // pool owns (its assigned slots and its reserve), across a hand-off.
-    let total: f32 = lights.iter().map(|light| light.intensity).sum();
+    let total: f32 = lights.iter().map(|(light, _)| light.intensity).sum();
     let count = lights.iter().count();
     // `LIGHTS_POOL_LOG=1` prints the pool's total **every frame** — the only way to see a hand-off, since
     // a 0.35 s fade is invisible in a 30-frame sample and far below a frame's mean luminance.
     if std::env::var_os("LIGHTS_POOL_LOG").is_some() {
-        let by_slot: Vec<String> = lights.iter().map(|light| format!("{:.0}", light.intensity)).collect();
+        let by_slot: Vec<String> = lights.iter().map(|(light, _)| format!("{:.0}", light.intensity)).collect();
         println!("pool {} {} {:.1} [{}]", *frame, count, total, by_slot.join(","));
     }
     if !frame.is_multiple_of(30) {
         return;
     }
+    let mut flame_at: Vec<Vec3> = flames.iter().map(|t| t.translation()).collect();
+    flame_at.sort_by(|a, b| a.x.total_cmp(&b.x));
+    println!("DEBUG flames {:?}", &flame_at[..flame_at.len().min(4)]);
+    for (light, at) in &lights {
+        println!("DEBUG pool light at {:?} intensity {:.0}", at.translation(), light.intensity);
+    }
     if let Some(light) = lights.iter().next() {
         println!(
             "flicker frame {}: {:.2} (pool total {:.0} over {count}, candidates {})",
             *frame,
-            light.intensity,
+            light.0.intensity,
             total,
             candidates.iter().count()
         );
