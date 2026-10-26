@@ -138,8 +138,13 @@ Adopted as written, with four things the implementation taught:
 - **The fade is measured, not asserted.** `a_hand_off_costs_less_than_a_pop_and_recovers_within_the_fade`
   sums the slots' bases: two full slots are 200, a hand-off dips the total and it is whole again by
   the end of the fade; with `fade_seconds: 0.0` the same test fails at `200 -> 200`, which is the old
-  pop. In the courtyard's 240-frame sequence the worst frame pair's change fell 0.697 -> 0.524 and
-  141 of 220 pairs got smoother, with the median unchanged (a steady pool is untouched).
+  pop.
+- **In a capture, the hysteresis is what does the work here, not the fade.** On the courtyard's
+  240-frame sequence (pool 4, seed 3), excluding the frames in which the pool fills, the worst frame
+  pair's change fell 0.697 -> 0.441 and the pairs over 0.45 fell from 2 to 0, with the median
+  unchanged. Setting `LIGHTS_HYSTERESIS=1.0 LIGHTS_FADE=0.0` reproduces the old sequence exactly,
+  which is how the first, wrong measurement (it read the pool's first filling frame) was caught: a
+  switch that turns a feature off has to change what you measured, or you measured something else.
 
 ## Pending index
 

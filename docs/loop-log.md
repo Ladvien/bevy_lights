@@ -399,15 +399,24 @@ the rule compares distances only, never how much a light matters.
 ### Verdict
 
 **GREAT.** The overlap rule does what the craft says (a 5 %-nearer challenger does not steal a light —
-verified by making the same test fail at `hysteresis: 1.0`; a challenger twice as near does), the fade
-removes 43 % of the worst frame pair's change in a 240-frame sequence, and a steady pool is
+verified by making the same test fail at `hysteresis: 1.0`; a challenger twice as near does), the two
+pairs that used to jump over 0.45 in a 240-frame sequence are gone, and a steady pool is
 frame-identical. Every line of the note's "What great looks like" holds.
+
+**A number I got wrong, and had to re-measure.** The first pass reported the worst pair falling
+0.697 → 0.524. That 0.524 was the *first* frame pair of the after-run — the pool filling in, not a
+hand-off — so it was not measuring this feature at all. Worse, setting `LIGHTS_HYSTERESIS=1.0
+LIGHTS_FADE=0.0` and re-capturing gave the same 0.524, which is what exposed it: the switch that turns
+the feature off must change the measurement, or the measurement is not of the feature. On the
+steady-state tail the real figures are 0.697 → 0.441 and two pairs over 0.45 → none. The claim that
+the *fade* removes the jump is also wrong on its own: in this run the hysteresis prevents the
+hand-offs rather than fading them.
 
 ### The craft checklist, before and after
 
 | line | before | after |
 |---|---|---|
-| pool hand-off popping | unmeasured; the note called it a known defect | worst frame pair's change 0.697 → 0.524 (the worst pair 152: 0.697 → 0.394); 141 of 220 pairs smoother |
+| pool hand-off popping | unmeasured; the note called it a known defect | steady-state worst frame pair 0.697 → 0.441 (37 % smaller); pairs over 0.45: 2 → 0; median unchanged |
 | steady is steady | untested | `a_steady_pool_keeps_its_candidates_and_its_brightness`: five frames, identical slots, positions and bases |
 | the total holds | untested | a hand-off dips the pool's total by one light's share and it is whole again inside the fade; `fade_seconds: 0.0` fails the same test |
 | the nearest torch still wins | nearest wins outright | a challenger 2× nearer takes the light in one frame; a 5 %-nearer one does not |
