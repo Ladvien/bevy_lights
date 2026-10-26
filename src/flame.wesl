@@ -59,6 +59,9 @@ struct FlameVertexOutput {
     @builtin(position) position: vec4<f32>,
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) phase: f32,
+    // How far this flame's own fire has caught: its instance scale, which `update_flames` writes from the
+    // fire's `kindle_gain`. Flat, because it is one number for the whole flame.
+    @location(2) @interpolate(flat) took: f32,
 }
 
 // ---- 2D simplex noise and the classic fbm over it (provenance UNVERIFIED, see header) ---------------------------------
@@ -118,6 +121,9 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     // units is the tag's (a fraction of `params.y`), and its base is lifted to its own origin. Its width is a
     // fraction of that, `FLAME_ASPECT`.
     let origin = world_from_local[3].xyz;
+    // The flame's catch rides on its instance transform (its scale, 0..1), so each flame's colour is its own
+    // fire's — one shared material cannot hold a per-flame number, and the transform can.
+    let took = clamp(length(world_from_local[0].xyz), 0.0, 1.0);
     let right = normalize(vec3<f32>(view.world_from_view[0].x, 0.0, view.world_from_view[0].z));
     let up = vec3<f32>(0.0, 1.0, 0.0);
     // The flame's `MeshTag` (`pack_flame_tag` in `src/model/tag.rs`): its clock phase in the low 16 bits and its height
@@ -128,6 +134,7 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     out.position = position_world_to_clip(billboard);
     out.uv = vec2<f32>(vertex.position.x, vertex.position.y) + vec2<f32>(0.5, 0.5);
     out.phase = tag.x * TAU;
+    out.took = took;
     return out;
 }
 
@@ -160,11 +167,11 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     let heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);
     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));
-    // A fire that is still catching is redder. `params.z` is how far the scene's catch has run — 1 for a fire that
-    // took long ago — so the steady ramp is pulled towards the ember at the start and released as the fuel catches.
-    // The whole flame goes, not only its core: a catching fire has no yellow core at all yet.
-    let took = clamp(material.params.z, 0.0, 1.0);
-    colour = mix(EMBER_RED * max(heat, 0.35), colour, took);
+    // A fire that is still catching is redder, and each flame knows its own progress (`in.took`): the steady ramp
+    // is pulled towards the ember at the start and released as the fuel catches. Per flame, not per scene, so a
+    // host lighting one torch does not tint every other fire in the world. The whole flame goes, not only its core:
+    // a catching fire has no yellow core at all yet.
+    colour = mix(EMBER_RED * max(heat, 0.35), colour, in.took);
     // Alpha 0 makes `AlphaMode::Add`'s blend state (`PREMULTIPLIED_ALPHA_BLENDING`, src + (1 - src.a) * dst) purely
     // additive: the same trick as `premultiply_alpha` in `bevy_pbr`'s `pbr_functions.wesl`. Any alpha above 0 would
     // darken what stands behind the flame.

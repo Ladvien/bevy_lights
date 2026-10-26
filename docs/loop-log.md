@@ -1026,3 +1026,60 @@ wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
    by distance, so the pool can hold the dim one.
 5. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
    an atlas.
+
+## Iteration 10 — 2026-10-26 — the catch belongs to the flame
+
+### What changed, and why it ranked second
+
+Iteration 9 left the catch colour in the material's **shared** uniform, with the youngest fire in the
+frame deciding. Exact for the courtyard's four braziers lighting together, and wrong for a host lighting
+one torch: every flame in the world was tinted red for three tenths of a second. A visible artifact, which
+ranks above the remaining beauty items and the blocked amplitude.
+
+### The model
+
+The catch is already per flame in the entity world — `update_flames` writes each flame's `Transform`
+scale from its own fire's `kindle_gain`. The shader now reads it there:
+`length(world_from_local[0].xyz)` in the vertex stage, passed flat, mixed into the ramp in the fragment.
+`params.z` returns to unused; one shared material can no longer carry one fire's state to another.
+
+### The tool had to be fixed first
+
+The validator's stub of `get_world_from_local` returned the **identity**, so a shader reading a scale from
+it was checked against a matrix with no scale. That is the same blind spot `tools/wesl-check` exists to
+close, one level down — `AGENTS.md` already records the first one (Bevy imports reported "not checked").
+The stub now returns a non-uniform scale (0.5, 2.0, 0.5) with a translation, so indexing the wrong column
+or component gives a wrong number rather than passing. With the stub fixed, the real change is actually
+checked.
+
+### A test that cannot bite, and says so
+
+`one_fire_catching_does_not_tint_another` passes under **both** ways the isolation holds — the `f32::MAX`
+skip and a `kindle: 0` site's gain of exactly 1 — and I confirmed by mutation that removing either does
+not fail it. Rather than delete it or pretend, its comment now states what it pins (the property) and what
+it cannot detect (a regression in the loop's shape).
+
+### The measurement
+
+On the courtyard's catch (frames 14–39), the flame core's mean blue climbs **60.0 → 68.8** as the fires
+take. The window is later than iteration 9's because the scene load moved; what matters is that the number
+is now read from each flame's own transform, so a host lighting one fire cannot move it for the others.
+
+### The gate
+
+`cargo build --release`, `cargo build`, `cargo test` (69 tests), `cargo test --features serde`,
+`cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, `cargo build --lib --target
+wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Top 5 remaining, ranked
+
+1. **The flicker amplitude, still uncited** (blocked: Maynard 2013 unobtainable).
+2. **An `elements` feature** authoring the fill against `bevy_elements`' exposure.
+3. **`hand_off` by luminance, not distance**: a dim far candidate and a bright near one are compared only
+   by distance, so the pool can hold the dim one.
+4. **The flagstones cost 256 draw calls** — recorded next to the look they buy; a crate-scale floor wants
+   an atlas.
+5. **The validator's other stubs are still identities** — `position_world_to_clip` and `view` return
+   placeholder values, so a shader that misuses *those* is checked no further than its types. The same fix
+   as this iteration's, applied to the rest of the stub set.
