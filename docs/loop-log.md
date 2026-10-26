@@ -108,7 +108,7 @@ four ±15 % fires and nothing else moving the exposure.
 
 The pool is real: the difference of the 8-light and the 2-light captures lights only the left of the
 frame, where the orbiting focus is at frame 600, and is exactly the six extra torches' glow
-(`/tmp/pool-diff.png`, amplified 4 ×).
+(a grey-level difference of the two captures, amplified 4 ×: nothing else in the frame differs).
 
 **Critique, as a hostile art director** (every item is a candidate for iteration 1):
 
