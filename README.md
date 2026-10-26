@@ -31,7 +31,9 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
   (`LightPool::size`, default 16) is handed every frame to the `PoolCandidate`s nearest the one entity
   carrying your focus marker, each light at the candidate's position plus its own world-space offset.
   Everything else is a flame and nothing else. The assignment is deterministic: distance, then
-  `Entity`. A slot keeps the candidate it holds until a challenger is `hysteresis` times nearer
+  `Entity`. A candidate is ranked by the **light it puts on the subject** (`intensity / distance²`), not by
+  its distance alone, so a bright brazier at 3 m outranks a dim torch at 2 m; `LightPool::rank` switches to
+  `Rank::Distance` for the old rule. A slot keeps the candidate it holds until a challenger is `hysteresis` times nearer
   (default 1.15, the overlap rule), and a slot that does change owner fades back up over
   `fade_seconds` (0.35 s) rather than popping. `reserve` (default 1) keeps a spare light so the owner
   a hand-off leaves behind fades *out* at the same time: the subject's light is continuous through the

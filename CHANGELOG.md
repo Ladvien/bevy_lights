@@ -6,6 +6,12 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **The pool ranks a candidate by the light it contributes, not by its distance.** `LightPool::rank`
+  defaults to `Rank::Illuminance`, which orders candidates by `intensity / distance²` — so a brazier at
+  3 m burning 60 000 lm takes a real light from a torch at 2 m burning 8 000, where the old rule gave it to
+  the torch. `Rank::Distance` restores the old behaviour. The overlap rule, the hand-offs and the reserve
+  are unchanged.
+
 - **A flame is redder while its fire catches.** The shader's ramp is pulled towards an ember red as a
   fire kindles and released as it takes, so the catch reads as a young fire and not as a steady one
   switching on. Driven by the same `kindle_gain` envelope as the light and the flame's growth, and carried

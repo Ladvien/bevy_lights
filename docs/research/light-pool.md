@@ -111,6 +111,15 @@ because a behaviour change in a released crate should be switchable).
 - `gain` still multiplies the written intensity and never the rank: a dimmer night does not reshuffle which
   lights are real.
 
+**What the demo showed, before and after a change to make it visible.** With the courtyard's candidates all
+at one intensity, `Illuminance` and `Distance` chose the *same* lights and the two captures had identical
+hashes — the rule is invisible when every candidate burns alike. So one bearer in six now carries a
+**lantern** (four times the lumens, a taller flame), which is the case the old rule got wrong: same
+distance, very different output. With that, the two rules give different frames (RMSE 2 %, mean 58.17
+against 57.44): under `Illuminance` the lanterns are the lights that get handed a real one, so the warm
+pools on the bearers are where the bright sources are, and the frame's light is more evenly carried into
+the middle distance.
+
 **Deviations.** The rank is per candidate and per frame, so the pool's cost gains a division per candidate
 per frame — the bench measures it. A host that wants a different weighting (size, colour, a gameplay
 priority) has `Rank::Distance` plus its own candidate intensities to scale by; a third variant is not
