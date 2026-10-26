@@ -45,29 +45,91 @@ use bevy_lights::*;
 
 use common::{Draw, ExampleHarness, camera, camera_placement, seed};
 
-/// The moon's illuminance, in lux: a full moon overhead is about 0.25 lx, so 0.3 is a cool key you
-/// barely see and the braziers are the scene's only strong light. At `ev100` 3.0 a surface needs tens
-/// of lux to read; the moon (a design default) is there for the cool tint it gives the shadow side,
-/// not for the exposure.
-const NIGHT_MOON_LUX: f32 = 0.3;
 /// How many torch-bearers walk the courtyard.
 const BEARERS: usize = 48;
-/// A brazier's light and its range. The box is 0.7 m tall; its flame stands on the coals at the top,
-/// 0.9 m tall, and the light sits at the flame's centre (`BRAZIER_LIGHT`, metres over the ground), not
-/// at the rim: a light a hand's width over a box lights the ground around it from inside the box's
-/// own shadow, which reads as a dark square under every brazier.
-const BRAZIER_LUMENS: f32 = 60_000.0;
-const BRAZIER_RANGE: f32 = 12.0;
+
+// ---- The look, as a cinematographer sets it: a temperature, a pool, and the ratio between the fire
+// ---- and the sky. Every lumen below is derived from these, not hand-picked. The numbers and their
+// ---- sources are in `docs/research/lighting-look.md`.
+
+/// The temperature a wood fire burns at, in kelvin: the warm half of the scene, and the colour every
+/// fire's light and flame is taken from.
+const FIRE_KELVIN: f32 = 1900.0;
+/// The temperature the camera is balanced to: tungsten, 2856 K (CIE Illuminant A), the standing
+/// convention for a firelit night. Against it a fire at 1900 K reads orange and the sky at 8000 K
+/// reads blue, so the scene's warm/cool split comes from two temperatures and one balance rather
+/// than from two hand-picked colours.
+const BALANCE_KELVIN: f32 = 2856.0;
+/// The temperature of the night sky's fill: the cool half. A moon is reflected sunlight, and against a
+/// fire balance it is far enough away in colour to read blue.
+const SKY_KELVIN: f32 = 8000.0;
+/// The camera's exposure for a firelit night: Bevy's exposure is `2^-ev100 / 1.2`, and a Lambertian
+/// surface of albedo 0.3 lit to `E` lux has luminance `0.3·E/π`. At `ev100` 6.0, a fire's pool at
+/// 1000 lx is linear 1.24 (a little over white) and 250 lx is 0.31: the fire is the frame's key and
+/// the sky, at a quarter of it, is two stops under. `ev100` 6 is a night interior/exterior stop.
+const NIGHT_EV100: f32 = 6.0;
+/// What a fire puts on the ground at the centre of its pool, in lux. The pool is sized so that this
+/// reads a little over middle grey at [`NIGHT_EV100`] and its edge, [`POOL_LUX`], is the last of the
+/// ground the fire owns.
+const POOL_LUX: f32 = 1000.0;
+/// The illuminance at the *edge* of a fire's pool: a quarter of the centre, so the edge is two stops
+/// down — the shoulder `lighting-look.md` asks for.
+const POOL_EDGE_LUX: f32 = 250.0;
+/// How far a brazier's pool reaches, in metres: the ground it lights to [`POOL_LUX`].
+const BRAZIER_POOL: f32 = 4.0;
+/// How far a carried torch's pool reaches. Smaller than a brazier's: a 0.35 m flame lighting a 4 m
+/// patch is the "flame too small for the ground it lights" defect `lighting-look.md` names.
+const TORCH_POOL: f32 = 2.0;
+/// The key-to-fill ratio the courtyard aims at: two to one, one stop. A fire's pool centre is the key
+/// and the moon is the fill; at 4:1 the moonlight left figures between pools at 3-9 DN, darker than
+/// the ground they stood on, which is worse than flat. One stop keeps a shadow side and keeps the
+/// courtyard readable away from the fires — the high-key end of the craft's scale, chosen for the
+/// reader rather than for the photograph.
+const COURT_RATIO: f32 = HIGH_KEY;
+
+/// The box's height, the flame on its coals, and the light at the flame's centre rather than at the
+/// rim: a light a hand's width over a box lights the ground from inside the box's own shadow, which
+/// reads as a dark square under every brazier.
 const BRAZIER_TOP: f32 = 0.7;
-const BRAZIER_FLAME_HEIGHT: f32 = 0.9;
+const BRAZIER_FLAME_HEIGHT: f32 = 1.1;
 const BRAZIER_LIGHT: f32 = BRAZIER_TOP + BRAZIER_FLAME_HEIGHT * 0.5;
-/// A fire's colour: a flame is warm, about 1900-2200 K, which is the warm half of the scene's
-/// warm-against-cool separation (the moon fill is the cool half). Design defaults.
-const BRAZIER_COLOUR: Color = Color::srgb(1.0, 0.60, 0.30);
-const TORCH_COLOUR: Color = Color::srgb(1.0, 0.70, 0.40);
-/// A carried torch's light and the height it sits over the bearer's feet.
-const TORCH_LUMENS: f32 = 8_000.0;
+/// How far past its pool a fire's light is still computed: the windowed inverse square has faded it
+/// out by here, so the falloff reads as a shoulder and never as a disc.
+const POOL_RANGE_MARGIN: f32 = 2.5;
+/// A carried torch's light sits this high over the bearer's feet.
 const TORCH_LIFT: f32 = 1.8;
+
+/// The lumens that put [`POOL_LUX`] on the ground `pool` metres out, `over` metres below the light.
+fn lumens_for(pool: f32, over: f32) -> f32 {
+    fire_lumens(POOL_LUX, pool, over)
+}
+
+/// The lumens a **hand-held** fire needs: a torch's flame is a tenth of a brazier's coal bed, so its
+/// pool is sized from its edge ([`POOL_EDGE_LUX`]) rather than its centre. Its centre is then four
+/// times that, which at this exposure is bright but not a searchlight — asking for a brazier's centre
+/// brightness from a 0.35 m flame needed 61 607 lm and blew the stone white.
+fn torch_lumens(pool: f32, over: f32) -> f32 {
+    fire_lumens(POOL_EDGE_LUX, pool, over)
+}
+
+/// The fire's colour as linear RGB, from the temperature it burns at.
+fn fire_temperature() -> LinearRgba {
+    let [r, g, b] = blackbody_colour(FIRE_KELVIN, 1.0);
+    LinearRgba::rgb(r, g, b)
+}
+
+/// The fire's colour, from the temperature it burns at.
+fn fire_colour() -> Color {
+    let [r, g, b] = blackbody_colour(FIRE_KELVIN, 1.0);
+    LinearRgba::rgb(r, g, b).into()
+}
+
+/// The night fill's colour: the sky at its temperature, as the camera balanced to the fire records it
+/// (so it is blue).
+fn sky_colour() -> Color {
+    let [r, g, b] = white_balanced(SKY_KELVIN, BALANCE_KELVIN, 1.0);
+    LinearRgba::rgb(r, g, b).into()
+}
 /// The brazier boxes' places: the courtyard's four inner corners, 5 m out from the centre.
 const BRAZIERS: [Vec3; 4] = [
     Vec3::new(5.0, 0.0, 5.0),
@@ -88,15 +150,30 @@ fn main() {
         .insert_resource(LightPool {
             size: std::env::var("LIGHTS_POOL").ok().and_then(|v| v.parse().ok()).unwrap_or(8),
             reach: 20.0,
-            light: PointLight { color: TORCH_COLOUR, range: 8.0, intensity: 0.0, ..default() },
+            light: PointLight {
+                color: fire_colour(),
+                // The same windowed falloff the fires have: the pool light is a torch's fire, one
+                // metre of it is a real light rather than a flame.
+                range: TORCH_POOL * POOL_RANGE_MARGIN,
+                intensity: 0.0,
+                ..default()
+            },
             ..default()
         })
         // A cool near-black behind the courtyard's far edge, instead of the default flat grey.
         .insert_resource(ClearColor(Color::srgb(0.010, 0.014, 0.034)))
+        // The night's fill, as a cinematographer sets it: the sky's colour, at the illuminance that
+        // makes COURT_RATIO against the fire. It is the host's light (this crate never adds one), and
+        // the ratio is the crate's number.
+        .insert_resource(NightFill { illuminance: fill_for(POOL_LUX, COURT_RATIO) })
+        // The flames' colour comes from the same temperature as their light, and `max_height` is set
+        // once here, before any site spawns (the height is packed as a fraction of it).
+        .insert_resource(FlameLook { color: fire_temperature(), strength: 0.82, max_height: 4.0 })
         .insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 0.0, ..default() })
         .add_systems(Startup, (spawn_scene, spawn_camera).chain())
         .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers).chain())
         .add_systems(Update, report_kindled)
+        .add_systems(Update, report_look)
         .run();
 }
 
@@ -119,14 +196,37 @@ struct Bearer {
     angle: f32,
 }
 
-fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>) {
+fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: Res<NightFill>) {
     let CameraPlacement(eye, look) = *placement;
     commands.spawn((
         camera(eye, look, 8.0),
         // A cool fill the moon does not have to provide: without it the courtyard's pillars are
-        // black silhouettes and the fire has nothing to read against.
-        AmbientLight { color: Color::srgb(0.55, 0.65, 1.0), brightness: 2.0, ..default() },
-        Exposure { ev100: 3.0 },
+        // black silhouettes and the fire has nothing to read against. Its colour is the sky's
+        // temperature, not a hand-picked blue.
+        AmbientLight { color: sky_colour(), brightness: 2.0, ..default() },
+        Exposure { ev100: NIGHT_EV100 },
+    ));
+    // The moon: the host's directional light (the crate never adds one), a sky-coloured fill at the
+    // illuminance that makes the target key-to-fill against the braziers' pools.
+    commands.spawn((
+        Name::new("Moon fill"),
+        DirectionalLight {
+            color: sky_colour(),
+            illuminance: fill.illuminance,
+            // A fill two stops under the fire throws no shadow worth a shadow map.
+            shadow_maps_enabled: false,
+            ..default()
+        },
+        // From behind the camera's shoulder and high: a fill's job is to keep the shadow side
+        // readable, and a fill that rakes from the side turns the whole frame into a warm wash (the
+        // baseline's fault). `lighting-look.md`'s separation comes from the two colours, not from the
+        // fill's direction.
+        Transform::from_rotation(Quat::from_euler(
+            EulerRot::XYZ,
+            -55f32.to_radians(),
+            -40f32.to_radians(),
+            0.0,
+        )),
     ));
 }
 
@@ -134,9 +234,22 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>) {
 #[derive(Resource, Clone, Copy)]
 struct CameraPlacement(Vec3, Vec3);
 
+/// The night sky's fill: an illuminance the host's moon provides, derived from the courtyard's target
+/// ratio against its fires rather than picked by eye.
+#[derive(Resource, Clone, Copy)]
+struct NightFill {
+    illuminance: f32,
+}
+
 /// A grey stone the fire reads warm against.
 fn stone(colour: Srgba) -> StandardMaterial {
     StandardMaterial { base_color: colour.into(), perceptual_roughness: 0.9, ..default() }
+}
+
+/// The same stone, polished: a floor with a specular answer to a fire, so the frame says where the
+/// fire is even in the ground's highlight. `lighting-look.md`'s "specular answer" line.
+fn polished_stone(colour: Srgba) -> StandardMaterial {
+    StandardMaterial { base_color: colour.into(), perceptual_roughness: 0.55, reflectance: 0.06, ..default() }
 }
 
 fn spawn_scene(
@@ -146,18 +259,25 @@ fn spawn_scene(
 ) {
     let stone_material = materials.add(stone(Srgba::rgb(0.32, 0.30, 0.28)));
     let bowl_material = materials.add(stone(Srgba::rgb(0.10, 0.09, 0.09)));
+    // The coals glow at the fire's own temperature, brighter than the stone can reflect: the source
+    // the light is motivated by, and the same colour as the flame on it.
+    let [cr, cg, cb] = blackbody_colour(FIRE_KELVIN, 1.0);
+    // The coals are hot, not white-hot: at this exposure 1.4 is the brightest thing in the frame that
+    // is not the flame, and 3.0 clipped to a white slab with no shape in it.
     let coal_material = materials.add(StandardMaterial {
         base_color: Srgba::rgb(0.14, 0.10, 0.09).into(),
-        emissive: LinearRgba::rgb(3.0, 0.6, 0.10),
+        emissive: LinearRgba::rgb(cr * 1.4, cg * 1.4, cb * 1.4),
         ..default()
     });
-    let coal_bed = meshes.add(Cuboid::new(0.66, 0.08, 0.66));
+    let coal_bed = meshes.add(Cuboid::new(0.34, 0.05, 0.34));
 
-    // The ground: one plane, so the pool's falloff has somewhere to read.
+    // The ground: one plane, so the pool's falloff has somewhere to read, and polished enough that a
+    // fire puts a highlight on it rather than a flat wash.
+    let ground_material = materials.add(polished_stone(Srgba::rgb(0.30, 0.28, 0.26)));
     commands.spawn((
         Name::new("Ground"),
         Mesh3d(meshes.add(Plane3d::default().mesh().size(40.0, 40.0))),
-        MeshMaterial3d(stone_material.clone()),
+        MeshMaterial3d(ground_material),
     ));
 
     // Two rows of six pillars, 6 m apart, 6 m either side of the axis: the light falls on their
@@ -174,25 +294,6 @@ fn spawn_scene(
             ));
         }
     }
-
-    // The moon: a dim cool key from behind the camera's left shoulder. A directional light is the
-    // host's, not the crate's (see the crate docs' ownership note); the crate never adds one.
-    commands.spawn((
-        Name::new("Moon"),
-        DirectionalLight {
-            color: Color::srgb(0.62, 0.72, 1.0),
-            illuminance: NIGHT_MOON_LUX,
-            // 0.3 lx throws a shadow nobody can see, so it is not worth a shadow map.
-            shadow_maps_enabled: false,
-            ..default()
-        },
-        Transform::from_rotation(Quat::from_euler(
-            EulerRot::XYZ,
-            -35f32.to_radians(),
-            -40f32.to_radians(),
-            0.0,
-        )),
-    ));
 
     // The four braziers.
     for (index, at) in BRAZIERS.iter().enumerate() {
@@ -217,16 +318,19 @@ fn spawn_scene(
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5, 0.0),
                     NotShadowCaster,
                 ));
+                // The fire's size, from its pool: POOL_LUX at BRAZIER_POOL metres out, from a light
+                // BRAZIER_LIGHT over the ground. 60 000 lm was 20x this and blew the pool it lit.
+                let lumens = lumens_for(BRAZIER_POOL, BRAZIER_LIGHT);
                 brazier.spawn((
                     Name::new("Coals"),
                     PointLight {
-                        color: BRAZIER_COLOUR,
-                        intensity: BRAZIER_LUMENS,
-                        range: BRAZIER_RANGE,
+                        color: fire_colour(),
+                        intensity: lumens,
+                        range: BRAZIER_POOL * POOL_RANGE_MARGIN,
                         shadow_maps_enabled: true,
                         ..default()
                     },
-                    Flicker { base: BRAZIER_LUMENS, phase },
+                    Flicker { base: lumens, phase },
                     Kindle::default(),
                     Transform::from_xyz(0.0, BRAZIER_LIGHT - BRAZIER_TOP * 0.5, 0.0),
                 ));
@@ -277,7 +381,10 @@ fn spawn_scene(
                 // it is not. Both sit at the same lift, so the hand-off is invisible.
                 bearer.spawn((
                     Name::new("Torch light"),
-                    PoolCandidate { offset: Vec3::Y * TORCH_LIFT, intensity: TORCH_LUMENS },
+                    PoolCandidate {
+                        offset: Vec3::Y * TORCH_LIFT,
+                        intensity: torch_lumens(TORCH_POOL, TORCH_LIFT - 0.85),
+                    },
                     Transform::from_xyz(0.0, TORCH_LIFT - 0.85, 0.0),
                 ));
                 bearer.spawn((
@@ -332,6 +439,27 @@ fn relight_braziers(
             }
         }
     }
+}
+
+/// Prints the look's numbers once, a second in: what the fires were sized to, and the key-to-fill the
+/// frame is built on. A capture can be checked against this line.
+fn report_look(fill: Res<NightFill>, mut said: Local<bool>) {
+    if *said {
+        return;
+    }
+    *said = true;
+    let brazier_lumens = lumens_for(BRAZIER_POOL, BRAZIER_LIGHT);
+    let torch_fire = torch_lumens(TORCH_POOL, TORCH_LIFT - 0.85);
+    println!(
+        "look: fire {FIRE_KELVIN:.0} K, sky {SKY_KELVIN:.0} K, balanced {BALANCE_KELVIN:.0} K, \
+pool {POOL_LUX:.0} lx (edge {POOL_EDGE_LUX:.0}) at {brazier_lumens:.0} lm (brazier, {BRAZIER_POOL:.1} m) \
+and {torch_fire:.0} lm (torch, {TORCH_POOL:.1} m), moon {:.1} lx, key-to-fill {:.2}:1 ({:.2} stops), \
+at the pool's edge {:.2}:1",
+        fill.illuminance,
+        key_to_fill(POOL_LUX, fill.illuminance),
+        stops(key_to_fill(POOL_LUX, fill.illuminance)),
+        key_to_fill(POOL_EDGE_LUX, fill.illuminance),
+    );
 }
 
 /// Prints every [`Kindled`]: four lines when the courtyard catches, four more on every `K`.
