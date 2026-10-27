@@ -2180,3 +2180,11 @@ No improvement attempted. Section 1.5 of the skill: tracked changes this pass di
 `git status --short` at pass start: `src/flame.rs`, `src/flicker.rs`, `src/lib.rs`, `src/model/fire.rs`, `src/model/mod.rs`, `src/pool.rs` modified (119 insertions, 38 deletions; newest mtime 11:44 today, after the iteration-20 merge), plus the long-standing `SKILL.md` edit. The src diff is an unfinished-looking feature: a per-light `depth` on `Flicker`/`FlameSite`, `flicker_swing(diameter, depth, t, phase)`, `FLICKER_DEPTH` exported, and `Flicker` losing its `Default` derive. No pass, `wiggum` or `omp` process was running, and the work is in no `refs/wiggum` snapshot yet. Left untouched in the working tree.
 
 Next pass: the owner either commits that work (with its research note and CHANGELOG entry, since it changes the flicker model's defaults and API) or discards it; then the iteration-20 backlog stands (bowl that shades its own rim; flame from above, round 6; a capture path for the catch; per-flame fuel-bed `D`; flicker amplitude citation).
+
+## Iteration 22 — 2026-10-27 — stopped: foreign uncommitted changes in `src/` (still)
+
+No improvement attempted. Section 1.5 of the skill: tracked changes this pass did not make mean stop and log.
+
+At pass start `git status --short` showed the same set as iteration 21: `src/flame.rs`, `src/flicker.rs`, `src/lib.rs`, `src/model/fire.rs`, `src/model/mod.rs`, `src/pool.rs` (119 insertions, 38 deletions, the per-light flicker `depth` work) plus the long-standing `SKILL.md` edit. File mtimes are 11:44 today, minutes before this pass began at ~11:47, so someone is probably editing the tree now. No `wiggum`/`omp` pass was running. Nothing was touched, built or reverted. GPU free 19.8 GB, so the environment is not the blocker.
+
+Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
