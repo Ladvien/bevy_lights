@@ -3142,3 +3142,11 @@ No improvement attempted, same stop as iterations 116–125 (section 1, step 5).
 Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues. GPU ~19 GiB VRAM free (`gpu-tenant status`: 4884/24576 MiB used).
 
 Needs the owner: let a pass resume `loop/iter-115` or discard it.
+
+## Iteration 127 — 2026-10-27 — stopped: the iteration-115 tree is still stranded
+
+No improvement attempted, same stop as iterations 116–126 (section 1, step 5). The checkout is on `loop/iter-115` at `e2a0f40` with the same nine modified files (+412/−110) and untracked `examples/occlusion.rs` (issue-#2 occlusion work, ungated); `src/flame.rs` last written 17:22:38. Not committed, not reverted.
+
+Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues. GPU tenant none, 18.9 GiB VRAM free.
+
+Needs the owner: let a pass resume `loop/iter-115` or discard it.
