@@ -525,7 +525,7 @@ fn spawn_scene(
                         shadow_maps_enabled: true,
                         ..default()
                     },
-                    Flicker { base: lumens, phase, diameter: brazier_bed() },
+                    Flicker { base: lumens, phase, diameter: brazier_bed(), ..default() },
                     Kindle::default(),
                     Transform::from_xyz(0.0, BRAZIER_LIGHT - BRAZIER_TOP * 0.5, 0.0),
                 ));
@@ -538,6 +538,7 @@ fn spawn_scene(
                         phase,
                         kindle: KINDLE_SECONDS,
                         diameter: brazier_bed(),
+                        depth: FLICKER_DEPTH,
                     },
                     // The flame's foot is on the coals, at the top of the box.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04, 0.0),
@@ -600,11 +601,18 @@ fn spawn_scene(
                         // flame drawn on it instead of the pool slot's phase.
                         phase: Some(phase),
                         diameter: None,
+                        ..default()
                     },
                     // The pool's lights flicker at the un-sized rate (`Flicker { diameter: None }` in
                     // `pool.rs`), so the torch's flame must too — the same value on both is what keeps the
                     // flame and its light one fire.
-                    FlameSite { height: flame_height, phase, kindle: 0.0, diameter: None },
+                    FlameSite {
+                        height: flame_height,
+                        phase,
+                        kindle: 0.0,
+                        diameter: None,
+                        depth: FLICKER_DEPTH,
+                    },
                     Transform::from_translation(at),
                 ));
             });
