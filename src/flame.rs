@@ -167,6 +167,14 @@ pub struct Flame {
     /// `Time<Real>`, like the flame's own clock, so a paused world's flames still move — the catch is
     /// part of the drawn fire, not of the light's.
     pub kindled: f32,
+    /// The entity this flame is the fire of: the parent of its [`FlameSite`] — the torch, the sconce, the
+    /// light — so "which torch is that flame" is one component read. `None` when the site is a root entity
+    /// or its parent is itself a `FlameSite` (a nested site belongs to the outer one, not to a prop).
+    ///
+    /// Kept current every frame by [`FlamePlugin`], so a site the host reparents or unparents is followed
+    /// rather than left pointing at its old torch. A despawned parent takes the site and the flame with it
+    /// (Bevy despawns descendants), so the value never resolves to whatever reuses the entity's slot.
+    pub source: Option<Entity>,
 }
 
 /// How the scene's flames look: the fire colour every flame is tinted from, how strongly it adds,
@@ -278,7 +286,7 @@ fn dress_flames(
             site.insert(Flamed).with_children(|parent| {
                 parent.spawn((
                     Name::new("Flame"),
-                    Flame { kindled: if catch > 0.0 { 0.0 } else { f32::MAX } },
+                    Flame { kindled: if catch > 0.0 { 0.0 } else { f32::MAX }, source: None },
                     tag,
                     Mesh3d(mesh),
                     MeshMaterial3d(material),
@@ -311,7 +319,7 @@ fn update_flames(
     assets: Res<FlameAssets>,
     mut materials: ResMut<Assets<FlameMaterial>>,
     mut flames: Query<(&mut Flame, &mut Transform, &mut MeshTag, &ChildOf)>,
-    sites: Query<&FlameSite>,
+    sites: Query<(&FlameSite, Option<&ChildOf>)>,
 ) {
     if !assets.built {
         return;
@@ -322,7 +330,11 @@ fn update_flames(
     let dt = real.delta_secs();
     let t = time.elapsed_secs();
     for (mut flame, mut transform, mut tag, parent) in &mut flames {
-        let site = sites.get(parent.parent()).ok();
+        let (site, owner) = sites.get(parent.parent()).map_or((None, None), |(s, o)| (Some(s), o));
+        let source = owner.map(ChildOf::parent).filter(|owner| !sites.contains(*owner));
+        if flame.source != source {
+            flame.source = source;
+        }
         if let Some(site) = site {
             // Only when the brightness byte actually changes: `MeshTag` is in `bevy_pbr`'s
             // `Changed<MeshTag>` re-extraction set, so a write here costs a render-world re-extract for
@@ -565,6 +577,38 @@ mod tests {
         app.world_mut().despawn(prop);
         app.update();
         assert!(flame_children(&mut app).is_empty(), "a prop that goes takes its flame with it");
+    }
+
+    /// Issue #2: a flame names the entity it is the fire of — its site's parent — so a diagnostic can
+    /// answer "whose torch is that"; a root site, or one nested under another site, has none, and a
+    /// site the host reparents is followed rather than left pointing at its old torch.
+    #[test]
+    fn a_flame_names_the_prop_its_site_hangs_on_and_follows_a_reparent() {
+        let site_of =
+            || FlameSite { height: 0.35, phase: 0.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH };
+        let mut app = dressing_app();
+        let torch = app.world_mut().spawn(Transform::default()).id();
+        let other = app.world_mut().spawn(Transform::default()).id();
+        let on_torch = app.world_mut().spawn((site_of(), ChildOf(torch))).id();
+        let on_root = app.world_mut().spawn(site_of()).id();
+        let nested = app.world_mut().spawn((site_of(), ChildOf(on_root))).id();
+        app.update();
+        let source_of = |app: &mut App, site: Entity| -> Option<Option<Entity>> {
+            app.world_mut()
+                .query::<(&Flame, &ChildOf)>()
+                .iter(app.world())
+                .find(|(_, parent)| parent.parent() == site)
+                .map(|(flame, _)| flame.source)
+        };
+        assert_eq!(source_of(&mut app, on_torch), Some(Some(torch)));
+        assert_eq!(source_of(&mut app, on_root), Some(None), "a root site belongs to no prop");
+        assert_eq!(source_of(&mut app, nested), Some(None), "a site under a site belongs to the outer site");
+        app.world_mut().entity_mut(on_torch).insert(ChildOf(other));
+        app.update();
+        assert_eq!(source_of(&mut app, on_torch), Some(Some(other)), "a reparented site is followed");
+        app.world_mut().entity_mut(on_torch).remove::<ChildOf>();
+        app.update();
+        assert_eq!(source_of(&mut app, on_torch), Some(None), "an unparented site has no source");
     }
 }
 
