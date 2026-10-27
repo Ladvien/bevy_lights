@@ -109,6 +109,11 @@ impl Material for FlameMaterial {
 /// the local offset the flame's foot belongs. [`FlamePlugin`] gives it a [`Flame`] child the first
 /// frame it sees it; nothing else is needed. Two sites with different [`FlameSite::phase`] values
 /// burn out of step forever.
+///
+/// The site is **not** tied to a light. A fire whose light has to sit somewhere other than the fire
+/// (a sconce's pool held out over the wall face, a window glow) is a light in one place and a site
+/// parented to the bracket in another; give both the same `phase`, `diameter` and `depth` and they
+/// breathe together. A light with no fire on it simply has no site.
 // `Visibility` (which pulls in `InheritedVisibility` and `ViewVisibility`), because a site always becomes a parent: `dress_flames` spawns
 // the `Flame` under it, and Bevy's propagation warns (B0004) and culls wrongly when a parent of a
 // visible entity has no visibility of its own.
@@ -529,6 +534,37 @@ mod tests {
         assert!((material.base.green - 0.9).abs() < 1e-6, "{:?}", material.base);
         assert!((material.base.alpha - 0.5).abs() < 1e-6, "{:?}", material.base);
         assert!((material.params.w - 0.5).abs() < 1e-6, "{:?}", material.params);
+    }
+
+    /// Issue #3: a flame need not be where its light is. A site is its own entity, parented to whatever
+    /// the host says the fire is on (a sconce's bracket), while the light hangs elsewhere; the flame
+    /// stands at the site's origin and goes when the prop goes — no anchor type needed.
+    #[test]
+    fn a_site_on_a_prop_keeps_its_flame_at_the_site_and_leaves_with_the_prop() {
+        let mut app = dressing_app();
+        let prop = app.world_mut().spawn(Transform::from_xyz(4.0, 0.0, 0.0)).id();
+        let site = app
+            .world_mut()
+            .spawn((
+                FlameSite { height: 0.35, phase: 0.7, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
+                Transform::from_xyz(0.0, 1.5, 0.0),
+                ChildOf(prop),
+            ))
+            .id();
+        app.update();
+        let flames = flame_children(&mut app);
+        assert_eq!(flames.len(), 1, "one flame: {flames:?}");
+        assert_eq!(flames[0].0, site, "the flame is the site's child, wherever the site stands");
+        let local = app
+            .world_mut()
+            .query_filtered::<&Transform, With<Flame>>()
+            .single(app.world())
+            .copied()
+            .unwrap_or_default();
+        assert_eq!(local.translation, Vec3::ZERO, "the flame's foot is the site's origin");
+        app.world_mut().despawn(prop);
+        app.update();
+        assert!(flame_children(&mut app).is_empty(), "a prop that goes takes its flame with it");
     }
 }
 

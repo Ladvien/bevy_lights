@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **Documented, and tested, that a `FlameSite` is independent of any light (issue #3).** A fire whose light sits elsewhere (a sconce's pool held out over the wall, a window glow) is a light in one place and a site parented to the prop in another; sharing `phase`, `diameter` and `depth` keeps them breathing together. No `FlameAnchor` type was added: the site's own `Transform` and parent already are the host-declared origin, and a light with no site draws no flame. A regression test pins that the flame stands at the site's origin and leaves with its prop.
+
 ### Changed
 
 - **The `courtyard` example's carried flames now have something carrying them.** Each bearer's flame hung 0.42 m out from the capsule with no hand, stick or lantern under it: seen from the elevated camera it was a light with no source. A torch now has a stick ending at the flame's foot, a lantern has an iron body, and a fist and an arm join it to the figure. Example geometry only: the crate's API and its lighting are unchanged (frame mean 54.74 → 54.72 at the elevated camera, pool 4). `docs/research/carried-fire.md` has the amendment.
