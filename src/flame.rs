@@ -59,8 +59,9 @@ pub struct FlameMaterial {
     #[uniform(0)]
     base: LinearRgba,
     /// `x` seconds (wrapped hourly), `y` the tag's height scale in world units ([`FlameLook::max_height`]),
-    /// `z` unused (the per-flame catch is read from each flame's own instance scale, so one fire's catch
-    /// cannot tint another's), `w` the ember strength.
+    /// `z` 1 on the material of the sites that asked for [`FlameSite::depth_fade`] and 0 on the rest (the
+    /// per-flame catch is read from each flame's own instance scale, so one fire's catch cannot tint
+    /// another's), `w` the ember strength.
     #[uniform(0)]
     params: Vec4,
 }
@@ -149,6 +150,18 @@ pub struct FlameSite {
     /// breath and its light's disagree. [`FLICKER_DEPTH`](crate::FLICKER_DEPTH) is the default and
     /// matches a light that never chose one.
     pub depth: f32,
+    /// Fade the flame out when its fire's source cannot be seen: the flame's upper half stops drawing over the
+    /// wall a torch is behind, so the player does not meet "a lone flame with no torch" (the question of
+    /// Sanctuary's playtest reports 1792667477 and 1792667613).
+    ///
+    /// The shader reads the depth prepass at the flame's source, a third of the way up it, and over a ring of
+    /// taps around it, and multiplies the flame's emission by the share of them the camera can see, so a wall
+    /// edge crossing the source takes the flame down over a few pixels rather than popping it
+    /// (`docs/research/flame-occlusion.md`). **It needs a [`DepthPrepass`](bevy::core_pipeline::prepass::DepthPrepass) on the
+    /// camera**: without one there is no depth to read and the flame draws whole. `false` (the default a host that
+    /// does not care writes) is the flame exactly as it always was, with no depth read at all. May be changed at
+    /// any time; [`FlamePlugin`] moves the flame to the right material.
+    pub depth_fade: bool,
 }
 
 /// The drawn flame: the child mesh [`FlamePlugin`] spawns under each [`FlameSite`].
@@ -205,11 +218,14 @@ impl Default for FlameLook {
     }
 }
 
-/// The one mesh, the one material, and the height scale every flame in the scene shares.
+/// The one mesh, the two materials, and the height scale every flame in the scene shares.
 #[derive(Resource, Default)]
 struct FlameAssets {
     mesh: Handle<Mesh>,
     material: Handle<FlameMaterial>,
+    /// The same material with the depth fade on, for the sites that set [`FlameSite::depth_fade`]. Two
+    /// shared materials rather than one per flame, so a scene with the fade off draws exactly as it did.
+    faded_material: Handle<FlameMaterial>,
     /// The height scale the material was built with ([`FlameLook::max_height`] at `Startup`): a
     /// [`FlameSite`]'s height is packed as a fraction of it, so the CPU packer and the shader must
     /// agree on it.
@@ -217,6 +233,13 @@ struct FlameAssets {
     /// Whether the handles have been made. The mesh and the material are built at `Startup`, after
     /// the asset server exists, and a host may add sites before that.
     built: bool,
+}
+
+impl FlameAssets {
+    /// The shared material a site's flame is drawn with.
+    fn material_for(&self, depth_fade: bool) -> &Handle<FlameMaterial> {
+        if depth_fade { &self.faded_material } else { &self.material }
+    }
 }
 
 /// The marker that a [`FlameSite`] already has its flame: `Without<Flamed>` on the site is why a
@@ -236,14 +259,16 @@ fn build_flame_assets(
     // camera and scales it by the flame's height, so the model is a unit square in the local XY
     // plane about its origin.
     assets.mesh = meshes.add(Rectangle::new(1.0, 1.0));
-    assets.material = materials.add(material_for(*look));
+    assets.material = materials.add(material_for(*look, false));
+    assets.faded_material = materials.add(material_for(*look, true));
     assets.max_height = look.max_height;
     assets.built = true;
 }
 
 /// The material for a [`FlameLook`]: its colour (green clamped, so a palette's oversaturated fire does
-/// not blow the ramp out) and its strength as the ember's weight.
-fn material_for(look: FlameLook) -> FlameMaterial {
+/// not blow the ramp out) and its strength as the ember's weight. `depth_fade` is the material of the
+/// sites that asked for [`FlameSite::depth_fade`]: the same flame with the shader's depth test turned on.
+fn material_for(look: FlameLook, depth_fade: bool) -> FlameMaterial {
     FlameMaterial {
         base: LinearRgba {
             red: look.color.red,
@@ -251,7 +276,7 @@ fn material_for(look: FlameLook) -> FlameMaterial {
             blue: look.color.blue,
             alpha: look.strength,
         },
-        params: Vec4::new(0.0, look.max_height, 0.0, look.strength),
+        params: Vec4::new(0.0, look.max_height, if depth_fade { 1.0 } else { 0.0 }, look.strength),
     }
 }
 
@@ -281,7 +306,7 @@ fn dress_flames(
         let brightness = flicker_swing(flame.diameter, flame.depth, t, flame.phase);
         let tag = MeshTag::new(pack_flame_tag(flame.phase, flame.height, brightness, max_height));
         let mesh = assets.mesh.clone();
-        let material = assets.material.clone();
+        let material = assets.material_for(flame.depth_fade).clone();
         commands.entity(site).queue_silenced(move |mut site: EntityWorldMut| {
             site.insert(Flamed).with_children(|parent| {
                 parent.spawn((
@@ -318,7 +343,7 @@ fn update_flames(
     look: Res<FlameLook>,
     assets: Res<FlameAssets>,
     mut materials: ResMut<Assets<FlameMaterial>>,
-    mut flames: Query<(&mut Flame, &mut Transform, &mut MeshTag, &ChildOf)>,
+    mut flames: Query<(&mut Flame, &mut Transform, &mut MeshTag, &mut MeshMaterial3d<FlameMaterial>, &ChildOf)>,
     sites: Query<(&FlameSite, Option<&ChildOf>)>,
 ) {
     if !assets.built {
@@ -329,13 +354,19 @@ fn update_flames(
     // with no kindle is left alone — a fire burning all along costs nothing here.
     let dt = real.delta_secs();
     let t = time.elapsed_secs();
-    for (mut flame, mut transform, mut tag, parent) in &mut flames {
+    for (mut flame, mut transform, mut tag, mut material, parent) in &mut flames {
         let (site, owner) = sites.get(parent.parent()).map_or((None, None), |(s, o)| (Some(s), o));
         let source = owner.map(ChildOf::parent).filter(|owner| !sites.contains(*owner));
         if flame.source != source {
             flame.source = source;
         }
         if let Some(site) = site {
+            // A site whose `depth_fade` changed moves its flame to the other shared material; the comparison
+            // reads through `Deref`, so a flame that did not change is not marked changed.
+            let wanted = assets.material_for(site.depth_fade);
+            if material.0 != *wanted {
+                material.0 = wanted.clone();
+            }
             // Only when the brightness byte actually changes: `MeshTag` is in `bevy_pbr`'s
             // `Changed<MeshTag>` re-extraction set, so a write here costs a render-world re-extract for
             // that flame. The byte holds 1/255 of the swing, so at 60 fps a 2.6 Hz fire skips some
@@ -361,7 +392,10 @@ fn update_flames(
         }
     }
     let elapsed = real.elapsed_secs_wrapped();
-    if let Some(mut made) = materials.get_mut(&assets.material) {
+    for handle in [&assets.material, &assets.faded_material] {
+        let Some(mut made) = materials.get_mut(handle) else {
+            continue;
+        };
         made.params.x = elapsed;
         if look.is_changed() {
             // Rewritten in place: a `FlameLook` change is a colour or strength change, and rebuilding
@@ -419,7 +453,7 @@ mod tests {
         let site = app
             .world_mut()
             .spawn((
-                FlameSite { height: 0.9, phase: 0.4, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
+                FlameSite { height: 0.9, phase: 0.4, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false },
                 Transform::default(),
             ))
             .id();
@@ -439,7 +473,7 @@ mod tests {
     fn an_unchanged_brightness_leaves_the_tag_unwritten() {
         let mut app = dressing_app();
         app.world_mut().spawn((
-            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: Some(0.34), depth: FLICKER_DEPTH },
+            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: Some(0.34), depth: FLICKER_DEPTH, depth_fade: false },
             Transform::default(),
         ));
         app.update();
@@ -468,7 +502,7 @@ mod tests {
     fn a_flames_tag_carries_its_sites_phase_and_height() {
         let mut app = dressing_app();
         app.world_mut().spawn((
-            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
+            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false },
             Transform::default(),
         ));
         app.update();
@@ -487,7 +521,7 @@ mod tests {
     fn a_flames_brightness_is_the_fires_own_swing() {
         let mut app = dressing_app();
         app.world_mut().spawn((
-            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: Some(0.34), depth: FLICKER_DEPTH },
+            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: Some(0.34), depth: FLICKER_DEPTH, depth_fade: false },
             Transform::default(),
         ));
         app.update();
@@ -512,7 +546,7 @@ mod tests {
         fn brightness_of(diameter: Option<f32>) -> f32 {
             let mut app = dressing_app();
             app.world_mut().spawn((
-                FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter, depth: FLICKER_DEPTH },
+                FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter, depth: FLICKER_DEPTH, depth_fade: false },
                 Transform::default(),
             ));
             // Eighteen frames of the fixed step: a 2.6 Hz fire and a 1.2 Hz one have parted company by
@@ -548,6 +582,40 @@ mod tests {
         assert!((material.params.w - 0.5).abs() < 1e-6, "{:?}", material.params);
     }
 
+    /// Issue #2: `depth_fade` is opt-in per site. A site that did not ask is drawn with the material that has
+    /// the depth read off, exactly as before the field existed; a site that did is drawn with the one that has
+    /// it on, whichever the host sets it to later, and a look change reaches both materials.
+    #[test]
+    fn a_site_that_asks_for_the_depth_fade_is_drawn_with_the_material_that_has_it() {
+        fn fade_of(app: &mut App, site: Entity) -> f32 {
+            let flame = app.world().get::<Children>(site).and_then(|c| c.first().copied()).expect("a dressed site has a flame");
+            let handle = app.world().get::<MeshMaterial3d<FlameMaterial>>(flame).expect("a flame has a material").0.clone();
+            app.world().resource::<Assets<FlameMaterial>>().get(&handle).expect("the material exists").params.z
+        }
+        let mut app = dressing_app();
+        let site = |depth_fade| FlameSite { height: 0.9, phase: 0.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade };
+        let plain = app.world_mut().spawn(site(false)).id();
+        let faded = app.world_mut().spawn(site(true)).id();
+        app.update();
+        assert_eq!(fade_of(&mut app, plain), 0.0);
+        assert_eq!(fade_of(&mut app, faded), 1.0);
+
+        app.world_mut().get_mut::<FlameSite>(plain).expect("the site").depth_fade = true;
+        app.world_mut().get_mut::<FlameSite>(faded).expect("the site").depth_fade = false;
+        app.update();
+        assert_eq!(fade_of(&mut app, plain), 1.0);
+        assert_eq!(fade_of(&mut app, faded), 0.0);
+
+        app.world_mut().resource_mut::<FlameLook>().strength = 0.5;
+        app.update();
+        for site in [plain, faded] {
+            let flame = app.world().get::<Children>(site).and_then(|c| c.first().copied()).expect("a flame");
+            let handle = app.world().get::<MeshMaterial3d<FlameMaterial>>(flame).expect("a material").0.clone();
+            let material = app.world().resource::<Assets<FlameMaterial>>().get(&handle).expect("exists").clone();
+            assert!((material.params.w - 0.5).abs() < 1e-6, "{:?}", material.params);
+        }
+    }
+
     /// Issue #3: a flame need not be where its light is. A site is its own entity, parented to whatever
     /// the host says the fire is on (a sconce's bracket), while the light hangs elsewhere; the flame
     /// stands at the site's origin and goes when the prop goes — no anchor type needed.
@@ -558,7 +626,7 @@ mod tests {
         let site = app
             .world_mut()
             .spawn((
-                FlameSite { height: 0.35, phase: 0.7, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
+                FlameSite { height: 0.35, phase: 0.7, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false },
                 Transform::from_xyz(0.0, 1.5, 0.0),
                 ChildOf(prop),
             ))
@@ -585,7 +653,7 @@ mod tests {
     #[test]
     fn a_flame_names_the_prop_its_site_hangs_on_and_follows_a_reparent() {
         let site_of =
-            || FlameSite { height: 0.35, phase: 0.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH };
+            || FlameSite { height: 0.35, phase: 0.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false };
         let mut app = dressing_app();
         let torch = app.world_mut().spawn(Transform::default()).id();
         let other = app.world_mut().spawn(Transform::default()).id();
@@ -663,6 +731,7 @@ mod kindle_tests {
             kindle: KINDLE_SECONDS,
             diameter: None,
             depth: FLICKER_DEPTH,
+            depth_fade: false,
         };
         app.world_mut().spawn((site, Transform::default()));
         app.update();
@@ -690,7 +759,7 @@ mod kindle_tests {
         // already alight.
         let mut app = app();
         app.world_mut().spawn((
-            FlameSite { height: 0.9, phase: 0.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
+            FlameSite { height: 0.9, phase: 0.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false },
             Transform::default(),
         ));
         app.update();
@@ -747,6 +816,7 @@ mod catch_colour_tests {
                 kindle: KINDLE_SECONDS,
                 diameter: None,
                 depth: FLICKER_DEPTH,
+                depth_fade: false,
             },
             Transform::default(),
         ));
@@ -779,11 +849,12 @@ mod catch_colour_tests {
                 kindle: KINDLE_SECONDS,
                 diameter: None,
                 depth: FLICKER_DEPTH,
+                depth_fade: false,
             },
             Transform::default(),
         ));
         app.world_mut().spawn((
-            FlameSite { height: 0.9, phase: 1.3, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
+            FlameSite { height: 0.9, phase: 1.3, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false },
             Transform::from_xyz(5.0, 0.0, 0.0),
         ));
         app.update();
