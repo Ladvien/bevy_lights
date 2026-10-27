@@ -250,3 +250,41 @@ fn a_sized_fire_flickers_at_the_puffing_laws_rate_and_an_unsized_one_at_the_inhe
         1000.0 * flicker_factor(t, 0.0)
     );
 }
+
+/// A deeper fire dips further and never rises above its base; a depth of zero holds the base still.
+/// A stray depth cannot drive a light below nothing.
+#[test]
+fn a_deeper_fire_dips_further_but_never_exceeds_its_base() {
+    let mut app = app();
+    let spawn = |app: &mut App, depth: f32| {
+        app.world_mut()
+            .spawn((
+                PointLight { intensity: 0.0, ..default() },
+                Flicker { base: 1000.0, phase: 0.0, diameter: None, depth },
+            ))
+            .id()
+    };
+    let still = spawn(&mut app, 0.0);
+    let calm = spawn(&mut app, 0.03);
+    let deep = spawn(&mut app, 0.4);
+    let wild = spawn(&mut app, 9.0);
+    let mut low = [f32::MAX; 4];
+    let mut high = [f32::MIN; 4];
+    for _ in 0..300 {
+        app.update();
+        for (i, id) in [still, calm, deep, wild].into_iter().enumerate() {
+            let v = app.world().get::<PointLight>(id).unwrap().intensity;
+            low[i] = low[i].min(v);
+            high[i] = high[i].max(v);
+        }
+    }
+    assert!(
+        (low[0] - 1000.0).abs() < 1e-2 && (high[0] - 1000.0).abs() < 1e-2,
+        "depth 0 is still: {low:?} {high:?}"
+    );
+    assert!(low[1] > low[2] && low[2] > 0.0, "a deeper fire dips further: {low:?}");
+    for (i, h) in high.iter().enumerate() {
+        assert!(*h <= 1000.0 + 1e-2, "fire {i} rose above its base: {h}");
+    }
+    assert!(low[3] >= 0.0, "a stray depth must not go negative: {}", low[3]);
+}

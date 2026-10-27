@@ -764,6 +764,34 @@ fn a_handed_out_light_takes_the_props_own_fire_phase_and_size() {
     assert_eq!(fires[1].2, None, "a fire with no size given keeps the un-sized rate: {fires:?}");
 }
 
+/// A prop's own flicker depth travels with its fire onto the pool light, and a candidate that chose
+/// none leaves the light at the crate default rather than at whichever prop held the slot before.
+#[test]
+fn a_handed_out_light_takes_the_props_own_flicker_depth_or_the_default() {
+    let mut app = app(LightPool { size: 2, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    app.world_mut().spawn((
+        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, depth: Some(0.3), ..default() },
+        Transform::from_translation(Vec3::new(1.0, 0.0, 0.0)),
+    ));
+    app.world_mut().spawn((
+        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, depth: None, ..default() },
+        Transform::from_translation(Vec3::new(9.0, 0.0, 0.0)),
+    ));
+    settle(&mut app);
+    let mut depths: Vec<(usize, f32)> = app
+        .world_mut()
+        .query_filtered::<(&PoolLight, &Flicker), ()>()
+        .iter(app.world())
+        .map(|(light, flicker)| (light.slot, flicker.depth))
+        .collect();
+    depths.retain(|(slot, _)| *slot < 2);
+    depths.sort_by_key(|(slot, _)| *slot);
+    assert_eq!(depths.len(), 2);
+    assert!((depths[0].1 - 0.3).abs() < 1e-6, "the near prop chose 0.3: {depths:?}");
+    assert!((depths[1].1 - FLICKER_DEPTH).abs() < 1e-6, "the far prop chose none: {depths:?}");
+}
+
 /// A host that models no per-prop phases keeps the crate's spread, so the slots still never beat in
 /// step: the new field is an opt-in, not a change of default.
 #[test]

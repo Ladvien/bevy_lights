@@ -17,6 +17,21 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **`Flicker::depth`, `FlameSite::depth`, `PoolCandidate::depth`; `flicker_swing` takes a depth** (landed in
+  `33fd290`, recorded here). How far a fire dips was the crate's inherited `0.15` for every fire; a host
+  now chooses it per fire (a calm lantern `0.03`, a guttering torch `0.3`). The multiplier runs
+  `1 − 2·depth ..= 1`, so a fire's **peak is always its base** and a deeper flicker darkens the trough
+  rather than brightening the crest; `FLICKER_DEPTH = 0.15` keeps every existing fire exactly as it was,
+  `MAX_FLICKER_DEPTH = 0.5` is the largest depth whose trough stays non-negative, and `flicker_depth`
+  clamps and reads `NaN` as the default. A pool slot adopts its winner's depth and returns to the default
+  for a candidate that chose none. **Breaking:** `flicker_swing(diameter, t, phase)` became
+  `flicker_swing(diameter, depth, t, phase)`, and `Flicker`, `FlameSite` and `PoolCandidate` gained a
+  field, so struct literals without `..default()` stop compiling. `docs/research/flicker-depth.md` is the
+  note: it bounds the default against Mandin & Most's measured flame fluctuation (a temperature amplitude
+  up to 25 % of the mean, against the ≈4.4 % the shipped `±0.15` implies through `T⁴`). The `0.15` itself
+  stays a design default. Two behaviour tests (`tests/flicker.rs`, `tests/pool.rs`) pin the
+  peak-is-base and slot-adoption invariants.
+
 - **`char_field`, `char_radiance`, `coal_radiance`, `EMBER_AT` and `blackbody_luminance`** — the
   engine-free half of a fuel bed. A bed of coals is a *surface with a temperature field on it*, not a
   uniform emitter: `char_field(u, v, seed)` is that field as a heap of overlapping coal shards (the
