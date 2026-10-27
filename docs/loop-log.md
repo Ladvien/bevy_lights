@@ -2324,3 +2324,11 @@ No improvement attempted. Section 1.5 of the skill: tracked changes this pass di
 `git status --short` at pass start is the same set as iterations 21–38: `src/flame.rs`, `src/flicker.rs`, `src/lib.rs`, `src/model/fire.rs`, `src/model/mod.rs`, `src/pool.rs` (the per-light flicker `depth` work) plus the `SKILL.md` edit. Nothing was built, touched or reverted.
 
 Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
+
+## Iteration 40 — 2026-10-27 — stopped: foreign uncommitted changes in `src/` (twentieth pass)
+
+No improvement attempted. Section 1.5 of the skill: tracked changes this pass did not make mean stop and log.
+
+`git status --short` at pass start is the same set as iterations 21–39: `src/flame.rs`, `src/flicker.rs`, `src/lib.rs`, `src/model/fire.rs`, `src/model/mod.rs`, `src/pool.rs` (the per-light flicker `depth` work) plus the `SKILL.md` edit. Nothing was built, touched or reverted. GPU free ~19 GB, `/tmp` 11 GB free.
+
+Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
