@@ -75,6 +75,9 @@ an order-of-magnitude check, not a calibration. It does not turn `0.15` into a m
 | `MAX_FLICKER_DEPTH` | 0.5 | geometry, not art: the largest depth whose trough (`1 − 2·depth`) is still ≥ 0 |
 | peak of the multiplier | 1.0 at every depth | design default, so a light budget never needs the depth |
 | the calm and guttering examples in the docs (0.03, 0.3) | 0.03, 0.3 | design defaults, illustrative only |
+| `CALM_FLICKER_DEPTH` | 0.05 | design default: the named calm end, within 0.05 of the note's 0.03 lantern (issue #4) |
+| `WHIPPING_FLICKER_DEPTH` | 0.3 | design default: the named gusting end, the note's 0.3 torch and its advised ceiling (issue #4) |
+| `flicker_mean(depth)` | `1 − flicker_depth(depth)` | algebra: the mean of `1 − depth·(1 − w)` for a zero-mean wobble `w` (issue #4) |
 
 ## Validation targets
 
@@ -92,6 +95,8 @@ A lantern at `0.03` reads as a steady, calm practical; a torch at `0.3` visibly 
 never exceeds its base; the default reads exactly as it did before the commit.
 
 ## Deviations
+
+- Added from issue #4: `flicker_mean`, `CALM_FLICKER_DEPTH` (0.05) and `WHIPPING_FLICKER_DEPTH` (0.3). No default moves and no rendering changes. The two constants are design defaults, named so hosts do not each invent a literal for "sheltered" and "gusting"; `flicker_mean` lets a host write a lumen budget against the fire's mean and solve for `Flicker::base` rather than dividing by a stale `0.85`. Not done from the same issue: the amplitude measurement (Maynard 2013 remains unobtainable) and making `FlameSite::depth` follow its light, which needs a link from a site to the light it motivates that does not exist (a pool light is a different entity from the prop's site); issue #3's host-declared origin is where that link would belong.
 
 - The default `0.15` is **unchanged**, so no default moves and no rendering changes.
 - Not done: any change to `MAX_FLICKER_DEPTH`. The measured ceiling above argues a host should rarely

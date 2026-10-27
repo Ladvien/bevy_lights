@@ -158,7 +158,7 @@ and a deeper flicker is a darker trough rather than a brighter crest. At the def
 of `FLICKER_DEPTH` that is 0.70–1.00 of base with a mean of 0.85 — the window a lumen budget written
 against the mean assumes. `Flicker::depth` is how far that fire dips, so a lantern can ask for 0.03 and
 a gusting torch for 0.3; `flicker_depth` clamps the value to `0..=MAX_FLICKER_DEPTH` (0.5, the deepest
-whose trough is still zero) and reads a `NaN` as the default.
+whose trough is still zero) and reads a `NaN` as the default. `CALM_FLICKER_DEPTH` (0.05) and `WHIPPING_FLICKER_DEPTH` (0.3) name the two ends, and `flicker_mean(depth)` is the multiplier's mean, so a budget is `base = lumens / flicker_mean(depth)` rather than a hand-divided `0.85`.
 
 Give a fire its fuel-bed size (`Flicker { diameter: Some(0.34) }`) and its flicker runs at the measured
 puffing rate, `1.5/√D` Hz — a brazier at 2.6 Hz, a pyre at 0.75 — so a large fire breathes more slowly

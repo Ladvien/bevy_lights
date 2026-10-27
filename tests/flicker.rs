@@ -288,3 +288,28 @@ fn a_deeper_fire_dips_further_but_never_exceeds_its_base() {
     }
     assert!(low[3] >= 0.0, "a stray depth must not go negative: {}", low[3]);
 }
+
+/// A lumen budget written against `flicker_mean` holds at any depth: the light a fire actually puts out
+/// averages `base · flicker_mean(depth)`, so a host solves for `base` instead of dividing by `0.85`.
+#[test]
+fn a_budget_solved_through_flicker_mean_is_the_light_the_fire_averages() {
+    for depth in [CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH] {
+        assert!((0.0..=MAX_FLICKER_DEPTH).contains(&depth));
+        let mut app = app();
+        let budget = 7900.0;
+        let light = app
+            .world_mut()
+            .spawn((
+                PointLight { intensity: 0.0, ..default() },
+                Flicker { base: budget / flicker_mean(depth), phase: 0.4, diameter: Some(0.3), depth },
+            ))
+            .id();
+        let (mut sum, frames) = (0.0, 3000);
+        for _ in 0..frames {
+            app.update();
+            sum += app.world().get::<PointLight>(light).unwrap().intensity;
+        }
+        let mean = sum / frames as f32;
+        assert!((mean / budget - 1.0).abs() < 0.03, "depth {depth}: mean {mean} against budget {budget}");
+    }
+}

@@ -97,6 +97,48 @@ pub fn flicker_depth(depth: f32) -> f32 {
     depth.clamp(0.0, MAX_FLICKER_DEPTH)
 }
 
+/// The depth of a **calm** fire: a sheltered lantern, a wick under a parapet, a gate lamp's pan. The
+/// light dips at most `0.10` below its peak (`0.90..=1.00`, mean `0.95`).
+///
+/// A design default, the calm end of the two illustrative depths in `docs/research/flicker-depth.md`
+/// (`0.03`, within `0.05` of this). It is named so that hosts mapping a sheltered fire onto it choose
+/// one number instead of each inventing a literal.
+pub const CALM_FLICKER_DEPTH: f32 = 0.05;
+
+/// The depth of a **whipping** fire: a hand torch in a draught, a wick in the wind. The light dips up
+/// to `0.60` below its peak (`0.40..=1.00`, mean `0.70`).
+///
+/// A design default, the gusting end of the two illustrative depths in `docs/research/flicker-depth.md`
+/// (`0.3`, exactly this). It sits at the note's advised ceiling; [`MAX_FLICKER_DEPTH`] is the geometric
+/// limit above it.
+pub const WHIPPING_FLICKER_DEPTH: f32 = 0.3;
+
+/// The mean of a fire's flicker multiplier at `depth`: `1 - depth`, with `depth` read through
+/// [`flicker_depth`] so it is the mean of what the light actually does. At [`FLICKER_DEPTH`] it is
+/// `0.85`.
+///
+/// A lumen budget is written against a fire's **mean** (a pool that must light the ground to 7900 lux
+/// on average), while [`Flicker::base`](crate::Flicker::base) is its **peak**. Divide the budget by
+/// this instead of by a literal `0.85` that goes stale the moment a fire chooses another depth.
+///
+/// ```
+/// # use bevy_lights::model::fire::*;
+/// // The pool must average 7900 lumens whatever the fire's depth: solve for the peak.
+/// for depth in [CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH] {
+///     let base = 7900.0 / flicker_mean(depth);
+///     let mut sum = 0.0;
+///     let n = 100_000;
+///     for i in 0..n {
+///         sum += base * flicker_swing(None, depth, i as f32 * 0.01, 0.4);
+///     }
+///     assert!((sum / n as f32 - 7900.0).abs() < 80.0);
+/// }
+/// assert_eq!(flicker_mean(FLICKER_DEPTH), 0.85);
+/// ```
+pub fn flicker_mean(depth: f32) -> f32 {
+    1.0 - flicker_depth(depth)
+}
+
 /// The shared shape of every flicker: two sines summed to `-1..=1`, the second at `omega_2` and 1.7
 /// times the clock phase.
 fn wobble(omega: f32, omega_2: f32, t: f32, phase: f32) -> f32 {
