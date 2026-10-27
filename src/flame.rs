@@ -139,6 +139,11 @@ pub struct FlameSite {
     /// measures. `None` (the default) uses the crate's un-sized rate, matching a light whose
     /// `Flicker::diameter` is `None`.
     pub diameter: Option<f32>,
+    /// How far the flame's brightness dips below its peak: **set it to the same value as
+    /// [`Flicker::depth`](crate::Flicker::depth) on the light this flame motivates**, or the flame's
+    /// breath and its light's disagree. [`FLICKER_DEPTH`](crate::FLICKER_DEPTH) is the default and
+    /// matches a light that never chose one.
+    pub depth: f32,
 }
 
 /// The drawn flame: the child mesh [`FlamePlugin`] spawns under each [`FlameSite`].
@@ -260,7 +265,7 @@ fn dress_flames(
     let t = time.elapsed_secs();
     for (site, flame) in &sites {
         let catch = flame.kindle;
-        let brightness = flicker_swing(flame.diameter, t, flame.phase);
+        let brightness = flicker_swing(flame.diameter, flame.depth, t, flame.phase);
         let tag = MeshTag::new(pack_flame_tag(flame.phase, flame.height, brightness, max_height));
         let mesh = assets.mesh.clone();
         let material = assets.material.clone();
@@ -318,7 +323,7 @@ fn update_flames(
             // `Changed<MeshTag>` re-extraction set, so a write here costs a render-world re-extract for
             // that flame. The byte holds 1/255 of the swing, so at 60 fps a 2.6 Hz fire skips some
             // frames; a fire that never changes costs nothing at all.
-            let brightness = flicker_swing(site.diameter, t, site.phase);
+            let brightness = flicker_swing(site.diameter, site.depth, t, site.phase);
             let packed = set_flame_brightness(tag.value, brightness);
             if packed != tag.value {
                 tag.value = packed;
