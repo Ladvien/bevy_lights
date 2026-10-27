@@ -89,13 +89,21 @@ fire's own surface expressible*, and the measurement that proves it works.
 
 ## Parameters
 
+The parameters below are the ones that shipped, and two of them differ from this note's first plan for a
+reason that only a capture could give: **an 8-bit share of one fire colour cannot draw a coal bed**, and
+neither can a ramp whose middle stop is past the display's white point. Both are recorded under
+`## Deviations`.
+
 | parameter | value | source |
 |---|---|---|
-| field size | 128×128, 8-bit greyscale | design default: the bed is 0.34 m and the closest camera in the showcase is 4 m, so one texel is ~2.7 mm — far under a pixel at every captured angle |
-| octaves | 3, lacunarity 1.6 | the flame shader's own fbm (`src/flame.wesl`), so the bed and the fire above it are the same kind of noise |
-| char contrast `low` | 0.35 of full emissive | design default: a third of the bed is well under the clip point; `10.1145_3130800.3130814`'s $T_0 = 150\,°C$ is cold enough to be dark, $T_1 = 450\,°C$ already visibly glowing, so the useful dynamic range spans roughly a factor of three |
-| char contrast `high` | 1.45 of full emissive | design default, chosen to be *above* the old constant 1.4 so the hottest coals stay the brightest thing in frame: the fix must not dim the source, only give it structure |
-| field mean | 0.90 of full emissive | design default, measured down from 1.0 until the 85° frame's clipped-pixel count reaches 0 with the high pass intact |
+| field size | 128×128, `Rgba32Float` | the bed is 0.34 m and the closest camera in the showcase is 4 m, so a texel is ~2.7 mm — far under a pixel at every captured angle. The format is `Rgba32Float` because the ramp's stops span 3.7 to 795 cd/m² and 8 bits clamps at 1.0 |
+| lumps, coarse / fine | 5.6 and 9.4 across, fine weighted 0.74 | design default: a bed of coals is a *crushed* material, so a heap of 10 cm lumps settles into a matrix of fragments a few centimetres across. Measured at 44 px — the bed's own size at the hero camera — one size of lump reads as a mesh |
+| lump radius, stretch, sparse cells | 0.36–0.62 cells, 0.62–1.24, 30 % | design defaults, chosen so shards overlap and a third of the cells hold no coal — the ash |
+| fracture depth | 0.30 and 0.14 of the radius, two scales | design default: one term gives every lump the same sawtooth |
+| core cooling | to 0.62 of the field, exponent 1.4 | the plume is axisymmetric (`10.1017_jfm.2018.707`), so the coals under the axis are the hottest and the rim is coolest |
+| char stop | 950 K, floor 0.6/0.5/0.45 cd/m² | design default. Char has stopped burning and shows only the fire's light on it, which is grey; a black hole in a bed reads as a missing texture |
+| ember stop | **1020 K** = 26.1 cd/m², DN 157 at `ev100` 6, at 0.30 of the field | `PBR3_12_Light_Sources`: a blackbody emitter's radiance is a temperature. Measured: at 1140 K the ember stop lands at **DN 255**, so every lump above the ash clipped in red and the structure survived only in green. 1020 K puts the ember at DN 157 |
+| fuel stop | **1300 K** = 795 cd/m², DN 255/217/0 | the hottest a coal bed gets without a visible flame: red and green at the top of the display's range, so the hottest coals carry their colour |
 | field seed | `LIGHTS_SEED`'s default (7) | so a capture is reproducible, like the figures' layout |
 
 ## Validation targets
