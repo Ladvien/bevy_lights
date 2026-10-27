@@ -18,8 +18,8 @@ pub use cinematography::{
     stops, white_balanced,
 };
 pub use fire::{
-    KINDLE_SECONDS, PUFFING_CONSTANT, flicker_factor, flicker_factor_of, flicker_rate, flicker_swing,
-    kindle_gain,
+    FLICKER_DEPTH, KINDLE_SECONDS, MAX_FLICKER_DEPTH, PUFFING_CONSTANT, flicker_depth, flicker_factor,
+    flicker_factor_of, flicker_rate, flicker_swing, kindle_gain,
 };
 pub use pool::{FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, hand_off, preferred};
 pub use reach::{RANGE_MARGIN, flame_light_offset, raised_light};
