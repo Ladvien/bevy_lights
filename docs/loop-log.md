@@ -2570,3 +2570,11 @@ Environment at the time: `MemAvailable` ~12 GiB, VRAM free ~2.0 GB (tenant `none
 Open issues at pass start (read, none acted on): #4 flicker mean the light budget was written against (enhancement), #3 host-declared flame origin (enhancement), #2 flame occlusion/ownership (enhancement), #1 publish 0.2.0 (release, owner's call, skipped). No bug issues are filed.
 
 Next pass: iteration 60's backlog stands (1: a bowl that shades its own rim), ranked with #2–#4 under the new issue rule once the tree is clean.
+
+## Iteration 62 — 2026-10-27 — stopped: the same uncommitted skill edit as iteration 61
+
+No improvement attempted. Section 1, step 5 of the skill: a tracked change this pass did not make means stop and log it. `git status --short` on `main`: ` M .omp/skills/bevy-lights-build-loop/SKILL.md`, the identical +36-line "Filed issues come before new features" diff iteration 61 found (file mtime 13:09:52, unchanged since). Not committed, not reverted.
+
+Open issues, unchanged from iteration 61: #4 flicker mean (enhancement), #3 host-declared flame origin (enhancement), #2 flame occlusion/ownership (enhancement), #1 publish 0.2.0 (release, skipped). No bug issues filed.
+
+Needs the owner: commit the skill edit or discard it. Until then every pass stops here. Iteration 60's backlog stands (1: a bowl that shades its own rim), to be ranked with #2–#4.
