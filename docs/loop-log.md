@@ -3014,3 +3014,23 @@ Full gate passed (build release/debug, test, test --features serde, examples, cl
 3. The flame from above, round 6 (`flame-overhead.md`).
 4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 5. #4 ask 3 (site takes its light's depth) needs a site-to-light link.
+
+## Iteration 113 — 2026-10-27 — Flame::source (issue #2, ask 2)
+
+Outcome: API addition, no rendering change. Scope: `Flame::source: Option<Entity>` in `src/flame.rs` (written by `update_flames` only on change), test `a_flame_names_the_prop_its_site_hangs_on_and_follows_a_reparent`, CHANGELOG.
+
+### Ranking
+
+Open issues: #4 (partly done), #3 (answered in iteration 112), #2 flame occlusion/ownership, #1 publish (release, seen, skipped). No bug issues. #2 is next on iteration 112's list; its ask 2 (`source`) is the self-contained slice. Asks 1 and 3 (occlusion fade, `visible_from`) need a depth-buffer or raycast design and GPU captures, so they are left; #2 stays open. `source` is the parent of the site, `None` for a root site or a site nested under a site; reparent and unparent are followed, a despawned parent takes the flame with it (acceptance 2 and 3 pinned by the test).
+
+### Verification
+
+No shader or default changed: no capture, benchmark (bench has no flame path) or GIF. `update_flames` gained one extra `Option<&ChildOf>` read per flame, and a write only on change. Full gate passed (build release/debug, test, test --features serde, examples, clippy, doc, fmt, wasm lib, wesl-check).
+
+### Top 5 remaining, ranked
+
+1. #2 occlusion fade (`FlameSite::depth_fade`) and `visible_from`: needs a design, a GPU capture campaign.
+2. A bowl that shades its own rim.
+3. The flame from above, round 6 (`flame-overhead.md`).
+4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+5. #4 ask 3 (site takes its light's depth) needs a site-to-light link.
