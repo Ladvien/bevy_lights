@@ -25,11 +25,14 @@ import bevy_pbr::render::{
     mesh_view_bindings::view,
     view_transformations::position_world_to_clip,
 };
+@if(DEPTH_PREPASS)
+import bevy_pbr::prepass::utils::prepass_depth;
 
 struct Flame {
     // The host's fire colour, and the ember strength in `.a`.
     base: vec4<f32>,
-    // x: seconds (wrapped hourly), y: the tag's height scale in world units (`FlameLook::max_height`), z: unused, w: the ember
+    // x: seconds (wrapped hourly), y: the tag's height scale in world units (`FlameLook::max_height`), z: 1 for the material of a
+    // site that asked for the depth fade, w: the ember
     // strength.
     params: vec4<f32>,
 }
@@ -53,6 +56,11 @@ const CORE_YELLOW: vec3<f32> = vec3<f32>(1.0, 0.78, 0.30);
 // once the fuel is alight. Planck's law is why this is a *temperature*: cooler emission is redder (the crate's
 // `blackbody_colour`), so the catch pulls the ramp towards the red end and lets it go as the fire takes.
 const EMBER_RED: vec3<f32> = vec3<f32>(0.95, 0.20, 0.02);
+// The depth fade (`docs/research/flame-occlusion.md`): the source point is a third of the way up the flame, the tap ring's radius
+// is this fraction of the flame's height, and a tap occludes when the scene is more than this fraction nearer than the source.
+const SOURCE_HEIGHT: f32 = 0.35;
+const FADE_RADIUS: f32 = 0.15;
+const FADE_MARGIN: f32 = 0.03;
 
 // The flame's own stage IO: only the quad's uv and the fire's phase cross to the fragment.
 struct FlameVertexOutput {
@@ -67,6 +75,9 @@ struct FlameVertexOutput {
     // The fire's flicker this frame (0.70..1.00 of its base), read from the tag: the same number the light's intensity
     // was multiplied by, so the drawn fire and the light it casts are one fire. Flat, for the same reason as `took`.
     @location(3) @interpolate(flat) brightness: f32,
+    // Where the fire's source is on the screen, for the depth fade (`FlameSite::depth_fade`): `.xy` the pixel, `.z` its depth, `.w`
+    // the tap ring's radius in pixels. `.w == 0` is "do not test": a flame that did not ask, or whose source is behind the camera.
+    @location(4) @interpolate(flat) fade: vec4<f32>,
 }
 
 // ---- 2D simplex noise and the classic fbm over it (provenance UNVERIFIED, see header) ---------------------------------
@@ -115,6 +126,74 @@ fn fbm(uv_in: vec2<f32>) -> f32 {
 
 // -----------------------------------------------------------------------------------------------------------------------
 
+// ---- The depth fade: a flame whose source cannot be seen goes out (`FlameSite::depth_fade`) --------------------------------
+
+// The pixel a world point lands on, in the same framebuffer coordinates `@builtin(position)` uses.
+fn pixel_of(ndc: vec2<f32>) -> vec2<f32> {
+    return view.viewport.xy + vec2<f32>(ndc.x * 0.5 + 0.5, 0.5 - ndc.y * 0.5) * view.viewport.zw;
+}
+
+// The fire's source on screen: its pixel and depth, and the radius of the ring of taps around it, from the flame's own drawn size
+// so a far flame reads a small ring and a near one a large one. `.w == 0` means no test: the material did not ask for it (the one
+// uniform branch an ordinary flame pays), or a point is behind the camera.
+fn fade_probe(origin: vec3<f32>, right: vec3<f32>, size: f32) -> vec4<f32> {
+    if material.params.z < 0.5 {
+        return vec4<f32>(0.0);
+    }
+    let source = origin + vec3<f32>(0.0, 1.0, 0.0) * (size * SOURCE_HEIGHT);
+    let c0 = position_world_to_clip(source);
+    let c1 = position_world_to_clip(source + right * (size * FADE_RADIUS));
+    if c0.w <= 0.0 || c1.w <= 0.0 {
+        return vec4<f32>(0.0);
+    }
+    let n0 = c0.xyz / c0.w;
+    let p0 = pixel_of(n0.xy);
+    let p1 = pixel_of(c1.xy / c1.w);
+    return vec4<f32>(p0, n0.z, clamp(distance(p0, p1), 2.0, 24.0));
+}
+
+@if(DEPTH_PREPASS)
+// 1 when the tap at `pixel` does not hide the source, 0 when the scene there is nearer than the source by more than the margin.
+// Reverse-Z: a larger depth is nearer. A tap off the screen sees nothing in front of it.
+fn tap_clear(pixel: vec2<f32>, source_depth: f32) -> f32 {
+    let low = view.viewport.xy;
+    let high = view.viewport.xy + view.viewport.zw;
+    if pixel.x < low.x || pixel.y < low.y || pixel.x >= high.x || pixel.y >= high.y {
+        return 1.0;
+    }
+    let scene_depth = prepass_depth(vec4<f32>(pixel, 0.0, 1.0), 0u);
+    return select(1.0, 0.0, scene_depth > source_depth * (1.0 + FADE_MARGIN));
+}
+
+// The share of the source the camera can see: the centre pixel and eight taps on a ring around it, smoothed so a wall edge
+// crossing the source takes the flame down over the ring's width instead of popping it.
+@if(DEPTH_PREPASS)
+fn source_visibility(fade: vec4<f32>) -> f32 {
+    if fade.w <= 0.0 {
+        return 1.0;
+    }
+    let c = fade.xy;
+    let r = fade.w;
+    let d = fade.z;
+    let k = 0.70710678 * r;
+    var seen = tap_clear(c, d);
+    seen += tap_clear(c + vec2<f32>(r, 0.0), d);
+    seen += tap_clear(c + vec2<f32>(-r, 0.0), d);
+    seen += tap_clear(c + vec2<f32>(0.0, r), d);
+    seen += tap_clear(c + vec2<f32>(0.0, -r), d);
+    seen += tap_clear(c + vec2<f32>(k, k), d);
+    seen += tap_clear(c + vec2<f32>(k, -k), d);
+    seen += tap_clear(c + vec2<f32>(-k, k), d);
+    seen += tap_clear(c + vec2<f32>(-k, -k), d);
+    return smoothstep(0.0, 1.0, seen / 9.0);
+}
+
+@if(!DEPTH_PREPASS)
+// A camera with no `DepthPrepass` has no depth to read: the fade is not compiled in and every flame is whole.
+fn source_visibility(fade: vec4<f32>) -> f32 {
+    return 1.0;
+}
+
 @vertex
 fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     var out: FlameVertexOutput;
@@ -149,6 +228,7 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     out.phase = f32((raw >> 8u) & 0xffu) / 255.0 * TAU;
     out.took = took;
     out.brightness = f32(raw & 0xffu) / 255.0;
+    out.fade = fade_probe(origin, right, size);
     return out;
 }
 
@@ -191,5 +271,5 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     // darken what stands behind the flame.
     // The fire's own flicker scales the emission as it scales the light: a flame that held still while its pool moved was
     // a source that did not motivate its own light. `docs/research/flame-flicker.md` measures it.
-    return vec4<f32>(colour * mask * material.params.w * in.brightness, 0.0);
+    return vec4<f32>(colour * mask * material.params.w * in.brightness * source_visibility(in.fade), 0.0);
 }

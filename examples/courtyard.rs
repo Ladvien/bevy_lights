@@ -51,6 +51,7 @@ use std::f32::consts::TAU;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::Exposure;
+use bevy::core_pipeline::prepass::DepthPrepass;
 use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
@@ -270,7 +271,7 @@ fn main() {
         // once here, before any site spawns (the height is packed as a fraction of it).
         .insert_resource(FlameLook { color: fire_temperature(), strength: 0.82, max_height: 4.0 })
         .insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 0.0, ..default() })
-        .add_systems(Startup, (spawn_scene, spawn_camera).chain())
+        .add_systems(Startup, (spawn_scene, spawn_camera, spawn_wall).chain())
         .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers).chain())
         .add_systems(Update, report_kindled)
         .add_systems(Update, report_look)
@@ -297,9 +298,81 @@ struct Bearer {
     angle: f32,
 }
 
+/// `LIGHTS_DEPTH_FADE=1` turns on `FlameSite::depth_fade` for every flame and gives the camera the
+/// `DepthPrepass` it reads; off, the courtyard draws exactly as it always has.
+fn depth_fade_on() -> bool {
+    std::env::var("LIGHTS_DEPTH_FADE").is_ok_and(|v| v != "0")
+}
+
+/// `LIGHTS_WALL=1` adds the occlusion test: a low wall across the courtyard's middle and three torches by
+/// it, one standing behind it with its flame reaching over the top (the case of issue #2: a lone flame
+/// with no torch under it), one mounted on its face (a source in front of the wall, which must never
+/// fade) and one past its end (a source the camera sees past the edge when it moves).
+fn spawn_wall(
+    mut commands: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<StandardMaterial>>,
+) {
+    if !std::env::var("LIGHTS_WALL").is_ok_and(|v| v != "0") {
+        return;
+    }
+    let stone_material = materials.add(stone(Srgba::rgb(0.32, 0.30, 0.28)));
+    let wood = materials.add(stone(Srgba::rgb(0.10, 0.08, 0.06)));
+    commands.spawn((
+        Name::new("Test wall"),
+        Mesh3d(meshes.add(Cuboid::new(8.0, 1.6, 0.4))),
+        MeshMaterial3d(stone_material),
+        Transform::from_xyz(0.0, 0.8, 0.0),
+    ));
+    let post = meshes.add(Cuboid::new(0.1, 0.8, 0.1));
+    // (the post's x and z, its phase): behind the wall, past its end.
+    for (x, z, phase) in [(-2.5, -1.2, 0.3), (4.6, -0.8, 2.1)] {
+        commands
+            .spawn((
+                Name::new("Test torch"),
+                Mesh3d(post.clone()),
+                MeshMaterial3d(wood.clone()),
+                Transform::from_xyz(x, 0.4, z),
+            ))
+            .with_children(|torch| {
+                torch.spawn((
+                    Name::new("Flame site"),
+                    FlameSite {
+                        height: 1.0,
+                        phase,
+                        kindle: 0.0,
+                        diameter: None,
+                        depth: FLICKER_DEPTH,
+                        depth_fade: depth_fade_on(),
+                    },
+                    Transform::from_xyz(0.0, 0.4, 0.0),
+                ));
+            });
+    }
+    // The one on the wall's face: a bracket 0.05 m proud of it, in front of the stone.
+    commands.spawn((
+        Name::new("Wall torch"),
+        Mesh3d(post),
+        MeshMaterial3d(wood),
+        Transform::from_xyz(2.5, 1.1, 0.25),
+        children![(
+            Name::new("Flame site"),
+            FlameSite {
+                height: 0.5,
+                phase: 1.1,
+                kindle: 0.0,
+                diameter: None,
+                depth: FLICKER_DEPTH,
+                depth_fade: depth_fade_on(),
+            },
+            Transform::from_xyz(0.0, 0.4, 0.0),
+        )],
+    ));
+}
+
 fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: Res<NightFill>) {
     let CameraPlacement(eye, look) = *placement;
-    commands.spawn((
+    let mut camera = commands.spawn((
         camera(eye, look, 8.0),
         // A cool fill the moon does not have to provide: without it the courtyard's pillars are
         // black silhouettes and the fire has nothing to read against. Its colour is the sky's
@@ -307,6 +380,10 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
         AmbientLight { color: sky_colour(), brightness: 2.0, ..default() },
         Exposure { ev100: NIGHT_EV100 },
     ));
+    // The depth fade reads the depth prepass, so a camera that asks for it carries one.
+    if depth_fade_on() {
+        camera.insert(DepthPrepass);
+    }
     // The moon: the host's directional light (the crate never adds one), a sky-coloured fill at the
     // illuminance that makes the target key-to-fill against the braziers' pools.
     commands.spawn((
@@ -542,6 +619,7 @@ fn spawn_scene(
                         kindle: KINDLE_SECONDS,
                         diameter: brazier_bed(),
                         depth: FLICKER_DEPTH,
+                        depth_fade: depth_fade_on(),
                     },
                     // The flame's foot is on the coals, at the top of the box.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04, 0.0),
@@ -661,6 +739,7 @@ fn spawn_scene(
                         kindle: 0.0,
                         diameter: None,
                         depth: FLICKER_DEPTH,
+                        depth_fade: depth_fade_on(),
                     },
                     Transform::from_translation(at),
                 ));
