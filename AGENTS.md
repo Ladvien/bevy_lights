@@ -177,6 +177,12 @@ is an art decision, so it needs the same treatment as a physics constant.
   paths. A mount point that does not match fails with "no mount point", which reads as a missing
   module. (Before this was fixed, `bevy_elements`' validator reported every module that imports
   `bevy_pbr` as "not checked" — the shaders that matter most.)
+- **A stub's *fields* are checked even though its *body* is not.** The `View` stub declared only
+  `world_from_view` and `clip_from_world`; `view.world_position` is in the real struct
+  (`bevy_render-0.20.0/src/view.wesl`) and was missing, so a shader reading the camera's position
+  failed to parse. That is the safe direction — a wrong name fails loudly — but a stub that declares a
+  *subset* of a real struct will reject valid code, and one that declares a *superset* will accept
+  invalid code. Declare the fields a shader may read, in the real struct's order.
 - **`AlphaMode::Add` needs premultiplied output**: the flame returns `(colour · mask, 0.0)`, and any
   alpha above 0 would darken what stands behind it.
 - **An app with no window is not paced.** A headless bench's `App::update()` measures CPU time only;
