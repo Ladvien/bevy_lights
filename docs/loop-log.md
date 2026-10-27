@@ -3086,3 +3086,11 @@ No improvement attempted, same stop as iterations 116–118 (section 1, step 5).
 Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues. GPU free VRAM ~20 GiB, tenant none.
 
 Needs the owner: let a pass resume `loop/iter-115` (capture, critique, bench, gate, ship; the tree is the issue-#2 occlusion work) or discard it.
+
+## Iteration 120 — 2026-10-27 — stopped: the iteration-115 tree is still stranded
+
+No improvement attempted, same stop as iterations 116–119 (section 1, step 5). The checkout is on `loop/iter-115` at `afb8963` with the same nine modified files (+412/−110) and untracked `examples/occlusion.rs`; the newest write is still 17:22:38 (`src/flame.rs`), 14 minutes before this pass looked. No omp, cargo or courtyard process for this repo is running. Not committed, not reverted.
+
+Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues. GPU tenant none, ~4.3 GiB VRAM in use.
+
+Needs the owner: let a pass resume `loop/iter-115` (capture, critique, bench, gate, ship; the tree is the issue-#2 occlusion work) or discard it.
