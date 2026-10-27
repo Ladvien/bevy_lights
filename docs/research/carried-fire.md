@@ -181,3 +181,21 @@ Judged at the courtyard's ground-level camera, the close torch camera, and the h
 - **Cheap.** One helper function; no new system, no new per-frame work.
 
 [`FlameSite`]: ../src/flame.rs
+
+## Amendment (iteration 60): a carried flame needs something carrying it
+
+**Defect, measured on the showcase.** At the elevated camera (`LIGHTS_EYE=0,14,14 LIGHTS_LOOK=0,0.5,0`, 36 frames, pool 4) every bearer's flame hangs 0.42 m out from the capsule with nothing under it: no hand, no stick, no lantern body. `TORCH_HAND` was chosen only so the billboard clears the body (see its comment), and the example spawns the "Torch fire" entity bare. A flame with no object is a light with no source.
+
+**Craft.** Doğaner (`10.7456_tojdac.1674124`), already quoted in [`flame-flicker.md`](flame-flicker.md): "these objects determine the motivation of the light in the scene." The *object* is what motivates; a bare flame is the one case where the audience can see the light and nothing that carries it.
+
+**Model.** The example gives each bearer a hand (a sphere at the arm's end) and a held object whose top is the flame's foot: a thin **stick** (torch) or a **lantern body** (the 1-in-6 lantern bearers). The object is unlit by design: it is dark wood/iron, `NotShadowCaster`, and the flame's pool lights it from above like any prop. This is example geometry only; the crate gains no API (the host owns its props, `AGENTS.md`).
+
+| quantity | value | source |
+|---|---|---|
+| stick radius / length | 0.02 m / from the hand to the flame's foot (`TORCH_HAND.y` up to `flame_light_offset` foot) | design default |
+| lantern body | 0.11 m cube-ish cylinder, radius 0.07 m | design default |
+| hand sphere | 0.05 m radius, the bearer's skin material | design default |
+
+**Validation targets.** At the elevated camera no flame is more than 0.02 m (≈1 px at 1280 px) from a solid pixel that is not background or ground; the flame's pool brightness (ground mean in a 2 m disc) moves by under 3 %; `bench_lights` unchanged (the bench builds no bearers).
+
+**Pending index.** No shipping-game or rendering source was consulted for torch proportions: they are design defaults.
