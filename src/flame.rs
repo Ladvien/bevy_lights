@@ -124,7 +124,9 @@ pub struct FlameSite {
     pub phase: f32,
     /// How long the flame takes to reach its full height after it is lit, in seconds: the same envelope
     /// the fire's *light* uses ([`kindle_gain`](crate::kindle_gain)), so the flame and the light it
-    /// motivates catch together. `0.0` (the default) is a fire that has been burning all along and needs
+    /// motivates catch together. The catch scales the flame's **drawn** size as well as its colour, so a
+    /// lit fire grows from a point over these seconds instead of appearing whole.
+    /// `0.0` (the default) is a fire that has been burning all along and needs
     /// no catch; a host lighting a fire sets it, usually to
     /// [`KINDLE_SECONDS`](crate::KINDLE_SECONDS).
     pub kindle: f32,
@@ -141,8 +143,9 @@ pub struct FlameSite {
 
 /// The drawn flame: the child mesh [`FlamePlugin`] spawns under each [`FlameSite`].
 ///
-/// Its `Transform` is the site's height scale times the fire's catch (a `FlameSite` with a
-/// [`kindle`](FlameSite::kindle) grows from nothing over that many seconds); its `MeshTag` carries the
+/// Its `Transform`'s scale is the fire's catch (a `FlameSite` with a [`kindle`](FlameSite::kindle)
+/// grows from nothing over that many seconds, and the shader multiplies that scale into the flame's
+/// drawn size); its `MeshTag` carries the
 /// site's phase and height **and the fire's flicker**, which [`FlamePlugin`] rewrites every frame from
 /// the same function the light's intensity comes from. So the flame breathes with the ground under it
 /// instead of holding still while the light moves.
@@ -556,6 +559,12 @@ mod kindle_tests {
         // A site that asks for a catch grows over that many seconds, on the same envelope the light
         // uses — so the flame and the light it motivates arrive together instead of the flame popping in
         // whole a frame before the light has begun.
+        //
+        // **This pins the CPU-side number only.** The drawn size is computed in the shader, by
+        // multiplying this scale into `size` (`src/flame.wesl`), and a capture — not this test — is what
+        // shows it: for four iterations the scale was written correctly and the shader ignored it, and
+        // this test passed the whole time. `docs/research/flame-kindle.md` has the measurement and
+        // `/home/ladvien/l18/kindle2_after/` the frames.
         let mut app = app();
         let site = FlameSite { height: 0.9, phase: 0.0, kindle: KINDLE_SECONDS, diameter: None };
         app.world_mut().spawn((site, Transform::default()));

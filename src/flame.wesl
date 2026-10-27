@@ -60,7 +60,9 @@ struct FlameVertexOutput {
     @location(0) uv: vec2<f32>,
     @location(1) @interpolate(flat) phase: f32,
     // How far this flame's own fire has caught: its instance scale, which `update_flames` writes from the
-    // fire's `kindle_gain`. Flat, because it is one number for the whole flame.
+    // fire's `kindle_gain`. The vertex stage multiplies it into the flame's drawn size, so a flame lit with
+    // its light grows from nothing with it; the fragment mixes the ember colour in by the same number. Flat,
+    // because it is one number for the whole flame.
     @location(2) @interpolate(flat) took: f32,
     // The fire's flicker this frame (0.70..1.00 of its base), read from the tag: the same number the light's intensity
     // was multiplied by, so the drawn fire and the light it casts are one fire. Flat, for the same reason as `took`.
@@ -135,7 +137,12 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     // function the light's intensity is, so the flame breathes with the ground under it.
     let raw = mesh_functions::get_tag(vertex_in.instance_index);
     let tag = unpack2x16unorm(raw);
-    let size = tag.y * material.params.y;
+    // The flame's drawn size carries its fire's catch: a flame lit with its light grows from nothing
+    // over the same envelope the light flares by (`kindle_gain`), so the source and the light it
+    // motivates are one event in two channels. `took` is the instance scale `update_flames` writes,
+    // read above; multiplying it in here is the whole difference between a documented catch and a
+    // flame that appears whole. `docs/research/flame-kindle.md` measures it.
+    let size = tag.y * material.params.y * took;
     let billboard = origin + right * (vertex.position.x * size * FLAME_ASPECT) + up * (vertex.position.y * size + size * 0.5);
     out.position = position_world_to_clip(billboard);
     out.uv = vec2<f32>(vertex.position.x, vertex.position.y) + vec2<f32>(0.5, 0.5);
