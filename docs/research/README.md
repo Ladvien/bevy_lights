@@ -12,6 +12,14 @@ plainly that it is a design default.
 - [`light-pool.md`](light-pool.md) — the budgeted pool of real lights, and why the hand-off must not
   pop.
 - [`flame.md`](flame.md) — the billboarded shader flame: one material, one draw, a tag per fire.
+- [`flame-flicker.md`](flame-flicker.md) — the drawn flame and its light as one fire: brightness on the
+  light's clock, the silhouette on real time.
+- [`flame-silhouette.md`](flame-silhouette.md) — the flame's edges, the puff law that would shape them,
+  and the per-flame diameter that blocks it.
+- [`flame-kindle.md`](flame-kindle.md) — a lit flame must *grow* with the light it motivates, and the
+  scale that was written but never drawn.
+- [`carried-fire.md`](carried-fire.md) — where a hand-held fire's light belongs, and the lumens it needs
+  from there.
 - [`lighting-look.md`](lighting-look.md) — the composition: key against fill, a light's colour from its
   temperature, and the lumens a fire needs for a pool of a given size.
 - [`pool-hand-off.md`](pool-hand-off.md) — the pool's hand-off: hysteresis (the overlap rule) and a

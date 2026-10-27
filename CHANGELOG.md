@@ -19,6 +19,17 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Fixed
 
+- **A flame lit with its light now grows from a point instead of appearing whole.** `FlameSite::kindle`
+  was documented to grow the flame over its catch, and `update_flames` wrote the right number every
+  frame — but into the `Transform`'s scale, which `src/flame.wesl` read only to tint the ember and never
+  to size the billboard. Measured on a flame spawned mid-run: its bbox height across the 0.6 s catch was
+  **flat at 155–174 px** (the silhouette's own noise) and only its peak luminance rose, 120 → 161 DN. The
+  vertex stage now multiplies that scale into the flame's drawn size, and the height follows
+  `kindle_gain` to **0.98 px RMSE** over the catch, 6 → 166 px. A settled flame is unchanged: all 13
+  capture cameras are pixel-identical before and after. The unit test that was supposed to cover this
+  read the CPU-side scale and passed throughout; its comment now records that only a capture can see
+  the drawn size. `docs/research/flame-kindle.md` is the note.
+
 - **A carried fire's light now sits in its flame, and is sized for where it is.** `examples/courtyard`
   put every handed-out torch pool light **1.80 m above the flame drawn on the torch** — a light with no
   source, and one that delivered **72 lx** where its 15 402 lm were sized for **250 lx** at the pool's

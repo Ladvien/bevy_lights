@@ -124,17 +124,21 @@ per-flame channel, and removing it would need a tag bit the crate does not have.
   capture**, not as `transform.scale`: the defect this note records is exactly the gap between those
   two.
 - A site with `kindle: 0.0` draws at full size on its first frame.
-- No flame's drawn height exceeds its site's `height` by more than the catch's own overshoot
-  (`kindle_gain`'s 1.35 peak at ~85 % of the envelope), and none is zero.
+- No flame's drawn height exceeds its site's `height` (`kindle_gain` peaks at 1.009, and the shader
+  clamps `took` to 1), and none is zero.
 - Brightness, phase, colour, flicker rate and clipping are unchanged by the fix.
 
 ## Deviations
 
-- **The catch also scales the flame during the *overshoot*.** `kindle_gain` peaks at about 1.35 before
-  settling to 1.0, so a flame that is catching is briefly **taller than its settled height**, by the
-  same 35 % its light is briefly brighter. That is the same event in the other channel and is kept
-  deliberately: `fire-light.md` calls the overshoot "the sound cue's visual half", and a light that
-  flares while its flame holds its size would be the same incoherence in miniature.
+- **There is no size overshoot to preserve, and a first draft of this note wrongly said there was.**
+  `kindle_gain` is `s + 0.35·sin(πs)` on a smoothstepped `s`, so its peak is **1.009 at t ≈ 0.46 s**
+  and it settles at exactly 1.0 — it has no overshoot *past* full, because the `0.35·sin` term fills the
+  ramp's slow start rather than pushing past its end (`fire-light.md`: `kindle_gain(0.3) ≈ 0.85`,
+  against a smoothstep of 0.5). The draft claimed the flame would be briefly "35 % taller than settled";
+  that is the amplitude of the sine term, not the peak of the sum. The shader's `clamp(.., 0, 1)` on
+  `took` therefore costs 0.9 % for one frame in the middle of a 0.6 s catch, which is why it is left
+  alone rather than widened. What the flare *does* mean for the size is that a catching fire reaches its
+  full height early — 85 % of the way up at half the envelope — and then holds it.
 - **The size is set in the vertex stage from the transform, not from a new tag field.** The `MeshTag`
   is full (height 16 | phase 8 | brightness 8), and `flame-silhouette.md` records that spending bits
   there is an allocation decision. `took` already carries the number.
@@ -165,9 +169,9 @@ catch:
   the light's intensity.
 - **The flame and its light arrive together.** At every frame of the catch, the flame's drawn height
   and the light's intensity are the same fraction of their full values.
-- **The overshoot is visible.** Around 85 % of the envelope the flame is briefly larger than it settles
-  to, and the light is briefly brighter — the flare reads as one event in two channels.
+- **The flare reads as one event.** At half the envelope the fire is already around 85 % lit and its
+  flame around 85 % grown, so the last third of the catch is the settle.
 - **Nothing else moves.** The settled flame is pixel-identical in size, shape, colour and brightness to
   the flame the crate draws today; the noise, the ramp and the flicker are untouched.
-- **The base stays seated.** A shrinking flame must keep its foot at the site's origin, not sink into
-  it or float above it.
+- **The base stays seated.** A growing flame must keep its foot at the site's origin, not sink into it
+  or float above it.
