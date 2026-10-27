@@ -604,7 +604,7 @@ fn spawn_scene(
                     // The pool's lights flicker at the un-sized rate (`Flicker { diameter: None }` in
                     // `pool.rs`), so the torch's flame must too — the same value on both is what keeps the
                     // flame and its light one fire.
-                    FlameSite { height: flame_height, phase, kindle: 0.0, diameter: None },
+                    FlameSite { height: flame_height, phase, kindle: 0.0, diameter: None, ..default() },
                     Transform::from_translation(at),
                 ));
             });

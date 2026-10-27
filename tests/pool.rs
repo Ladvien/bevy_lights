@@ -58,7 +58,7 @@ fn slots(app: &mut App) -> Vec<(usize, Vec3, Visibility, f32)> {
 fn candidate(app: &mut App, at: Vec3, intensity: f32) -> Entity {
     app.world_mut()
         .spawn((
-            PoolCandidate { offset: Vec3::Y * 2.0, intensity, ..default() },
+            PoolCandidate { offset: Vec3::Y * 2.0, intensity, ..default(), ..default() },
             Transform::from_translation(at),
         ))
         .id()
@@ -556,7 +556,7 @@ fn a_child_candidate_moves_with_its_parent() {
     let torch = app
         .world_mut()
         .spawn((
-            PoolCandidate { offset: Vec3::Y, intensity: 100.0, ..default() },
+            PoolCandidate { offset: Vec3::Y, intensity: 100.0, ..default(), ..default() },
             Transform::from_xyz(0.0, 1.0, 0.0),
         ))
         .id();
@@ -728,11 +728,11 @@ fn a_handed_out_light_takes_the_props_own_fire_phase_and_size() {
     focus_at(&mut app, Vec3::ZERO);
     // One candidate near, one far, each with its own fire: different phases and one sized bed.
     app.world_mut().spawn((
-        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, phase: Some(2.5), diameter: Some(0.34) },
+        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, phase: Some(2.5), diameter: Some(0.34), ..default() },
         Transform::from_translation(Vec3::new(1.0, 0.0, 0.0)),
     ));
     app.world_mut().spawn((
-        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, phase: Some(4.1), diameter: None },
+        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, phase: Some(4.1), diameter: None, ..default() },
         Transform::from_translation(Vec3::new(9.0, 0.0, 0.0)),
     ));
     settle(&mut app);
