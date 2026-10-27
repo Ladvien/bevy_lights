@@ -25,8 +25,8 @@ Croteam's *Serious Sam* flares test one point: "We can use the occlusion query f
 A **screen-space soft occlusion at the flame's source point**, in the flame's own fragment shader, with no CPU state.
 
 1. The vertex stage projects the flame's source point: the flame's foot, lifted by a third of its drawn height (where the fuel burns, not the quad's base), and a second point offset sideways by a fraction of the height. These give the pixel to test and a tap radius in pixels that scales with how large the flame is on screen. Both are flat across the quad.
-2. The fragment reads the depth prepass at the centre pixel and at 8 taps on a ring of that radius (a 9-tap disc). A tap is *occluding* when the scene's depth is nearer than the source point's by more than a relative margin (`FADE_MARGIN`, 3 % of the view distance): a bracket, the wall the torch hangs on, or the torch's own head are at the source's depth or behind it and must not count.
-3. The flame's emission is multiplied by the fraction of taps *not* occluding, run through `smoothstep`. A wall edge sliding across the source takes the flame down in steps of 1/9 smoothed, over as many pixels as the ring is wide; it never pops. A flame behind a wall edge by more than the ring radius is at zero.
+2. The fragment reads the depth prepass at 16 taps on a Vogel disc of that radius (radius `sqrt((i + 0.5) / 16)`, turned by the golden angle each step), so every tap has its own x offset: a vertical wall edge, which is what a wall end is, flips them one at a time. (A first draft used the centre and two rings of eight, whose taps are 4-fold symmetric and flip in lumps of 2-4: measured per-frame steps of up to 0.26 on a pan, against 0.26 at best for the disc too, see Validation; the disc's win is the plateaus break up, 0.15 and 0.10 steps instead of 0.4.) A tap is *occluding* when the scene's depth is nearer than the source point's by more than a relative margin (`FADE_MARGIN`, 3 % of the view distance): a bracket, the wall the torch hangs on, or the torch's own head are at the source's depth or behind it and must not count.
+3. The flame's emission is multiplied by the fraction of taps *not* occluding, run through `smoothstep`. A wall edge sliding across the source takes the flame down in steps of 1/16 smoothed, over as many pixels as the ring is wide; it never pops. A flame behind a wall edge by more than the ring radius is at zero.
 4. The reach is opt-in twice. A site asks with `FlameSite::depth_fade`; and the host's camera must carry `DepthPrepass`, because without it the `DEPTH_PREPASS` shader def is absent, the depth read does not exist in the compiled shader and the flame is exactly today's. A site that does not ask draws with the shared material whose `params.z` is 0: the same instances and the same draw call as today, one uniform branch in the fragment.
 
 No CPU raycast: 393 flames in a night frame would be 393 rays against the scene's meshes every frame, and the depth the pass has is the scene the player is looking at, including geometry the host never tagged as an occluder.
@@ -36,7 +36,7 @@ No CPU raycast: 393 flames in a night frame would be 393 rays against the scene'
 | parameter | value | source |
 |---|---|---|
 | source point height | 0.35 of the drawn flame height | design default: the fuel burns in the lower third |
-| tap ring | 8 taps at radius `FADE_RADIUS` of the flame's height, plus the centre | design default |
+| taps | 16 on a Vogel disc of radius `FADE_RADIUS` = 0.10 of the flame's height (a first value of 0.15 left a flame beside a wall end at 45 % for a metre of camera travel) | design default |
 | radius clamp | 2 to 24 px | design default: under 2 px the taps coincide; over 24 px the ring samples unrelated geometry |
 | `FADE_MARGIN` | 3 % of view distance (reverse-Z: `scene > source * 1.03`) | design default |
 | fade shape | `smoothstep(0, 1, visible fraction)` | design default |
@@ -53,6 +53,7 @@ No CPU raycast: 393 flames in a night frame would be 393 rays against the scene'
 
 - **Soft in space, not eased in time.** The issue asks for a fade "over `FlameLook`'s own short envelope". A shader has no memory, and a temporal envelope needs the CPU to know the occlusion, which is the raycast this note rejects. The spatial softness gives the stability the issue wants (no flicker between occluded and not when the camera is still) and a smooth transition when the camera or the occluder moves. A fully occluded flame that clears does return at full strength within the ring's width of motion, not a fixed time.
 - **`FlameSite::visible_from(camera)` is not built.** It needs a CPU-side visibility answer; the depth lives on the GPU. Left to a host with a ray.
+- **The fade is not a time envelope, and is steppy in sixteenths.** Measured above: no pop, but a 0.26 single-frame step at the worst. More taps would smooth it at a cost per flame fragment; not done.
 - **A multisampled view reads sample 0** of the prepass depth. At the margin used this decides the same answer as any other sample except on a silhouette edge, where the fade is smoothed anyway.
 - **`FADE_MARGIN` and the source height are design defaults**, not measured against a source.
 

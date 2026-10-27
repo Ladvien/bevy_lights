@@ -88,6 +88,18 @@ impl FlyCamera {
     }
 }
 
+impl FlyCamera {
+    /// Aim at `look_at` from `eye`, setting the yaw and pitch the fly system writes back to the rotation every frame: a system
+    /// that moves the camera on its own must aim it here, or the fly system restores the old aim.
+    pub fn aim(&mut self, transform: &mut Transform, eye: Vec3, look_at: Vec3) {
+        let dir = (look_at - eye).normalize_or(Vec3::NEG_Z);
+        self.yaw = (-dir.x).atan2(-dir.z);
+        self.pitch = dir.y.clamp(-1.0, 1.0).asin();
+        *transform =
+            Transform::from_translation(eye).with_rotation(Quat::from_euler(EulerRot::YXZ, self.yaw, self.pitch, 0.0));
+    }
+}
+
 /// The harness camera: a `Camera3d` at `eye` looking at `look_at`, flown with WASD when the window
 /// has focus.
 pub fn camera(eye: Vec3, look_at: Vec3, speed: f32) -> impl Bundle {
