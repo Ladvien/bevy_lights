@@ -285,6 +285,25 @@ call.
 6. Re-run the gate on the merged tree; a failure stops the pass before the push. Then
    `git push origin main`.
 
+### README, demos and docs stay true
+
+A README is read before anything else, so a false line there costs more than a false line anywhere else.
+An audit on 2026-10-27 found one in each of the four loop repos: a `tour.gif` captioned "at noon" over a HUD
+reading 10.00 h with a running clock; a `ties.gif` captioned for rivalry colours that appear in none of its 240
+frames; a hero caption promising a flame catch that its file never shows; and a demo video captioned as the full
+recording of the GIF above it when it shows different objects. Before you push a change a user can see:
+
+1. **Put it in the section it belongs to.** Do not append to the introduction or to the end, and do not
+   restructure the README in a feature pass. It reads in this order — what it is in one line, the demo, what
+   you get, install, quick start, then the detail sections — and an item added in the wrong place undoes it.
+2. **A caption describes the file as it exists.** Open the GIF or still (frame count, size, any HUD burned into
+   it) and write only what you can read off it; a figure quoted from program output comes from running that
+   program now, not from the log. Recipe: `tools/gif.sh` and `docs/DEMOS.md`.
+3. **Media you cannot regenerate here is logged, not left lying.** With no GPU or display on this machine, name
+   the stale file and its path in the report and change its caption to what it still shows.
+4. **The quick-start block is compiled.** `tests/readme.rs` builds it in a scratch crate; edit it only together
+   with the code it shows, then run `cargo test --release --test readme`.
+
 ## Rules
 
 - One improvement per iteration, fully finished: researched, implemented, GREAT-signed-off,
