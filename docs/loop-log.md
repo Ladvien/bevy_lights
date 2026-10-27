@@ -2460,3 +2460,46 @@ No improvement attempted. Section 1.5 of the skill: tracked changes this pass di
 `git status --short` at pass start lists the same per-light flicker `depth` work as iterations 21–55 (13 files across `src/`, `examples/`, `tests/`, `README.md`, plus the `SKILL.md` edit). Nothing was built, touched or reverted.
 
 Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
+
+## Iteration 57 — 2026-10-27 — flicker depth: recorded, bounded, tested, and the gate repaired
+
+Scope: a docs-and-gate iteration. No rendering changed, so there is no before/after capture and no GIF re-encode; the default `FLICKER_DEPTH = 0.15` is unchanged and the multiplier at the default is algebraically identical to before (`1 − 0.15(1 − w) = 0.85 + 0.15w`). Benchmark not run: nothing on the bench's path changed except a `HashMap` type annotation.
+
+### State at pass start
+
+Tree clean on `main`. The foreign work that stopped iterations 21–56 was committed as `33fd290` (per-light flicker `depth`) by an earlier recovery pass. That commit shipped an API change and a default's meaning with **no research note, no CHANGELOG entry, and no test of the new field**, against `AGENTS.md`. It also left `cargo clippy -D warnings` (type_complexity at `src/pool.rs`) and `cargo doc -D warnings` (unresolved `MAX_FLICKER_DEPTH` link in `src/flicker.rs`) failing; its message reports only `cargo test`.
+
+### What ranked first, and the runner-up
+
+1. **Close the gap `33fd290` left** (category 3, API friction, and a standing gate failure): research note, CHANGELOG, README, two behaviour tests, and the two gate failures. Also settles backlog item 5 (the flicker amplitude, "uncited for 20 iterations") as far as the available sources allow.
+2. Runner-up: a bowl that shades its own rim (iteration 20's item 1). A geometry change with its own note and a full capture campaign; it should not start on a tree whose gate is red.
+
+### Sources
+
+Craft: `10.7456_tojdac.1674124` (Doğaner). Production: `s2011-advances-pdf-slides`. Technical: Mandin & Most, *Characterization of the Puffing Phenomenon on a Pool Fire*, IAFSS FSS 6 p. 1137 (PDF fetched; quote verified against its text layer); `10.1038_s41598-020-78229-x` (Gergely 2020; downloaded, not converted: scribe timed out). Note: `docs/research/flicker-depth.md` (`e03f9bb`).
+
+### Finding, with its limits
+
+Mandin & Most report a flame **temperature** fluctuation amplitude "can experimentally reach 25 % of the time averaged temperature". Converting through radiance ∝ T⁴ puts the shipped ±0.15 about a 0.85 mean at ΔT/T ≈ ±4.4 %, about a sixth of that ceiling. This is an order-of-magnitude bound (grey-body assumption, temperature not luminance), and the note says so. **`0.15` is still a design default.** A web-search summary claimed this paper measured *luminosity*; the PDF says temperature, so the note uses the PDF.
+
+### Changes
+
+- `tests/flicker.rs::a_deeper_fire_dips_further_but_never_exceeds_its_base`; `tests/pool.rs::a_handed_out_light_takes_the_props_own_flicker_depth_or_the_default`. Neither could fail before the fix (the API existed); they pin the peak-is-base and slot-adoption invariants that had no test.
+- `src/pool.rs`: `winners` map type inferred (clippy). `src/flicker.rs`: doc link path-qualified (rustdoc).
+- CHANGELOG entry marked **Breaking** (the `flicker_swing` signature and three struct fields); README `Flicker` bullet and the research table; `docs/research/README.md`.
+
+### Gate (final tree)
+
+`cargo build --release`, `cargo build`, `cargo test` (39 lib + 9/3/29 behaviour + 1 readme + 19 doctests), `cargo test --features serde`, `cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc`, `cargo fmt --check`, wasm lib build, `tools/wesl-check` — all pass. (The first gate run, before the two fixes, failed clippy and doc; the serde run's `cargo test --features serde` passed.)
+
+### Environment
+
+home-still: `distill_search` returned only 0.5-score noise for flame-luminosity queries; `scribe_convert` and `markdown_read` timed out at 30 s. `paper_search`/`paper_download` worked (Semantic Scholar and Europe PMC circuit breakers open). GPU free ~19.9 GB, `/tmp` 32 %. No capture needed.
+
+### Top 5 remaining, ranked
+
+1. **A bowl that shades its own rim** (iteration 20's item 1).
+2. **The flame from above, round 6** (`flame-overhead.md`).
+3. **A capture path that can show the catch** (the catch runs on `Time<Real>`).
+4. A luminance-measured flicker amplitude: convert Gergely 2020 and Mandin & Most into the corpus once scribe is healthy, and look for a pool-fire radiance-fluctuation paper (Maynard 2013 is unobtainable).
+5. Per-flame fuel-bed `D` in the fragment stage; `Rank::Weighted` against the flagstones' 256 draws; `bench_lights` has no `depth` cases.

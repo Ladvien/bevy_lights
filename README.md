@@ -20,7 +20,9 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
 ## What you get
 
 - **`Flicker` + `Kindle`** (`FlickerPlugin`). Every `PointLight` and `SpotLight` carrying `Flicker` is
-  modulated around its base intensity by a summed sine (0.70–1.00 of base, mean 0.85), and a light
+  modulated around its base intensity by a summed sine (0.70–1.00 of base, mean 0.85 at the default
+  `depth` of 0.15; `Flicker::depth` is how far that fire dips, so a lantern can ask for 0.03 and a torch for
+  0.3, and its peak stays the base at any depth), and a light
   with `Kindle` flares up over 0.6 s instead of switching on. Give a fire its fuel-bed size
   (`Flicker { diameter: Some(0.34) }`) and its flicker runs at the measured puffing rate,
   `1.5/√D` Hz — a brazier at 2.6 Hz, a pyre at 0.75 — so a large fire breathes more slowly than a
@@ -202,6 +204,7 @@ Every default is researched and cited, or marked a design default. The notes:
 | [`docs/research/light-pool.md`](docs/research/light-pool.md) | the pool's budget, reach, sort and phases | Olsson, Billeter & Assarsson 2012 (clustered shading); Ghost of Tsushima (SIGGRAPH 2021 *Advances*); *Stochastic tile-based lighting* (SIGGRAPH 2025 *Advances*); RTR4's many-light chapter |
 | [`docs/research/flame.md`](docs/research/flame.md) | the flame's shape, noise, ramp and packing | Nguyen, *GPU Gems* ch. 6 §6.1; RTR4 §6.3; Sanctuary decision 0228 |
 | [`docs/research/flame-flicker.md`](docs/research/flame-flicker.md) | why a drawn flame breathes with the light it motivates, and how the two share one function | Xia & Zhang 2018; SIGGRAPH 2011 *Advances*' fire talk; Doğaner on motivated sources |
+| [`docs/research/flicker-depth.md`](docs/research/flicker-depth.md) | how far a fire dips, who chooses, and a measured ceiling for the default | Mandin & Most (IAFSS 6) on flame fluctuation; Gergely et al. 2020; Doğaner |
 | [`docs/research/corpus.md`](docs/research/corpus.md) | what the home-still library holds for cinematography, photography, CG lighting, game-lighting craft, many-light rendering, fire physics and perception — and what it does not | the live corpus |
 
 ## Bevy compatibility
