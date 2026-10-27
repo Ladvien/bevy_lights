@@ -27,7 +27,9 @@
 //! # Knobs
 //!
 //! `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
-//! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`.
+//! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`. `LIGHTS_DEPTH_FADE=1`
+//! sets `FlameSite::depth_fade` on every flame and gives the camera a `DepthPrepass`; the occlusion
+//! case it is for has its own scene in `examples/occlusion.rs`.
 //! `LIGHTS_RANK=distance` (rank by distance alone, the old rule), `LIGHTS_REACH`, `LIGHTS_FOCUS_WALK` (the focus's orbit radius; past the pool's reach the torches
 //! stream across the boundary, which is what makes a candidate leave the pool) and `LIGHTS_POOL_LOG`
 //! (the pool's total every frame, the only way to see a hand-off) are also this example's own.
@@ -51,6 +53,7 @@ use std::f32::consts::TAU;
 
 use bevy::asset::RenderAssetUsages;
 use bevy::camera::Exposure;
+use bevy::core_pipeline::prepass::DepthPrepass;
 use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
@@ -297,9 +300,15 @@ struct Bearer {
     angle: f32,
 }
 
+/// `LIGHTS_DEPTH_FADE=1` turns on `FlameSite::depth_fade` for every flame and gives the camera the
+/// `DepthPrepass` it reads; off, the courtyard draws exactly as it always has.
+fn depth_fade_on() -> bool {
+    std::env::var("LIGHTS_DEPTH_FADE").is_ok_and(|v| v != "0")
+}
+
 fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: Res<NightFill>) {
     let CameraPlacement(eye, look) = *placement;
-    commands.spawn((
+    let mut camera = commands.spawn((
         camera(eye, look, 8.0),
         // A cool fill the moon does not have to provide: without it the courtyard's pillars are
         // black silhouettes and the fire has nothing to read against. Its colour is the sky's
@@ -307,6 +316,10 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
         AmbientLight { color: sky_colour(), brightness: 2.0, ..default() },
         Exposure { ev100: NIGHT_EV100 },
     ));
+    // The depth fade reads the depth prepass, so a camera that asks for it carries one.
+    if depth_fade_on() {
+        camera.insert(DepthPrepass);
+    }
     // The moon: the host's directional light (the crate never adds one), a sky-coloured fill at the
     // illuminance that makes the target key-to-fill against the braziers' pools.
     commands.spawn((
@@ -542,6 +555,7 @@ fn spawn_scene(
                         kindle: KINDLE_SECONDS,
                         diameter: brazier_bed(),
                         depth: FLICKER_DEPTH,
+                        depth_fade: depth_fade_on(),
                     },
                     // The flame's foot is on the coals, at the top of the box.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04, 0.0),
@@ -661,6 +675,7 @@ fn spawn_scene(
                         kindle: 0.0,
                         diameter: None,
                         depth: FLICKER_DEPTH,
+                        depth_fade: depth_fade_on(),
                     },
                     Transform::from_translation(at),
                 ));

@@ -52,23 +52,18 @@ const BEVY_MODULES: &[&str] = &[
     "bevy_pbr::render::mesh_functions",
     "bevy_pbr::render::mesh_view_bindings",
     "bevy_pbr::render::view_transformations",
+    "bevy_pbr::prepass::utils",
 ];
 
 /// The errors that are not the crate's shaders' fault, and so are reported rather than counted as
 /// failures: a Bevy module the stub list does not have. The stub list is a convenience for checking
 /// the crate's own code, not a complete model of Bevy.
-const BENIGN: &[&str] = &[
-    "is declared with `package` visibility",
-    "module not found",
-];
+const BENIGN: &[&str] = &["is declared with `package` visibility", "module not found"];
 
 /// The path to register a virtual module under: `Absolute` components, because that is the form the
 /// router strips a mount's prefix down to.
 fn virtual_path(name: &str) -> ModulePath {
-    ModulePath::new(
-        wgsl_parse::syntax::PathOrigin::Absolute,
-        name.split("::").map(str::to_string).collect(),
-    )
+    ModulePath::new(wgsl_parse::syntax::PathOrigin::Absolute, name.split("::").map(str::to_string).collect())
 }
 
 /// A stub's source: the declarations the crate's shaders reach for, with Bevy's own signatures.
@@ -78,9 +73,7 @@ fn virtual_path(name: &str) -> ModulePath {
 /// driver. `constants` carries the bind-group numbers Bevy substitutes from Rust.
 fn stub_source(name: &str) -> String {
     let source = match name {
-        "constants" => {
-            "const MATERIAL_BIND_GROUP: u32 = 1u;\nconst MESH_BIND_GROUP: u32 = 0u;\n"
-        }
+        "constants" => "const MATERIAL_BIND_GROUP: u32 = 1u;\nconst MESH_BIND_GROUP: u32 = 0u;\n",
         // The children, re-exported so `import bevy_pbr::render::{forward_io, mesh_functions};`
         // resolves each as a namespace.
         "bevy_pbr::render" => {
@@ -134,8 +127,15 @@ fn stub_source(name: &str) -> String {
              \x20   clip_from_world: mat4x4<f32>,\n\
              \x20   world_position: vec3<f32>,\n\
              \x20   exposure: f32,\n\
+             \x20   viewport: vec4<f32>,\n\
              };\n\
              @group(0) @binding(0) var<uniform> view: View;\n"
+        }
+        // The depth prepass read, which exists only when the view carries a `DepthPrepass` (the `DEPTH_PREPASS` def).
+        "bevy_pbr::prepass::utils" => {
+            "fn prepass_depth(frag_coord: vec4<f32>, sample_index: u32) -> f32 {\n\
+             \x20   return frag_coord.z + f32(sample_index);\n\
+             }\n"
         }
         "bevy_pbr::render::view_transformations" => {
             "fn position_world_to_clip(world: vec3<f32>) -> vec4<f32> {\n\
@@ -163,80 +163,83 @@ fn main() {
     let root = std::env::args().nth(1).unwrap_or_else(|| "src".to_string());
     let root = Path::new(&root);
 
-    let mut files = FileResolver::new(root);
-    files.set_extension("wesl");
-    files.set_root(root);
-
-    let mut router = Router::new();
-    router.mount_resolver(
-        "bevy_lights".parse().expect("the crate's name"),
-        Files(files),
-    );
-
-    for namespace in BEVY_NAMESPACES {
-        for spelling in [namespace.to_string(), format!("bevy_lights/{namespace}")] {
-            let mut stubs = VirtualResolver::new();
-            // Every WESL package has a root module (`package`), which is the empty path, not a
-            // component called `package`; a mount that cannot answer it fails every import.
-            stubs.add_module(ModulePath::new_root(), String::new().into());
-            if *namespace == "constants" {
-                // `constants::MATERIAL_BIND_GROUP` is the *root* of the `constants` package: the
-                // module path is the mount itself, empty, not a component called `constants`.
-                stubs.add_module(ModulePath::new_root(), stub_source("constants").into());
-            } else if *namespace == "bevy_pbr" {
-                // `bevy_pbr::render` exists for its children: Bevy's shaders import through it.
-                stubs.add_module(virtual_path("render"), stub_source("bevy_pbr::render").into());
-            }
-            for name in BEVY_MODULES {
-                if let Some(rest) = name.strip_prefix(&format!("{namespace}::")) {
-                    stubs.add_module(virtual_path(rest), stub_source(name).into());
-                }
-            }
-            router.mount_resolver(spelling.parse().expect("a namespace"), stubs);
-        }
-    }
-
-    // `keep_main`: a library module has no entry point, and stripping keeps only what an entry point
-    // reaches, so without it a library compiled to an *empty* string and "the WGSL is ok" checked
-    // nothing past the parser (a `let x: f32 = vec3<f32>(1.0);` in a library module passed). Keeping
-    // the module's own declarations pulls in what they import, and `visibility: false` is how Bevy
-    // compiles the crate's shaders, so a `package` item imported across the crate's modules is not
-    // refused here when Bevy accepts it.
-    let options = wesl::CompileOptions {
-        keep_main: true,
-        visibility: false,
-        ..Default::default()
-    };
-    let compiler = wesl::Compiler::new_with_resolver(options, router);
-
+    // Every shader def a Bevy view can set and the crate's shaders branch on is compiled both ways: a branch that is
+    // stripped is a branch nobody checked, and `DEPTH_PREPASS` is on only for a camera with a `DepthPrepass`.
     let mut failed = 0;
-    for module in MODULES {
-        let path: ModulePath = match module.parse() {
-            Ok(path) => path,
-            Err(e) => {
-                println!("{module}: the module path is wrong: {e}");
-                failed += 1;
-                continue;
-            }
-        };
-        match compiler.compile_module(&path) {
-            Ok(result) => {
-                let wgsl = result.to_string();
-                match naga::front::wgsl::parse_str(&wgsl) {
-                    Ok(_) => println!("{module}: the WGSL is ok"),
-                    Err(e) => {
-                        println!("{module}: the WGSL has an error:\n{}", e.emit_to_string(&wgsl));
-                        failed += 1;
+    for depth_prepass in [false, true] {
+        let mut files = FileResolver::new(root);
+        files.set_extension("wesl");
+        files.set_root(root);
+
+        let mut router = Router::new();
+        router.mount_resolver("bevy_lights".parse().expect("the crate's name"), Files(files));
+
+        for namespace in BEVY_NAMESPACES {
+            for spelling in [namespace.to_string(), format!("bevy_lights/{namespace}")] {
+                let mut stubs = VirtualResolver::new();
+                // Every WESL package has a root module (`package`), which is the empty path, not a
+                // component called `package`; a mount that cannot answer it fails every import.
+                stubs.add_module(ModulePath::new_root(), String::new().into());
+                if *namespace == "constants" {
+                    // `constants::MATERIAL_BIND_GROUP` is the *root* of the `constants` package: the
+                    // module path is the mount itself, empty, not a component called `constants`.
+                    stubs.add_module(ModulePath::new_root(), stub_source("constants").into());
+                } else if *namespace == "bevy_pbr" {
+                    // `bevy_pbr::render` exists for its children: Bevy's shaders import through it.
+                    stubs.add_module(virtual_path("render"), stub_source("bevy_pbr::render").into());
+                }
+                for name in BEVY_MODULES {
+                    if let Some(rest) = name.strip_prefix(&format!("{namespace}::")) {
+                        stubs.add_module(virtual_path(rest), stub_source(name).into());
                     }
                 }
+                router.mount_resolver(spelling.parse().expect("a namespace"), stubs);
             }
-            Err(e) => {
-                let text = e.to_string();
-                if let Some(benign) = BENIGN.iter().find(|b| text.contains(**b)) {
-                    println!("{module}: not checked ({benign}): {text}");
-                } else {
-                    println!("{module}: ERROR {e}");
+        }
+
+        // `keep_main`: a library module has no entry point, and stripping keeps only what an entry point
+        // reaches, so without it a library compiled to an *empty* string and "the WGSL is ok" checked
+        // nothing past the parser (a `let x: f32 = vec3<f32>(1.0);` in a library module passed). Keeping
+        // the module's own declarations pulls in what they import, and `visibility: false` is how Bevy
+        // compiles the crate's shaders, so a `package` item imported across the crate's modules is not
+        // refused here when Bevy accepts it.
+        let mut features = wesl::Features::new();
+        features.set("DEPTH_PREPASS", depth_prepass);
+        let options =
+            wesl::CompileOptions { keep_main: true, visibility: false, features, ..Default::default() };
+        let compiler = wesl::Compiler::new_with_resolver(options, router);
+
+        for module in MODULES {
+            let path: ModulePath = match module.parse() {
+                Ok(path) => path,
+                Err(e) => {
+                    println!("{module} (DEPTH_PREPASS={depth_prepass}): the module path is wrong: {e}");
                     failed += 1;
+                    continue;
+                }
+            };
+            match compiler.compile_module(&path) {
+                Ok(result) => {
+                    let wgsl = result.to_string();
+                    match naga::front::wgsl::parse_str(&wgsl) {
+                        Ok(_) => println!("{module} (DEPTH_PREPASS={depth_prepass}): the WGSL is ok"),
+                        Err(e) => {
+                            println!(
+                                "{module} (DEPTH_PREPASS={depth_prepass}): the WGSL has an error:\n{}",
+                                e.emit_to_string(&wgsl)
+                            );
+                            failed += 1;
+                        }
+                    }
+                }
+                Err(e) => {
+                    let text = e.to_string();
+                    if let Some(benign) = BENIGN.iter().find(|b| text.contains(**b)) {
+                        println!("{module} (DEPTH_PREPASS={depth_prepass}): not checked ({benign}): {text}");
+                    } else {
+                        println!("{module} (DEPTH_PREPASS={depth_prepass}): ERROR {e}");
+                        failed += 1;
+                    }
                 }
             }
         }
