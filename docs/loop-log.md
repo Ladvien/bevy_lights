@@ -2990,3 +2990,27 @@ No shader, system or default changed, so no capture or benchmark was run (`flick
 3. A bowl that shades its own rim (iteration 20's item 1).
 4. The flame from above, round 6 (`flame-overhead.md`).
 5. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+
+## Iteration 112 — 2026-10-27 — a site is already host-placed (issue #3)
+
+Outcome: docs and one regression test, no rendering or API change. Scope: `FlameSite` rustdoc, `src/flame.rs` test `a_site_on_a_prop_keeps_its_flame_at_the_site_and_leaves_with_the_prop`, CHANGELOG.
+
+### Ranking
+
+Open issues: #4 (partly done, left open), #3 host-declared flame origin, #2 flame occlusion/ownership (enhancements), #1 publish (release, seen, skipped). No bug issues. #3 first: the oldest enhancement. Finding: the crate never spawns sites or ties one to a light — `FlameSite` is a host-spawned entity whose own `Transform` and parent are the origin, so Sanctuary's "flame at the light" is its own `site_fire_lights` choice. A `FlameAnchor` would duplicate the hierarchy. The issue's acceptance 1 (flame at site, not light), 3 (anchor despawn takes the flame, no origin ghost) and 4 (host opt-out) hold today; the new test pins 1 and 3. Phase and kindle are copied by the host (`phase`, `diameter`, `depth`, `kindle`) and the docs now say so. Runner-up: #2, needs a design.
+
+### Not done
+
+No capture, benchmark or GIF: nothing rendered or run per-frame changed. Craft/production/technical research was not needed (no default or model changed). #3 left for the owner to close after confirming Sanctuary can parent its site to the bracket.
+
+### Verification
+
+Full gate passed (build release/debug, test, test --features serde, examples, clippy, doc, fmt, wasm lib, wesl-check).
+
+### Top 5 remaining, ranked
+
+1. #2 flame occlusion / `Flame::source` (the second ask is a one-field addition).
+2. A bowl that shades its own rim (iteration 20's item 1).
+3. The flame from above, round 6 (`flame-overhead.md`).
+4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+5. #4 ask 3 (site takes its light's depth) needs a site-to-light link.
