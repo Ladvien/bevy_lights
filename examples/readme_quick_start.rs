@@ -34,6 +34,7 @@ fn setup(mut commands: Commands) {
             kindle: KINDLE_SECONDS,
             diameter: Some(0.34),
             depth: FLICKER_DEPTH,
+            depth_fade: false,
         },
     ));
 
@@ -54,7 +55,14 @@ fn setup(mut commands: Commands) {
             ..default()
         },
         // The pool's lights flicker at the un-sized rate, so this flame does too.
-        FlameSite { height: torch_height, phase: 1.9, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
+        FlameSite {
+            height: torch_height,
+            phase: 1.9,
+            kindle: 0.0,
+            diameter: None,
+            depth: FLICKER_DEPTH,
+            depth_fade: false,
+        },
         Transform::from_xyz(4.0, 0.0, 2.0),
     ));
 
