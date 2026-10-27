@@ -3054,3 +3054,11 @@ Acceptance 1–4 pinned: 300 s at 50 Hz time-average of `base · flicker_swing` 
 3. The flame from above, round 6 (`flame-overhead.md`).
 4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 5. #4 ask 3 (site takes its light's depth) needs a site-to-light link.
+
+## Iteration 116 — 2026-10-27 — stopped: stranded iteration-115 tree on `loop/iter-115`
+
+No improvement attempted. Section 1, step 5 of the skill: a tracked change this pass did not make means stop and log it. The checkout is on `loop/iter-115` (not `main`) at `ee759b3` (Research: flame occlusion, unmerged) with nine tracked files modified and `examples/occlusion.rs` untracked: `src/flame.rs`, `src/flame.wesl`, `tools/wesl-check/src/main.rs`, `examples/common/mod.rs`, `examples/courtyard.rs`, `examples/readme_quick_start.rs`, `README.md`, `CHANGELOG.md`, `docs/research/flame-occlusion.md` (+412/−110). Last write 17:22 on 2026-10-27; this pass found no running omp process for this repo. It reads as the issue-#2 (flame occlusion) implementation, unfinished and ungated: no log entry, no GREAT verdict, no benchmark. Not committed, not reverted. The driver's snapshots (`refs/wiggum/`, `git log --all --grep='WIP(pass'`) hold earlier trees of it.
+
+Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues.
+
+Needs the owner: either let a pass resume `loop/iter-115` (capture, critique, bench, gate, ship) or discard the tree.
