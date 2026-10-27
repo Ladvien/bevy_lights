@@ -84,7 +84,8 @@ pub use flame::{Flame, FlameLook, FlameMaterial, FlamePlugin, FlameSite};
 pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled};
 pub use model::{
     FADE_SECONDS, HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY, MOON_KEY, RANGE_MARGIN, blackbody_colour,
-    fade_factor, fill_for, fire_lumens, flame_light_offset, flicker_factor, flicker_swing, hand_off,
+    char_field, char_share, fade_factor, fill_for, fire_lumens, flame_light_offset, flicker_factor, flicker_swing,
+    hand_off,
     key_to_fill, kindle_gain, pack_flame_tag, preferred, raised_light, stops, unpack_flame_tag,
     white_balanced,
 };
