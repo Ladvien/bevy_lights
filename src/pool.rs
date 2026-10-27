@@ -17,6 +17,7 @@ use bevy::light::PointLight;
 use bevy::prelude::*;
 
 use crate::flicker::{Flicker, FlickerPlugin};
+use crate::model::FLICKER_DEPTH;
 use crate::model::pool::{fade_factor, fade_out_factor, preferred};
 use crate::{FADE_SECONDS, HYSTERESIS, LightsSystems, chain_sets};
 
@@ -198,6 +199,11 @@ pub struct PoolCandidate {
     /// The fire's fuel-bed diameter, in the host's world units, when the host knows it: the same value
     /// the flame on this prop is given, so the handed-out light breathes at the flame's own rate.
     pub diameter: Option<f32>,
+    /// How far the fire dips below its peak, when the host chose a depth: the same value as the
+    /// [`Flicker::depth`] and [`FlameSite::depth`](crate::FlameSite::depth) of the fire on this prop.
+    /// `None` (the default) is [`FLICKER_DEPTH`](crate::FLICKER_DEPTH). A slot adopts it with the
+    /// candidate and takes the default again when the next candidate has none.
+    pub depth: Option<f32>,
 }
 
 /// One of the crate's spawned real lights. Marks an entity the pool owns and drives.
@@ -355,7 +361,7 @@ fn assign_pool<F: Component>(
                 Name::new(format!("Pool light {slot}")),
                 PoolLight { slot },
                 PointLight { intensity: 0.0, ..pool.light },
-                Flicker { base: 0.0, phase: 1.3 * slot as f32, diameter: None },
+                Flicker { base: 0.0, phase: 1.3 * slot as f32, ..default() },
                 Transform::default(),
                 Visibility::Hidden,
             ));
@@ -591,16 +597,18 @@ fn assign_pool<F: Component>(
         }
     }
 
-    // Each winner's own fire clock, resolved once for the `pool.size` candidates that won rather than
-    // carried through the rank list's sort. A candidate that gives neither number is absent from the map,
-    // so a slot it wins keeps the slot's own `1.3 · slot` phase and the un-sized rate.
-    let winners: std::collections::HashMap<Entity, (Option<f32>, Option<f32>)> = chosen_by_slot
+    // Each winner's own fire clock and depth, resolved once for the `pool.size` candidates that won
+    // rather than carried through the rank list's sort. A candidate that gives none of these is absent
+    // from the map, so a slot it wins keeps the slot's own `1.3 · slot` phase, the un-sized rate and
+    // the crate's `FLICKER_DEPTH`.
+    let winners: std::collections::HashMap<Entity, (Option<f32>, Option<f32>, Option<f32>)> =
+        chosen_by_slot
         .values()
         .filter_map(|entity| {
             candidates
                 .get(*entity)
                 .ok()
-                .map(|(.., candidate)| (*entity, (candidate.phase, candidate.diameter)))
+                .map(|(.., candidate)| (*entity, (candidate.phase, candidate.diameter, candidate.depth)))
         })
         .collect();
 
@@ -653,11 +661,12 @@ fn assign_pool<F: Component>(
                 transform.translation = at;
                 // The slot keeps its own phase until a candidate says otherwise: the light handed to a
                 // prop must breathe on that prop's clock, or it beats against the flame drawn on it.
-                if let Some((phase, diameter)) = winners.get(&entity).copied() {
+                if let Some((phase, diameter, depth)) = winners.get(&entity).copied() {
                     if let Some(phase) = phase {
                         flicker.phase = phase;
                     }
                     flicker.diameter = diameter;
+                    flicker.depth = depth.unwrap_or(FLICKER_DEPTH);
                 }
                 flicker.base = intensity * pool.gain * fade;
                 visibility.set_if_neq(Visibility::Inherited);
