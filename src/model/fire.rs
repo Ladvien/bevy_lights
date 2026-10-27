@@ -67,30 +67,83 @@ pub fn flicker_rate(diameter: f32) -> f32 {
 /// }
 /// ```
 pub fn flicker_factor_of(diameter: f32, t: f32, phase: f32) -> f32 {
-    let omega = TAU * flicker_rate(diameter);
-    let wobble = (omega * t + phase).sin() * 0.5 + (1.7 * omega * t + 1.7 * phase).sin() * 0.5;
-    0.85 + 0.15 * wobble
+    flicker_swing(Some(diameter), FLICKER_DEPTH, t, phase)
 }
 
-/// The flicker multiplier of a fire, sized by its fuel bed when the host knows it: the one place the
-/// "sized or un-sized" choice is made.
+/// The depth of the flicker a fire has when the host does not choose one: the light dips up to
+/// `0.15` below its peak, so the multiplier runs `0.70..=1.00` with mean `0.85`.
 ///
-/// `Some(diameter)` is [`flicker_factor_of`] and `None` is [`flicker_factor`]. A fire's **light** and
-/// the **flame drawn on it** are one fire, so both are written from this function: the light's
-/// intensity by `flicker_lights` and the flame's emission by `update_flames`. Going through one
-/// function is what makes it impossible for a flame to hold still while the ground under it flickers,
-/// which is the defect this exists to prevent.
+/// A design default inherited from Sanctuary (decision 0127), recorded in `docs/research/fire-light.md`.
+pub const FLICKER_DEPTH: f32 = 0.15;
+
+/// The deepest flicker a host may ask for. The multiplier then runs `0.00..=1.00`: a fire that gutters
+/// all the way out and back. Any deeper would go below zero, so [`flicker_depth`] clamps here.
+pub const MAX_FLICKER_DEPTH: f32 = 0.5;
+
+/// A host's flicker depth made safe to use: clamped to `0..=`[`MAX_FLICKER_DEPTH`], with a `NaN`
+/// read as the default [`FLICKER_DEPTH`].
 ///
 /// ```
 /// # use bevy_lights::model::fire::*;
-/// assert_eq!(flicker_swing(None, 2.0, 0.4), flicker_factor(2.0, 0.4));
-/// assert_eq!(flicker_swing(Some(0.34), 2.0, 0.4), flicker_factor_of(0.34, 2.0, 0.4));
+/// assert_eq!(flicker_depth(0.3), 0.3);
+/// assert_eq!(flicker_depth(-1.0), 0.0);
+/// assert_eq!(flicker_depth(9.0), MAX_FLICKER_DEPTH);
+/// assert_eq!(flicker_depth(f32::NAN), FLICKER_DEPTH);
 /// ```
-pub fn flicker_swing(diameter: Option<f32>, t: f32, phase: f32) -> f32 {
-    match diameter {
-        Some(diameter) => flicker_factor_of(diameter, t, phase),
-        None => flicker_factor(t, phase),
+pub fn flicker_depth(depth: f32) -> f32 {
+    if depth.is_nan() {
+        return FLICKER_DEPTH;
     }
+    depth.clamp(0.0, MAX_FLICKER_DEPTH)
+}
+
+/// The shared shape of every flicker: two sines summed to `-1..=1`, the second at `omega_2` and 1.7
+/// times the clock phase.
+fn wobble(omega: f32, omega_2: f32, t: f32, phase: f32) -> f32 {
+    (omega * t + phase).sin() * 0.5 + (omega_2 * t + 1.7 * phase).sin() * 0.5
+}
+
+/// The multiplier a wobble of `-1..=1` gives at `depth`: the fire's peak is 1, and it dips by up to
+/// `2 · depth`. At [`FLICKER_DEPTH`] that is `0.85 + 0.15 · wobble`.
+fn dip(depth: f32, wobble: f32) -> f32 {
+    1.0 - flicker_depth(depth) * (1.0 - wobble)
+}
+
+/// The flicker multiplier of a fire, sized by its fuel bed when the host knows it, and as deep as the
+/// host asks: the one place the "sized or un-sized" choice is made.
+///
+/// `Some(diameter)` runs the flicker at the puffing rate ([`flicker_rate`]) and `None` at the crate's
+/// un-sized rate ([`flicker_factor`]'s 7.3 rad/s). `depth` is how far the light dips: the multiplier
+/// runs `1 - 2·depth ..= 1` with mean `1 - depth`, so the fire's **peak is always its base** and a
+/// deeper flicker is a darker trough rather than a brighter crest. [`FLICKER_DEPTH`] is the default;
+/// the value is read through [`flicker_depth`], so a stray number cannot drive the light negative.
+///
+/// A fire's **light** and the **flame drawn on it** are one fire, so both are written from this
+/// function: the light's intensity by `flicker_lights` and the flame's emission by `update_flames`.
+/// Going through one function is what makes it impossible for a flame to hold still while the ground
+/// under it flickers, which is the defect this exists to prevent.
+///
+/// ```
+/// # use bevy_lights::model::fire::*;
+/// assert_eq!(flicker_swing(None, FLICKER_DEPTH, 2.0, 0.4), flicker_factor(2.0, 0.4));
+/// assert_eq!(flicker_swing(Some(0.34), FLICKER_DEPTH, 2.0, 0.4), flicker_factor_of(0.34, 2.0, 0.4));
+/// // The peak is the base at any depth; a deeper fire only dips further.
+/// for depth in [0.0, 0.03, 0.15, 0.4] {
+///     for i in 0..500 {
+///         let f = flicker_swing(None, depth, i as f32 * 0.01, 0.4);
+///         assert!(f <= 1.0 + 1e-6 && f >= 1.0 - 2.0 * depth - 1e-6);
+///     }
+/// }
+/// ```
+pub fn flicker_swing(diameter: Option<f32>, depth: f32, t: f32, phase: f32) -> f32 {
+    let (omega, omega_2) = match diameter {
+        Some(diameter) => {
+            let omega = TAU * flicker_rate(diameter);
+            (omega, 1.7 * omega)
+        }
+        None => (7.3, 13.1),
+    };
+    dip(depth, wobble(omega, omega_2, t, phase))
 }
 
 /// How long a fire takes to take hold, in seconds: a light that has a [`Kindle`] flares up over this
@@ -110,8 +163,7 @@ pub const KINDLE_SECONDS: f32 = 0.6;
 /// The result is exactly `0.85 ± 0.15` in the range `[0.70, 1.00]`, which is what a light budget
 /// written against the mean (Sanctuary's `WALL_LIGHT_LUMENS` divides by 0.85) assumes.
 pub fn flicker_factor(t: f32, phase: f32) -> f32 {
-    let wobble = (7.3 * t + phase).sin() * 0.5 + (13.1 * t + 1.7 * phase).sin() * 0.5;
-    0.85 + 0.15 * wobble
+    flicker_swing(None, FLICKER_DEPTH, t, phase)
 }
 
 /// The share of its burn a fire has `t` seconds after it was lit: 0 at the start, then a flare that
