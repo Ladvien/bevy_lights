@@ -11,82 +11,58 @@ lights placed over thousands of virtual ones, and billboard shader flames.
 > researched and every default is cited or marked a design default; the code is tested, gated in CI
 > and reviewed against captures. It is still code an agent wrote, and you should treat it as such.
 
-![Fires that catch, flicker at their own rate, and a pool of real lights](docs/media/showcase.gif)
+![Four braziers, each with a real light of its own, and 48 torch-bearers sharing an 8-light pool](docs/media/showcase.gif)
 
-*Two seconds of `examples/courtyard`: the braziers catch (0.6 s, light and flame together), then the
-fires breathe at the rate the puffing law gives their fuel bed — 2.6 Hz for a 0.34 m coal bed — and the
-pool hands its real lights between torches without a pop. Longer run: [`courtyard.gif`](docs/media/courtyard.gif).*
+*Two seconds of `examples/courtyard`, 480 × 270 at 30 fps: four braziers — real lights, each with a
+`Kindle` and a 0.34 m coal bed, which the puffing law sizes to `1.5/√0.34 ≈ 2.57 Hz` — and 48
+torch-bearers, each a `PoolCandidate`, sharing the example's eight pooled real lights. The clip opens
+while the courtyard is still lighting up and the fires breathe from there; the coals are the
+`char_field` texture the example builds at startup. What it cannot show is a **flame** catching: a
+flame's catch runs on `Time<Real>`, and on a headless capture the material's first pipeline compile
+outlasts `KINDLE_SECONDS`. [`docs/DEMOS.md`](docs/DEMOS.md) has that trap, the recipe that would catch
+one, and the frequencies measured in this file. The same courtyard at 640 × 360 is
+[`courtyard.gif`](docs/media/courtyard.gif).
 
 ## What you get
 
-- **`Flicker` + `Kindle`** (`FlickerPlugin`). Every `PointLight` and `SpotLight` carrying `Flicker` is
-  modulated around its base intensity by a summed sine (0.70–1.00 of base, mean 0.85 at the default
-  `depth` of 0.15; `Flicker::depth` is how far that fire dips, so a lantern can ask for 0.03 and a torch for
-  0.3, and its peak stays the base at any depth), and a light
-  with `Kindle` flares up over 0.6 s instead of switching on. Give a fire its fuel-bed size
-  (`Flicker { diameter: Some(0.34) }`) and its flicker runs at the measured puffing rate,
-  `1.5/√D` Hz — a brazier at 2.6 Hz, a pyre at 0.75 — so a large fire breathes more slowly than a
-  small one. `Kindled { entity }` is the message a
-  host hears on the frame a fire catches, for the sound of it. An invisible light is not rewritten
-  (nothing is extracted for it) but its kindle still counts.
-- **The light pool** (`LightPoolPlugin::<YourFocusMarker>`). A fixed number of real point lights
-  (`LightPool::size`, default 16) is handed every frame to the best-ranked `PoolCandidate`s around the one
-  entity carrying your focus marker, each light at the candidate's position plus its own world-space offset.
-  Everything else is a flame and nothing else. The assignment is deterministic: rank, then `Entity`.
-  A candidate is ranked by the **light it puts on the subject** (`intensity / distance²`), not by its
-  distance alone, so a bright brazier at 3 m outranks a dim torch at 2 m; `LightPool::rank` switches to
-  `Rank::Distance` for the old rule. A slot keeps the candidate it holds until a challenger is
-  `hysteresis` times better (default 1.15, the overlap rule, measured in the same quantity the rank uses),
-  and only a candidate **no other slot holds** is ever a challenger, so a newcomer displaces the pool's
-  *worst* light rather than reshuffling all of them. A slot that does change owner fades back up over
-  `fade_seconds` (0.35 s) rather than popping, and `reserve` (default 1) both keeps a spare light so the
-  owner a hand-off leaves behind fades *out* at the same time — the subject's light is continuous through
-  the change rather than dipping, which is the craft's "overlapping key lights" — and caps how many lights
-  change owner in one frame, so a hand-off is never made without a cross-fade to hide it.
-- **Shader flames** (`FlamePlugin`). An additive billboard fire (`src/flame.wesl`) is drawn on every
-  `FlameSite`, out of one material and one draw per flame, with each fire's phase, height and
-  brightness packed into its `MeshTag` so two fires never burn in step. One shared shape clock, written
-  once a frame, on `Time<Real>` — a paused world's shape still moves. A site with a `kindle` grows its
-  flame from nothing on the same curve its light kindles by, so the two arrive together; and
-  `FlameSite::diameter` given the same value as the light's `Flicker::diameter` makes the flame **breathe
-  at the light's own rate and phase**, so the fire and the ground it lights are one fire rather than a
-  still flame over a moving pool; `PoolCandidate::phase` does the same for a light the pool hands over.
-- **The lighting look** (`bevy_lights::model::cinematography`). The numbers a cinematographer sets,
-  as plain functions: `key_to_fill` and `stops` (with `LOW_KEY` 8:1, `MOON_KEY` 4:1 and `HIGH_KEY`
-  2:1), `fill_for`, `fire_lumens` (the lumens a pool of a given size and brightness needs),
-  `blackbody_colour` (a light's colour from its temperature), `blackbody_luminance` (that
-  temperature's **magnitude** in cd/m², which a glowing *surface* needs and a light's colour does not
-  carry) and `white_balanced` (the same as a camera balanced elsewhere records it). Size a fire by the
-  pool it lights and colour it by the temperature it burns at, instead of picking lumens and an RGB by
-  eye.
-- **The fuel bed a fire sits in** (`bevy_lights::model::char`). A bed of coals is a *surface with a
-  temperature field on it*, and a constant `emissive` is the one thing a real bed never is: it clips to
-  a white slab the moment the camera looks down at it, and hides the flame standing in it. `char_field`
-  is the field — a heap of overlapping coal shards, bright lumps with dark ash between them, seeded so
-  a capture is reproducible — and `char_radiance` / `coal_radiance` map a sample to a colour through
-  char, ember and fuel. `coal_radiance` writes those three stops as **temperatures**, so a bed's
-  brightness and its hue come from one model and cannot drift apart at a different exposure. The
-  example generates a `Rgba32Float` image from the field at startup and uses it as the bed's
-  `emissive_texture`; the note's numbers were chosen by measuring the stops in display DN, because a
-  ramp whose middle stop is past the display's white point cannot show the structure underneath it.
-- **Engine-free maths** (`bevy_lights::model`). Every curve the crate runs, as plain `f32` functions with
-  no `bevy` in them, so a host can reuse them in its own systems: `flicker_factor` and
-  `flicker_factor_of` with `flicker_rate`, `flicker_swing` (the sized-or-un-sized choice the light and
-  the flame both read), `kindle_gain`, `raised_light` and `flame_light_offset` (where a fire's light
-  belongs, so a flame and the real light it motivates cannot drift apart), `pack_flame_tag` and its
-  inverse; the pool's
-  `hand_off` and `preferred` (the overlap rule, on distances and on any "smaller is
-  better" quantity) with its `fade_factor` / `fade_out_factor`; the whole of `model::cinematography`
-  above, and the whole of `model::char`. `tests/leaf.rs` keeps them engine-free.
+- **Flickering, kindling fires** (`FlickerPlugin`): a point or spot light modulated below its base by a
+  summed sine, at a rate its fuel bed sets and a depth the host chooses, plus a `Kindle` that flares a
+  fire up over 0.6 s and a `Kindled` message for the sound of it.
+- **A budgeted pool of real lights** (`LightPoolPlugin::<YourFocusMarker>`): a fixed number of real
+  point lights handed to the best-ranked candidates around the one entity carrying your focus marker,
+  with hysteresis, a cross-fade and a per-frame hand-off budget, so a light that changes owner does not
+  pop.
+- **Flames drawn where the fire is** (`FlamePlugin`): one additive billboard material and one draw per
+  flame, each breathing on the same curve as the light it motivates — and at that light's own rate,
+  phase and depth when the site is given them.
+- **The maths as plain functions** (`bevy_lights::model`): the flicker law and its depth, the kindle,
+  the pool's hold-and-fade rules, the cinematographer's key against fill, the blackbody, and the
+  temperature field of a fuel bed — no `bevy` in any of them, so a host can reuse them in its own
+  systems.
 
-### What a host touches
+## Install
 
-Everything public is `Reflect`, so a BRP front end can read and drive it. The components a game spawns or
-marks: `Flicker`, `Kindle`, `PoolCandidate`, `FlameSite`; the ones the crate spawns and a host reads or
-styles: `PoolLight` (recolour it for a palette; name its lights what you like), `Flame`; and the resources
-it sets: `LightPool` (size, reach, gain, rank, hysteresis, fade, reserve, the slot light's template) and
-`FlameLook` (colour, strength, the set-once `max_height`). `Kindled { entity }` is the message a host hears
-when a fire catches.
+`0.1.0` is on crates.io:
+
+```toml
+[dependencies]
+bevy_lights = "0.1"
+```
+
+That release was cut at `b6e734c` and predates the flicker depth, the pool's rank, hysteresis, fade and
+reserve, the lighting look and the fuel bed. Everything this README describes is on `main`, so depend on
+the branch if you want it, and read `CHANGELOG.md` for the list:
+
+```toml
+[dependencies]
+bevy_lights = { git = "https://github.com/Ladvien/bevy_lights", branch = "main" }
+```
+
+The crate is pinned to Bevy 0.20; its MSRV is Rust 1.97.1. `serde` is an optional feature: it derives
+`serde` on the components and resources a host saves — `Flicker`, `Kindle`, `PoolCandidate`, `PoolLight`,
+`FlameSite`, `FlameLook`, `Rank` — and turns on Bevy's own `serialize` for the colours they carry.
+`LightPool` is deliberately not one of them: `PointLight` has no serde derive, and a light's intensity is
+a runtime number the crate rewrites every frame.
 
 ## Quick start
 
@@ -172,16 +148,121 @@ A light you want to be able to *re-light* is re-inserted with `Kindle::default()
 
 `examples/courtyard.rs` is the full showcase, `examples/bench_lights.rs` the CPU bench.
 
+## Features
+
+### Fires: flicker, depth and kindle
+
+Every `PointLight` and `SpotLight` carrying `Flicker` is modulated **below** its base intensity by a
+summed sine: the multiplier runs `1 - 2·depth ..= 1`, so `Flicker::base` is the fire's brightest moment
+and a deeper flicker is a darker trough rather than a brighter crest. At the default `Flicker::depth`
+of `FLICKER_DEPTH` that is 0.70–1.00 of base with a mean of 0.85 — the window a lumen budget written
+against the mean assumes. `Flicker::depth` is how far that fire dips, so a lantern can ask for 0.03 and
+a gusting torch for 0.3; `flicker_depth` clamps the value to `0..=MAX_FLICKER_DEPTH` (0.5, the deepest
+whose trough is still zero) and reads a `NaN` as the default.
+
+Give a fire its fuel-bed size (`Flicker { diameter: Some(0.34) }`) and its flicker runs at the measured
+puffing rate, `1.5/√D` Hz — a brazier at 2.6 Hz, a pyre at 0.75 — so a large fire breathes more slowly
+than a small one. `diameter: None` is the crate's inherited un-sized rate, for a fire whose size is not
+modelled.
+
+A light with `Kindle` flares up over `KINDLE_SECONDS` (0.6 s) instead of switching on, on
+`kindle_gain`'s curve: a smoothstep with a flare running ahead of it, so it is 0.85 of the way at half
+time, tips nine tenths of one percent above its base at about 0.46 s, and settles at exactly 1.
+`Kindled { entity }` is the message a host hears on the frame a fire catches, for the sound of it. An
+invisible light is not rewritten (nothing is extracted for it) but its kindle still counts.
+
+### The light pool
+
+A fixed number of real point lights (`LightPool::size`, default 16) is handed every frame to the
+best-ranked `PoolCandidate`s around the one entity carrying your focus marker, each light at the
+candidate's position plus its own world-space offset. Everything else is a flame and nothing else. The
+assignment is deterministic: rank, then `Entity`.
+
+A candidate is ranked by the **light it puts on the subject** (`intensity / distance²`), not by its
+distance alone, so a bright brazier at 3 m outranks a dim torch at 2 m; `LightPool::rank` switches to
+`Rank::Distance` for the old rule. A slot keeps the candidate it holds until a challenger is
+`hysteresis` times better (default 1.15, the overlap rule, measured in the same quantity the rank
+uses), and only a candidate **no other slot holds** is ever a challenger, so a newcomer displaces the
+pool's *worst* light rather than reshuffling all of them. A slot that does change owner fades back up
+over `fade_seconds` (0.35 s) rather than popping, and `reserve` (default 1) both keeps a spare light so
+the owner a hand-off leaves behind fades *out* at the same time — the subject's light is continuous
+through the change rather than dipping, which is the craft's "overlapping key lights" — and caps how
+many lights change owner in one frame, so a hand-off is never made without a cross-fade to hide it.
+
+`PoolCandidate::phase`, `diameter` and `depth` let a slot adopt its winner's own fire clock, fuel-bed
+rate and depth, so a light handed to a torch breathes as that torch's flame does. Each is optional:
+`phase: None` leaves the slot's own `1.3 · slot` clock alone, `diameter: None` gives the pool's un-sized
+rate, and `depth: None` restores `FLICKER_DEPTH` — so a host that models no per-prop fire keeps the
+pool's uniform one.
+
+### Shader flames
+
+An additive billboard fire (`src/flame.wesl`) is drawn on every `FlameSite`, out of one material and one
+draw per flame, with each fire's phase, height and brightness packed into its `MeshTag` so two fires
+never burn in step. One shared shape clock, written once a frame, on `Time<Real>` — a paused world's
+shape still moves.
+
+A site with a `kindle` grows its flame from nothing on the same curve its light kindles by, so the two
+arrive together. `FlameSite::diameter` given the same value as the light's `Flicker::diameter` makes the
+flame **breathe at the light's own rate and phase**, so the fire and the ground it lights are one fire
+rather than a still flame over a moving pool; `FlameSite::depth` is the same choice for the flame's
+brightness, and giving it the light's `Flicker::depth` is what keeps the two dipping together.
+`PoolCandidate::phase` does the same for a light the pool hands over.
+
+### The lighting look
+
+The numbers a cinematographer sets, as plain functions in `bevy_lights::model::cinematography`:
+`key_to_fill` and `stops` (with `LOW_KEY` 8:1, `MOON_KEY` 4:1 and `HIGH_KEY` 2:1), `fill_for`,
+`fire_lumens` (the lumens a pool of a given size and brightness needs), `blackbody_colour` (a light's
+colour from its temperature), `blackbody_luminance` (that temperature's **magnitude** in cd/m², which a
+glowing *surface* needs and a light's colour does not carry) and `white_balanced` (the same as a camera
+balanced elsewhere records it). Size a fire by the pool it lights and colour it by the temperature it
+burns at, instead of picking lumens and an RGB by eye.
+
+### The fuel bed
+
+A bed of coals is a *surface with a temperature field on it*, and a constant `emissive` is the one thing
+a real bed never is: it clips to a white slab the moment the camera looks down at it, and hides the flame
+standing in it. `char_field` is the field — a heap of overlapping coal shards, bright lumps with dark ash
+between them, seeded so a capture is reproducible — and `char_radiance` / `coal_radiance` map a sample to
+a colour through char, ember and fuel. `coal_radiance` writes those three stops as **temperatures**, so a
+bed's brightness and its hue come from one model and cannot drift apart at a different exposure. The
+example generates a `Rgba32Float` image from the field at startup and uses it as the bed's
+`emissive_texture`; the note's numbers were chosen by measuring the stops in display DN, because a ramp
+whose middle stop is past the display's white point cannot show the structure underneath it.
+
+### Engine-free maths
+
+Every curve the crate runs, as plain `f32` functions with no `bevy` in them, so a host can reuse them in
+its own systems: `flicker_factor` and `flicker_factor_of` with `flicker_rate` and `PUFFING_CONSTANT`,
+`flicker_swing` (the sized-or-un-sized choice, and the depth, the light and the flame both read) with
+`flicker_depth` and `FLICKER_DEPTH` / `MAX_FLICKER_DEPTH`, `kindle_gain`, `raised_light` and
+`flame_light_offset` (where a fire's light belongs, so a flame and the real light it motivates cannot
+drift apart), `pack_flame_tag` and its inverse with `set_flame_brightness`; the pool's `hand_off` and
+`preferred` (the overlap rule, on distances and on any "smaller is better" quantity) with its
+`fade_factor` / `fade_out_factor`, `HYSTERESIS` and `FADE_SECONDS`; the whole of
+`model::cinematography` above, and the whole of `model::char` with `EMBER_AT`. `tests/leaf.rs` keeps them
+engine-free.
+
+### What a host touches
+
+The components a game spawns or marks are `Reflect` and registered by the plugins — `Flicker`, `Kindle`,
+`PoolCandidate`, `FlameSite` — so a BRP front end can read and drive them, and so are the resources a
+host sets, `LightPool` (size, reach, gain, rank, hysteresis, fade, reserve, the slot light's template)
+and `FlameLook` (colour, strength, the set-once `max_height`). The crate spawns `PoolLight` (registered
+too: recolour it for a palette; name its lights what you like) and `Flame`, a plain component a host
+finds or counts and never spawns. `Kindled { entity }` is the message a host hears when a fire catches.
+
 ## Plays well with
 
 This crate owns **practical lights** and nothing else.
 
 | what | whose |
 |---|---|
-| Sun, moon, sky, exposure, weather, the lightning flash | `bevy_elements` (this crate never meters exposure and never adds a `DirectionalLight`) |
-| A gameplay illuminance grid (how lit a tile is, for AI or stealth) | `bevy_light_grid` |
-| Trees, forest-fire spread | `bevy_flora` |
-| Who lights a lamp, and when | `bevy_society` or the game |
+| Sun, moon, sky, exposure, weather, the lightning flash | [`bevy_elements`](https://github.com/Ladvien/bevy_elements) (this crate never meters exposure and never adds a `DirectionalLight`) |
+| A gameplay illuminance grid (how lit a tile is, for AI or stealth) | [`bevy_light_grid`](https://github.com/Ladvien/bevy_light_grid) |
+| Trees, forest-fire spread | [`bevy_flora`](https://github.com/Ladvien/bevy_flora) |
+| Who lights a lamp, and when | [`bevy_society`](https://github.com/Ladvien/bevy_society) or the game |
 | Flicker, kindle, the pool of real lights, the shader flames, the placement helpers | **this crate** |
 
 A pool light is a light in mid-air with no source of its own: a host styles it (recolour it for the
@@ -205,7 +286,11 @@ Every default is researched and cited, or marked a design default. The notes:
 | [`docs/research/flame.md`](docs/research/flame.md) | the flame's shape, noise, ramp and packing | Nguyen, *GPU Gems* ch. 6 §6.1; RTR4 §6.3; Sanctuary decision 0228 |
 | [`docs/research/flame-flicker.md`](docs/research/flame-flicker.md) | why a drawn flame breathes with the light it motivates, and how the two share one function | Xia & Zhang 2018; SIGGRAPH 2011 *Advances*' fire talk; Doğaner on motivated sources |
 | [`docs/research/flicker-depth.md`](docs/research/flicker-depth.md) | how far a fire dips, who chooses, and a measured ceiling for the default | Mandin & Most (IAFSS 6) on flame fluctuation; Gergely et al. 2020; Doğaner |
+| [`docs/research/fuel-bed.md`](docs/research/fuel-bed.md) | why a bed is a temperature field and not a constant `emissive` | Pirk et al. 2017 (wood combustion); Xia & Zhang 2018; *PBR* 3rd ed. ch. 12 on blackbody emitters; Prince 2004 on clipped highlights |
 | [`docs/research/corpus.md`](docs/research/corpus.md) | what the home-still library holds for cinematography, photography, CG lighting, game-lighting craft, many-light rendering, fire physics and perception — and what it does not | the live corpus |
+
+The full index, with the notes behind the flame's silhouette, its catch and its read from overhead, is
+[`docs/research/README.md`](docs/research/README.md).
 
 ## Bevy compatibility
 
@@ -220,10 +305,10 @@ or agent — changing it.
 
 ## Contributing
 
-Read `AGENTS.md` (identical to `CLAUDE.md`). The short version: every feature lands with a research
-note, every default is cited or marked a design default, `src/model/` stays engine-free, `src/` stays
-free of game vocabulary (`tests/leaf.rs` enforces both), and a shader change is checked with
-`tools/wesl-check` before any capture.
+Read `AGENTS.md`. The short version: every feature lands with a research note, every default is cited or
+marked a design default, `src/model/` stays engine-free, `src/` stays free of game vocabulary
+(`tests/leaf.rs` enforces both), and a shader change is checked with `tools/wesl-check` before any
+capture.
 
 ## License
 
