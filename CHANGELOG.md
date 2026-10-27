@@ -17,6 +17,19 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **`char_field`, `char_radiance`, `coal_radiance`, `EMBER_AT` and `blackbody_luminance`** — the
+  engine-free half of a fuel bed. A bed of coals is a *surface with a temperature field on it*, not a
+  uniform emitter: `char_field(u, v, seed)` is that field as a heap of overlapping coal shards (the
+  bright lumps are coal, the dark channels between them the ash), `char_radiance` maps a sample to a
+  colour through three stops, and `coal_radiance` is the same ramp written from three *temperatures* so
+  a bed's brightness and colour cannot drift apart. `blackbody_luminance` is the missing magnitude
+  `blackbody_colour` never gave: it normalises to its brightest channel, which is right for a light
+  whose lumens the host sets and wrong for a surface whose `emissive` is a radiance in cd/m².
+  `docs/research/fuel-bed.md` is the note. The defect it fixes is measured: `examples/courtyard`'s
+  coal bed was a constant `emissive`, so it clipped to a **flat white slab** at every camera and
+  reached `min channel ≥ 245` over 36 px at 85° of elevation — where it also hid the flame iteration 19
+  had made visible from above.
+
 - **`model::reach::flame_light_offset(height)`** — where a fire's own light belongs, relative to its
   `FlameSite`'s origin: `(0, height/2, 0)`, the centre of the flame billboard `src/flame.wesl` draws. A
   fire's flame and the real light it motivates are two entities, and a host that places them by different

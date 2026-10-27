@@ -52,9 +52,21 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
 - **The lighting look** (`bevy_lights::model::cinematography`). The numbers a cinematographer sets,
   as plain functions: `key_to_fill` and `stops` (with `LOW_KEY` 8:1, `MOON_KEY` 4:1 and `HIGH_KEY`
   2:1), `fill_for`, `fire_lumens` (the lumens a pool of a given size and brightness needs),
-  `blackbody_colour` (a light's colour from its temperature) and `white_balanced` (the same as a
-  camera balanced elsewhere records it). Size a fire by the pool it lights and colour it by the
-  temperature it burns at, instead of picking lumens and an RGB by eye.
+  `blackbody_colour` (a light's colour from its temperature), `blackbody_luminance` (that
+  temperature's **magnitude** in cd/m², which a glowing *surface* needs and a light's colour does not
+  carry) and `white_balanced` (the same as a camera balanced elsewhere records it). Size a fire by the
+  pool it lights and colour it by the temperature it burns at, instead of picking lumens and an RGB by
+  eye.
+- **The fuel bed a fire sits in** (`bevy_lights::model::char`). A bed of coals is a *surface with a
+  temperature field on it*, and a constant `emissive` is the one thing a real bed never is: it clips to
+  a white slab the moment the camera looks down at it, and hides the flame standing in it. `char_field`
+  is the field — a heap of overlapping coal shards, bright lumps with dark ash between them, seeded so
+  a capture is reproducible — and `char_radiance` / `coal_radiance` map a sample to a colour through
+  char, ember and fuel. `coal_radiance` writes those three stops as **temperatures**, so a bed's
+  brightness and its hue come from one model and cannot drift apart at a different exposure. The
+  example generates a `Rgba32Float` image from the field at startup and uses it as the bed's
+  `emissive_texture`; the note's numbers were chosen by measuring the stops in display DN, because a
+  ramp whose middle stop is past the display's white point cannot show the structure underneath it.
 - **Engine-free maths** (`bevy_lights::model`). Every curve the crate runs, as plain `f32` functions with
   no `bevy` in them, so a host can reuse them in its own systems: `flicker_factor` and
   `flicker_factor_of` with `flicker_rate`, `flicker_swing` (the sized-or-un-sized choice the light and
@@ -62,8 +74,8 @@ pool hands its real lights between torches without a pop. Longer run: [`courtyar
   belongs, so a flame and the real light it motivates cannot drift apart), `pack_flame_tag` and its
   inverse; the pool's
   `hand_off` and `preferred` (the overlap rule, on distances and on any "smaller is
-  better" quantity) with its `fade_factor` / `fade_out_factor`; and the whole of `model::cinematography`
-  above. `tests/leaf.rs` keeps them engine-free.
+  better" quantity) with its `fade_factor` / `fade_out_factor`; the whole of `model::cinematography`
+  above, and the whole of `model::char`. `tests/leaf.rs` keeps them engine-free.
 
 ### What a host touches
 

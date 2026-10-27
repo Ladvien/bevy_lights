@@ -2046,3 +2046,129 @@ Xvfb picked a held display once and was fixed by the wrapper's rotating explicit
 you are killed"*, in the working tree when this pass began, as iterations 14–18 also logged. Left **uncommitted**
 again: a tracked change this pass did not write belongs to its author. Its guidance was followed — the research note
 was committed alone before any code.
+
+## Iteration 20 — 2026-10-27 — a fuel bed is a surface with a temperature field on it
+
+Outcome: **GREAT** on every line of the note's `## What great looks like`. The pass inherited a killed
+pass's work (pass 21: note committed as `a4cdcd7`, implementation uncommitted and never logged) and
+finished it, after finding four defects in it by measurement. Commits `b6bad4d` (implementation),
+`01532aa` (note), `d2f2cc0` (docs + GIF).
+
+### What ranked first, and the runner-up
+
+1. **The braziers' coal bed clips to a flat white slab from a steep camera.** Picked: it is category 1
+   (a visible artifact and a physically wrong result), it is the brightest thing in frame at exactly the
+   camera iteration 19 spent five rounds making the flame visible from, so it *masks* that work, and it
+   is the previous iteration's own first backlog item. Measured baseline: **36 px** at
+   `min channel ≥ 245` at 85°, red standard deviation **1.2 DN**.
+2. **`blackbody_colour` has no magnitude** — a surface's `emissive` is a radiance in cd/m², and a colour
+   normalised to its own peak cannot supply one. Shipped as part of 1, because the bed is what needs it.
+
+### What the inherited implementation got wrong (all four found by measuring)
+
+1. **Voronoi partition → connected ash net.** A nearest-lump field makes the ash a mesh by construction,
+   so the bed renders as a waffle of pale cells however it is tuned. Replaced with a **union of
+   overlapping shards**: channels terminate where three shards meet and 30 % of cells hold no coal.
+2. **The ember stop was past the display's white point.** At `ev100` 6, 1140 K lands on **DN 255** red,
+   so every lump above the ash was identical white and structure survived only in green — the reason the
+   inherited build rendered a *pale* honeycomb. Ember is now 1020 K (DN 157); fuel 1300 K.
+3. **The upper ramp was a cube**, pinning the median coal (field 0.50, `EMBER_AT` 0.30 → 0.29 of the
+   upper half → 0.02) at the ember stop. Measured bed median luminance **96.9 DN** against the stone
+   bowl's **166.5**: the source was darker than its own prop. Exponent 1.4 puts it at **194.7**.
+4. **The bed's drawn size was hard-coded 0.34 m** while `LIGHTS_BED` moved only flicker and flame, so
+   `LIGHTS_UNSIZED` — whose point is comparing two flicker rates — drew the same box either way.
+
+### Sources
+
+Unchanged from the committed note (`01532aa` records the amendments): craft `10.1525_fq.2004.57.3.24`
+(Prince — a blown highlight is an absence, not a brightness); production `GP` ch. 6 (the ancestor never
+draws a fuel bed, which is why this defect is this crate's own) and `s2011-advances-pdf-slides`;
+technical `10.1145_3130800.3130814` (Pirk et al. — char is a *field* over the surface),
+`10.1017_jfm.2018.707` (Xia & Zhang — the plume is axisymmetric, so the bed cools to its rim), and
+`PBR3_12_Light_Sources` (a blackbody emitter is perfectly diffuse).
+
+### The critique and the verdict
+
+`/tmp/l20/critique.md`, written before the verdict and kept. Evidence: `/tmp/l20/before/` (base
+`a4cdcd7`), `/tmp/l20/after3/` (final), with `after/` and `after2/` the two rejected rounds.
+
+- **No clipped fuel bed at any camera — GREAT.** 36 px → **0 px** at 85°; 0 px at 0/15/30/45/60/75°.
+- **The bed has structure — GREAT.** Red std **1.2 → 35.4 DN** (target ≥ 12).
+- **The source stays the brightest thing — GREAT.** Peak red **255** (target ≥ 240); bed now brighter
+  than its rim at the hero camera and at every camera where a coal is in view.
+- **The hero camera reads the same fire — GREAT.** Bed mean **157.19 → 153.22 DN** (−2.5 %, inside the
+  10 % bound); frame mean 53.09 → 53.07; **714** changed pixels, all four beds.
+- **Iteration 19's flame not regressed — GREAT.** No shader change; flame-core pixels identical at
+  0/15/30/45°, −0.9/−5.0/−6.9 % at 60/75/85° (the flame runs on `Time<Real>`, so the capture is not
+  locked to its animation).
+- **No new cost — GREAT.** No new draw or light: one texture sample in a pass that already samples the
+  stone. Texture generation is **37 ms** once at startup.
+
+Named, not hidden: at 85° the bed's *median* coal (163 DN) is still under the rim's p95 (230 DN). l20's
+critique blamed this on the bed being too narrow; **that is falsified by measurement** — widening to
+0.55 m and 0.68 m moves coal-p50/rim-p50 0.89 → 0.88 → 0.81, and darkening the bowl albedo 0.10 → 0.040
+moves it 0.85 → 0.90. The lever was the ramp and it is now spent; the remaining fix is a bowl that
+shades its own rim, which is a geometry change with its own note.
+
+### Benchmark
+
+`bench_lights`, default sizes, current tree against the base worktree (`a4cdcd7`, target
+`/home/ladvien/l20/base-target`), interleaved on the same host:
+
+| round | current `p50_us` | base `p50_us` |
+|---|---|---|
+| 1 | 603 | 502 |
+| 2 | 472 | 577 |
+
+**No regression**, and no comparison is claimed beyond that: `examples/bench_lights.rs` contains **0**
+calls into `src/model/char.rs`, so it cannot see this change at all. The alternating rounds differ by
+±20 % from each other in both directions, which is this host's load; the change is one CPU pass at
+startup and one texture sample per fragment.
+
+### The gate
+
+On the final tree: `cargo build --release`, `cargo build`, `cargo test` (**39 lib + 8/3/28 behaviour +
+1 readme + 18 doctests**), `cargo test --features serde`, `cargo build --examples --all-features`,
+`cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`, `cargo fmt --check`,
+`cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### One mistake this pass made, and how it was caught
+
+`git checkout examples/courtyard.rs` to undo a one-line bowl probe **discarded the whole uncommitted
+fuel-bed implementation** in that file, which is exactly what `AGENTS.md` and the driver's snapshot
+section warn against. It was recovered in full from the driver's `refs/wiggum` checkpoint
+(`git checkout 347001f -- examples/courtyard.rs`) and the `bed_side` fix re-applied. The recovery was
+verified field by field against the pre-checkout diff.
+
+### Media
+
+`docs/media/showcase.gif` re-encoded from this build: the bed is visible at 480 px, so the change is one
+the README's hero shows. Same recipe, same caption, 2.3 MB, 60 frames.
+
+### Environment
+
+GPU held by other tenants (VLLM 14.6 GB, ~5 GB free) — enough for a 1280×720 capture. `/tmp` 32 % used.
+Xvfb via an explicit rotating `-n` per run; no `XOpenDisplayFailed` this pass.
+
+### Top 5 remaining, ranked
+
+1. **A bowl that shades its own rim.** The bed's median coal cannot beat the rim's p95 while the fire's
+   light sits 0.575 m above the fuel and the rim is 0.8 m out: it receives ~58 000 lx at point-blank
+   range. Measured this pass that neither a wider bed nor a darker albedo is the lever.
+2. **The flame from above, round 6** — iteration 19's dissolve: the tongue must *shrink* as the disc
+   arrives rather than sit at full size behind it. All the arithmetic is in `flame-overhead.md`.
+3. **A capture path that can show the catch** (iteration 18's item 1, unbuilt): the catch runs on
+   `Time<Real>` and pipeline warm-up outlasts it.
+4. A per-flame fuel-bed `D` in the fragment stage (blocked on a wider `MeshTag` or a second instance
+   attribute; `GpuComponentArrayBuffer` is the unexamined option).
+5. The flicker amplitude, still uncited 20 iterations, and `Rank::Weighted` with the flagstones' 256
+   draw calls.
+
+### One tracked change this pass did not make
+
+`.omp/skills/bevy-lights-build-loop/SKILL.md` still carries the unstaged edit adding *"Your work is
+saved even if you are killed"*, in the working tree when this pass began, as iterations 14–19 also
+logged. Left **uncommitted** again: a tracked change this pass did not write belongs to its author. Its
+guidance was followed, and it earned its keep this pass — the recovery above used the checkpoint it
+describes.
