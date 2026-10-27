@@ -125,9 +125,15 @@ fn stub_source(name: &str) -> String {
              }\n"
         }
         "bevy_pbr::render::mesh_view_bindings" => {
+            // `world_position` is the camera's own place, and the flame's overhead basis reads it: a stub leaving it out
+            // let a shader that reads it through `wesl-check` as "not checked", so it is here with a non-zero value.
+            // A camera above and to the side of the origin, so a shader that reads the wrong field of the wrong struct
+            // produces a wrong number here rather than passing.
             "struct View {\n\
              \x20   world_from_view: mat4x4<f32>,\n\
              \x20   clip_from_world: mat4x4<f32>,\n\
+             \x20   world_position: vec3<f32>,\n\
+             \x20   exposure: f32,\n\
              };\n\
              @group(0) @binding(0) var<uniform> view: View;\n"
         }

@@ -45,6 +45,14 @@ const PI: f32 = 3.14159265;
 const FLAME_HALF_WIDTH: f32 = 0.20;
 const FLAME_TIP: f32 = 0.90;
 const PROFILE_PEAK: f32 = 1.172;
+// Where the upright flame turns into its own cross-section: the camera's elevation over the fire, in radians. Below
+// `OVERHEAD_START` the flame is the upright tongue exactly as it was, so no ground-level view changes at all; above
+// `OVERHEAD_FULL` it is the round puff, and the turn between them is smooth so a camera rising does not pop.
+// 50 deg is where a third-person camera's own default sits, still upright; 76 deg is steep enough that the upright quad
+// has lost four fifths of its area. Both are design defaults, calibrated in captures
+// (`docs/research/flame-overhead.md`).
+const OVERHEAD_START: f32 = 0.873;
+const OVERHEAD_FULL: f32 = 1.326;
 // The ramp: the cool rim and tip, then the host's fire colour, then the hot core.
 const EDGE_RED: vec3<f32> = vec3<f32>(0.70, 0.06, 0.005);
 const CORE_YELLOW: vec3<f32> = vec3<f32>(1.0, 0.78, 0.30);
@@ -67,6 +75,9 @@ struct FlameVertexOutput {
     // The fire's flicker this frame (0.70..1.00 of its base), read from the tag: the same number the light's intensity
     // was multiplied by, so the drawn fire and the light it casts are one fire. Flat, for the same reason as `took`.
     @location(3) @interpolate(flat) brightness: f32,
+    // How far the camera is above the fire, 0 from the side to 1 overhead: the flame is drawn upright at 0 and as its
+    // own cross-section at 1. Flat, because it is one number for the whole flame.
+    @location(4) @interpolate(flat) cross: f32,
 }
 
 // ---- 2D simplex noise and the classic fbm over it (provenance UNVERIFIED, see header) ---------------------------------
@@ -126,11 +137,37 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     // units is the tag's (a fraction of `params.y`), and its base is lifted to its own origin. Its width is a
     // fraction of that, `FLAME_ASPECT`.
     let origin = world_from_local[3].xyz;
+    // ---- The overhead basis -----------------------------------------------------------------------------------------
+    // An upright quad is an *axial* billboard (Akenine-Moller et al., Real-Time Rendering 4th ed., section 13.6.3): its
+    // normal is horizontal, so the area it presents to the camera is `cos(elevation)` of its face and it collapses to a
+    // line as the camera goes overhead. The reference names both the failure and the fix -- "if the viewer flies over
+    // the trees and looks down, the illusion is ruined, as the trees will appear nearly edge-on and look like the
+    // cutouts they are. One workaround is to add a horizontal cross section", and section 13.6.2's note that "overhead
+    // each type of billboard, the world-oriented version will fully face it, while the axial version will be more
+    // affixed to the scene". A flame is *axisymmetric* (Xia & Zhang 2018 assume "laminar axisymmetric incompressible
+    // flows without swirling"), so the honest cross-section is its own widest width: the flame turns from an upright
+    // tongue seen from the side into a round puff seen down its axis. The one quad does both, by turning its
+    // `up` axis from the world's up towards the horizontal-away-from-camera and shortening what it draws along it.
+    // `docs/research/flame-overhead.md` has the sources and the measured before/after.
+    let to_cam = normalize(view.world_position - origin);
+    let elev = asin(clamp(to_cam.y, -1.0, 1.0));
+    let cross = smoothstep(OVERHEAD_START, OVERHEAD_FULL, elev);
+    // Away from the camera, horizontal. Dead straight down and straight up both leave no horizontal part, so it falls
+    // back to the camera's own right axis, which is horizontal for any camera that is not rolled a quarter turn.
+    let away = vec3<f32>(-to_cam.x, 0.0, -to_cam.z);
+    let flat = select(normalize(vec3<f32>(view.world_from_view[0].x, 0.0, view.world_from_view[0].z)),
+        normalize(away), length(away) > 1e-3);
+    // The axis the quad's own Y is drawn along, and how long the flame is along it: its height from the side, its
+    // footprint from above.
+    let flame_up = normalize(mix(vec3<f32>(0.0, 1.0, 0.0), flat, cross));
+    // The flame's widest point is `2 * FLAME_HALF_WIDTH` of its height, which is its diameter when the flame is seen
+    // down its own axis. So from above the quad is drawn isotropic — the same world size across as along — and the
+    // silhouette inside it is round; from the side it is the upright tongue, `FLAME_ASPECT` as wide as it is tall.
+    let along = mix(1.0, FLAME_ASPECT, cross);
     // The flame's catch rides on its instance transform (its scale, 0..1), so each flame's colour is its own
     // fire's — one shared material cannot hold a per-flame number, and the transform can.
     let took = clamp(length(world_from_local[0].xyz), 0.0, 1.0);
     let right = normalize(vec3<f32>(view.world_from_view[0].x, 0.0, view.world_from_view[0].z));
-    let up = vec3<f32>(0.0, 1.0, 0.0);
     // The flame's `MeshTag` (`pack_flame_tag` in `src/model/tag.rs`): height in the high 16 bits, unsigned-normalised,
     // which `unpack2x16unorm` reads back as `.y`; the clock phase in the next byte and the fire's own brightness in the
     // low byte, both plain 0..255 shares. The brightness is the fire's flicker, written every frame from the same
@@ -143,12 +180,16 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     // read above; multiplying it in here is the whole difference between a documented catch and a
     // flame that appears whole. `docs/research/flame-kindle.md` measures it.
     let size = tag.y * material.params.y * took;
-    let billboard = origin + right * (vertex.position.x * size * FLAME_ASPECT) + up * (vertex.position.y * size + size * 0.5);
+    // From the side the quad stands on the fire's own origin; from above it lies centred on it, which is where a plume's
+    // footprint is. The lift fades as the basis turns, so the flame never slides sideways as the camera rises.
+    let lift = size * 0.5 * (1.0 - cross);
+    let billboard = origin + right * (vertex.position.x * size * FLAME_ASPECT) + flame_up * (vertex.position.y * size * along + lift);
     out.position = position_world_to_clip(billboard);
     out.uv = vec2<f32>(vertex.position.x, vertex.position.y) + vec2<f32>(0.5, 0.5);
     out.phase = f32((raw >> 8u) & 0xffu) / 255.0 * TAU;
     out.took = took;
     out.brightness = f32(raw & 0xffu) / 255.0;
+    out.cross = cross;
     return out;
 }
 
@@ -176,9 +217,24 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     // Noise eats into the upper flame, so its top licks instead of ending in a smooth point.
     body -= (1.0 - n3) * 0.9 * pow(u, 1.8);
     body = select(body, -1.0, dy < 0.0);
-    let mask = smoothstep(0.0, 0.30, body) * smoothstep(0.0, 0.06, y);
-    // Hottest along the axis and low down: red rim and tip, the host's fire, a yellow core.
-    let heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);
+    // ---- Seen down its own axis ------------------------------------------------------------------------------------
+    // A flame is axisymmetric, so from overhead it is not a teardrop: it is the round cross-section of the plume at its
+    // widest, `2 * FLAME_HALF_WIDTH` of its height across, with the same turbulence rippling its edge and the same hot
+    // core in the middle. `body_round` is that disc, and `in.cross` mixes it in as the camera rises, so the two
+    // silhouettes are one continuous turn rather than two shapes swapped at a threshold.
+    let radial = length(vec2<f32>(dx, (in.uv.y - 0.5) * FLAME_ASPECT));
+    let round_radius = FLAME_HALF_WIDTH * (1.0 + (n1 - 0.5) * 0.5) + 1e-4;
+    var body_round = 1.0 - radial / round_radius;
+    body_round -= (1.0 - n3) * 0.5;
+    let body_final = mix(body, body_round, in.cross);
+    // The base band seats the upright flame's foot on its fire. A cross-section has no foot, so it fades out as the
+    // basis turns; leaving it on would erase the whole disc, because every fragment of it is at the base's height.
+    let seat = mix(smoothstep(0.0, 0.06, y), 1.0, in.cross);
+    let mask = smoothstep(0.0, 0.30, body_final) * seat;
+    // Hottest along the axis and low down from the side; hottest in the middle from above, where `u` means nothing.
+    let heat_side = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);
+    let heat_round = clamp(body_round, 0.0, 1.0) * (1.0 - 0.45 * clamp(radial / round_radius, 0.0, 1.0));
+    let heat = mix(heat_side, heat_round, in.cross);
     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));
     // A fire that is still catching is redder, and each flame knows its own progress (`in.took`): the steady ramp
