@@ -23,11 +23,18 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         PointLight { color: LinearRgba::rgb(r, g, b).into(), intensity: lumens, range: 10.0, ..default() },
         // `diameter` sizes the flicker by the fuel bed (`f = 1.5/√D` Hz); `None` uses the un-sized rate.
-        Flicker { base: lumens, phase: 0.0, diameter: Some(0.34) },
+        Flicker { base: lumens, phase: 0.0, diameter: Some(0.34), ..default() },
         Kindle::default(),
         // `kindle` grows the flame with its light, on the same 0.6 s envelope, and `diameter` matches
-        // the `Flicker`'s so the drawn flame breathes at the same rate the light does.
-        FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS, diameter: Some(0.34) },
+        // the `Flicker`'s so the drawn flame breathes at the same rate the light does. `depth` is how
+        // far it dips: give the flame the same one as its light, or the two disagree.
+        FlameSite {
+            height: 1.1,
+            phase: 0.0,
+            kindle: KINDLE_SECONDS,
+            diameter: Some(0.34),
+            depth: FLICKER_DEPTH,
+        },
     ));
 
     // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
@@ -47,7 +54,7 @@ fn setup(mut commands: Commands) {
             ..default()
         },
         // The pool's lights flicker at the un-sized rate, so this flame does too.
-        FlameSite { height: torch_height, phase: 1.9, kindle: 0.0, diameter: None },
+        FlameSite { height: torch_height, phase: 1.9, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
         Transform::from_xyz(4.0, 0.0, 2.0),
     ));
 

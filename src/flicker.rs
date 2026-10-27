@@ -9,7 +9,7 @@ use bevy::time::Time;
 
 use crate::LightsSystems;
 use crate::chain_sets;
-use crate::model::{KINDLE_SECONDS, flicker_swing, kindle_gain};
+use crate::model::{FLICKER_DEPTH, KINDLE_SECONDS, flicker_swing, kindle_gain};
 
 /// [`FlickerPlugin`]: modulates every [`Flicker`] light and advances every [`Kindle`].
 pub struct FlickerPlugin;
@@ -27,11 +27,11 @@ impl Plugin for FlickerPlugin {
 /// A light's mean intensity and the clock phase its flicker runs at.
 ///
 /// The light's intensity is written every frame (while it is visible) as
-/// `base · flicker_swing(diameter, t, phase) · kindle_gain(…)`: see [`flicker_swing`]. Put it on a
+/// `base · flicker_swing(diameter, depth, t, phase) · kindle_gain(…)`: see [`flicker_swing`]. Put it on a
 /// [`PointLight`] or a [`SpotLight`]. Two fires given different phases never fall into step, and the
 /// `diameter` here is the same number the flame drawn on the fire should be given, so the two breathe
 /// together.
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
+#[derive(Component, Clone, Copy, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[reflect(Component)]
 pub struct Flicker {
@@ -49,6 +49,21 @@ pub struct Flicker {
     /// `None` (the default) uses the crate's un-sized rate, which is a host's choice for a fire whose
     /// size is not modelled. `Some(0.34)` is a brazier's coal bed; `Some(4.0)` a bonfire.
     pub diameter: Option<f32>,
+    /// How far the light dips below its peak: the multiplier runs `1 - 2·depth ..= 1` with mean
+    /// `1 - depth`, so [`base`](Self::base) is always the fire's **brightest** moment and a deeper
+    /// flicker is a darker trough.
+    ///
+    /// [`FLICKER_DEPTH`] (`0.15`, the default) is the crate's inherited flicker, `0.70..=1.00`. A calm
+    /// lantern is `0.03`; a gusting torch `0.3`. Clamped to `0..=`[`MAX_FLICKER_DEPTH`]. **Set the same
+    /// value on the [`FlameSite`](crate::FlameSite) drawn on the fire**, so the flame and the ground
+    /// under it dip together.
+    pub depth: f32,
+}
+
+impl Default for Flicker {
+    fn default() -> Self {
+        Self { base: 0.0, phase: 0.0, diameter: None, depth: FLICKER_DEPTH }
+    }
 }
 
 /// A light that is taking hold: its intensity flares up over [`KINDLE_SECONDS`] instead of switching
@@ -196,7 +211,7 @@ fn modulate<L: Emits>(
         None => 1.0,
     };
     if !hidden {
-        let swing = flicker_swing(flicker.diameter, t, flicker.phase);
+        let swing = flicker_swing(flicker.diameter, flicker.depth, t, flicker.phase);
         *light.intensity() = flicker.base * swing * gain;
     }
     lit
