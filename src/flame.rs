@@ -139,6 +139,11 @@ pub struct FlameSite {
     /// measures. `None` (the default) uses the crate's un-sized rate, matching a light whose
     /// `Flicker::diameter` is `None`.
     pub diameter: Option<f32>,
+    /// How far the flame's brightness dips below its peak: **set it to the same value as
+    /// [`Flicker::depth`](crate::Flicker::depth) on the light this flame motivates**, or the flame's
+    /// breath and its light's disagree. [`FLICKER_DEPTH`](crate::FLICKER_DEPTH) is the default and
+    /// matches a light that never chose one.
+    pub depth: f32,
 }
 
 /// The drawn flame: the child mesh [`FlamePlugin`] spawns under each [`FlameSite`].
@@ -260,7 +265,7 @@ fn dress_flames(
     let t = time.elapsed_secs();
     for (site, flame) in &sites {
         let catch = flame.kindle;
-        let brightness = flicker_swing(flame.diameter, t, flame.phase);
+        let brightness = flicker_swing(flame.diameter, flame.depth, t, flame.phase);
         let tag = MeshTag::new(pack_flame_tag(flame.phase, flame.height, brightness, max_height));
         let mesh = assets.mesh.clone();
         let material = assets.material.clone();
@@ -318,7 +323,7 @@ fn update_flames(
             // `Changed<MeshTag>` re-extraction set, so a write here costs a render-world re-extract for
             // that flame. The byte holds 1/255 of the swing, so at 60 fps a 2.6 Hz fire skips some
             // frames; a fire that never changes costs nothing at all.
-            let brightness = flicker_swing(site.diameter, t, site.phase);
+            let brightness = flicker_swing(site.diameter, site.depth, t, site.phase);
             let packed = set_flame_brightness(tag.value, brightness);
             if packed != tag.value {
                 tag.value = packed;
@@ -360,7 +365,7 @@ fn update_flames(
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
-    use crate::model::unpack_flame_tag;
+    use crate::model::{FLICKER_DEPTH, unpack_flame_tag};
     use core::f32::consts::TAU;
 
     /// The headless half of the plugin: assets, a look, and the two systems, with no render app (a
@@ -396,7 +401,10 @@ mod tests {
         let mut app = dressing_app();
         let site = app
             .world_mut()
-            .spawn((FlameSite { height: 0.9, phase: 0.4, kindle: 0.0, diameter: None }, Transform::default()))
+            .spawn((
+                FlameSite { height: 0.9, phase: 0.4, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
+                Transform::default(),
+            ))
             .id();
         app.update();
         let children = flame_children(&mut app);
@@ -414,7 +422,7 @@ mod tests {
     fn an_unchanged_brightness_leaves_the_tag_unwritten() {
         let mut app = dressing_app();
         app.world_mut().spawn((
-            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: Some(0.34) },
+            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: Some(0.34), depth: FLICKER_DEPTH },
             Transform::default(),
         ));
         app.update();
@@ -443,7 +451,7 @@ mod tests {
     fn a_flames_tag_carries_its_sites_phase_and_height() {
         let mut app = dressing_app();
         app.world_mut().spawn((
-            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: None },
+            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
             Transform::default(),
         ));
         app.update();
@@ -462,7 +470,7 @@ mod tests {
     fn a_flames_brightness_is_the_fires_own_swing() {
         let mut app = dressing_app();
         app.world_mut().spawn((
-            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: Some(0.34) },
+            FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter: Some(0.34), depth: FLICKER_DEPTH },
             Transform::default(),
         ));
         app.update();
@@ -471,7 +479,7 @@ mod tests {
         let children = flame_children(&mut app);
         assert_eq!(children.len(), 1);
         let (_, _, brightness) = unpack_flame_tag(children[0].1, max_height);
-        let expected = flicker_swing(Some(0.34), t, 2.5);
+        let expected = flicker_swing(Some(0.34), FLICKER_DEPTH, t, 2.5);
         assert!(
             (brightness - expected).abs() < 1.0 / 255.0,
             "brightness {brightness} against the light's own {expected}"
@@ -486,8 +494,10 @@ mod tests {
     fn a_sized_flame_and_an_unsized_one_do_not_read_alike() {
         fn brightness_of(diameter: Option<f32>) -> f32 {
             let mut app = dressing_app();
-            app.world_mut()
-                .spawn((FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter }, Transform::default()));
+            app.world_mut().spawn((
+                FlameSite { height: 0.35, phase: 2.5, kindle: 0.0, diameter, depth: FLICKER_DEPTH },
+                Transform::default(),
+            ));
             // Eighteen frames of the fixed step: a 2.6 Hz fire and a 1.2 Hz one have parted company by
             // then, and at t = 0 every fire's swing is 0.85 whatever its size.
             for _ in 0..18 {
@@ -527,6 +537,7 @@ mod tests {
 mod kindle_tests {
     use super::*;
     use crate::KINDLE_SECONDS;
+    use crate::model::FLICKER_DEPTH;
     use bevy::time::TimeUpdateStrategy;
 
     fn app() -> App {
@@ -566,7 +577,13 @@ mod kindle_tests {
         // this test passed the whole time. `docs/research/flame-kindle.md` has the measurement and
         // `/home/ladvien/l18/kindle2_after/` the frames.
         let mut app = app();
-        let site = FlameSite { height: 0.9, phase: 0.0, kindle: KINDLE_SECONDS, diameter: None };
+        let site = FlameSite {
+            height: 0.9,
+            phase: 0.0,
+            kindle: KINDLE_SECONDS,
+            diameter: None,
+            depth: FLICKER_DEPTH,
+        };
         app.world_mut().spawn((site, Transform::default()));
         app.update();
         // The first frame after the flame is dressed: it is barely there.
@@ -593,7 +610,7 @@ mod kindle_tests {
         // already alight.
         let mut app = app();
         app.world_mut().spawn((
-            FlameSite { height: 0.9, phase: 0.0, kindle: 0.0, diameter: None },
+            FlameSite { height: 0.9, phase: 0.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
             Transform::default(),
         ));
         app.update();
@@ -607,6 +624,7 @@ mod kindle_tests {
 mod catch_colour_tests {
     use super::*;
     use crate::KINDLE_SECONDS;
+    use crate::model::FLICKER_DEPTH;
     use bevy::time::TimeUpdateStrategy;
 
     fn app() -> App {
@@ -643,7 +661,13 @@ mod catch_colour_tests {
         // The flame's scale IS the colour's input: 0..1 while it catches, exactly 1 once it has taken.
         let mut app = app();
         app.world_mut().spawn((
-            FlameSite { height: 0.9, phase: 0.0, kindle: KINDLE_SECONDS, diameter: None },
+            FlameSite {
+                height: 0.9,
+                phase: 0.0,
+                kindle: KINDLE_SECONDS,
+                diameter: None,
+                depth: FLICKER_DEPTH,
+            },
             Transform::default(),
         ));
         app.update();
@@ -669,11 +693,17 @@ mod catch_colour_tests {
         // regression in the loop's shape.
         let mut app = app();
         app.world_mut().spawn((
-            FlameSite { height: 0.9, phase: 0.0, kindle: KINDLE_SECONDS, diameter: None },
+            FlameSite {
+                height: 0.9,
+                phase: 0.0,
+                kindle: KINDLE_SECONDS,
+                diameter: None,
+                depth: FLICKER_DEPTH,
+            },
             Transform::default(),
         ));
         app.world_mut().spawn((
-            FlameSite { height: 0.9, phase: 1.3, kindle: 0.0, diameter: None },
+            FlameSite { height: 0.9, phase: 1.3, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
             Transform::from_xyz(5.0, 0.0, 0.0),
         ));
         app.update();
