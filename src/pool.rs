@@ -601,7 +601,7 @@ fn assign_pool<F: Component>(
     // rather than carried through the rank list's sort. A candidate that gives none of these is absent
     // from the map, so a slot it wins keeps the slot's own `1.3 · slot` phase, the un-sized rate and
     // the crate's `FLICKER_DEPTH`.
-    let winners: std::collections::HashMap<Entity, (Option<f32>, Option<f32>, Option<f32>)> = chosen_by_slot
+    let winners: std::collections::HashMap<_, _> = chosen_by_slot
         .values()
         .filter_map(|entity| {
             candidates
