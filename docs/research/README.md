@@ -14,6 +14,8 @@ plainly that it is a design default.
 - [`flame.md`](flame.md) — the billboarded shader flame: one material, one draw, a tag per fire.
 - [`flame-flicker.md`](flame-flicker.md) — the drawn flame and its light as one fire: brightness on the
   light's clock, the silhouette on real time.
+- [`flicker-depth.md`](flicker-depth.md) — how far a fire dips, who chooses, and a measured ceiling the
+  default sits well inside.
 - [`flame-silhouette.md`](flame-silhouette.md) — the flame's edges, the puff law that would shape them,
   and the per-flame diameter that blocks it.
 - [`flame-kindle.md`](flame-kindle.md) — a lit flame must *grow* with the light it motivates, and the
