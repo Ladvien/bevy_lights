@@ -1796,3 +1796,114 @@ even if you are killed"*, in the working tree when this pass began, as iteration
 logged. Left **uncommitted** again: a tracked change this pass did not write belongs to its author. Its
 guidance was followed — the corpus re-scan and the research note were each committed alone before any
 code, then the implementation, then the docs, then the media.
+
+## Iteration 18 — 2026-10-26 — a lit flame grows with its light
+
+Outcome: **shipped.** `kindle` was documented to grow the flame, the CPU wrote the right number every
+frame, and the shader never used it. One multiply in the vertex stage, and a lit fire grows from a point.
+
+### What ranked first, and the runner-up
+
+1. **A `FlameSite` with a `kindle` did not grow its flame.** Picked: it is a *documented behaviour that
+   does not happen*, category 1, and it puts the drawn source and the light it motivates in disagreement
+   at the one moment the audience is watching for it — a fire being lit. Measured: the flame's bbox
+   height across the catch was **flat at 155–174 px** (silhouette noise) while the light went 6 % → 100 %,
+   and only the flame's peak luminance moved (120 → 161 DN). The fix is one multiply, the crate's own
+   showcase spawns exactly this way, and the README already promised the behaviour.
+2. **The flame has no internal structure.** Width sd in the mid-band 3.7 % of mean width, hot patches per
+   row 1.06–1.45 (a vertical stripe core), no bulge at any distance. Real and still the largest beauty
+   gap — but still blocked on a per-flame `D` needing a wider `MeshTag`, which is an allocation decision,
+   not a pass's work.
+3. A per-flame fuel-bed `D` in the fragment stage (iterations 16 and 17's #1). Unchanged.
+4. The tip must pinch and shed. Same mechanism as 3.
+5. The flicker amplitude, still uncited (blocked 17 iterations).
+
+The pick beats the runner-up because the runner-up cannot be finished without an allocation decision this
+crate has deferred twice, while this was a shipped-behaviour lie with a one-line fix and a metric.
+
+### Sources
+
+- craft: `10.7456_tojdac.1674124` (Doğaner — the set light "mimics" the candle; the flame is the only
+  part of the source the audience can see) and `s2007-advances-course-notes-0-4-mb` (TF2: "Even when
+  viewed only in silhouette with no internal shading at all, the characters are readily identifiable" —
+  size is the first read).
+- production: `s2011-advances-pdf-slides` ("Ramp the alpha to fade in/out over particle lifetime";
+  "shrink particles as they fade") and `GPU Gems` ch. 6 §6.1 (the emitter's own size is a parameter).
+- technical: `10.1017_jfm.2018.707` (re-read for a flame-length law: it derives the *puffing frequency*
+  from vortex shedding and gives no length-vs-time law, so nothing new rests on it) plus
+  `book_real_time_rendering_4th_akenine` §6.3, unchanged.
+- Note: `docs/research/flame-kindle.md`, committed alone as `998ed68`.
+
+### The work
+
+`src/flame.wesl`'s vertex stage: `let size = tag.y * material.params.y * took;`. `took` was already in
+the vertex stage — read from `length(world_from_local[0].xyz)`, the instance scale `update_flames`
+writes from `kindle_gain` — and was already flat-interpolated to the fragment for the ember colour. It
+now also scales the quad. No new tag bit, no new uniform, no second per-flame channel. The rustdoc for
+`FlameSite::kindle` and `Flame` now say the catch scales the *drawn* size and how.
+
+### A claim of mine that was wrong, corrected
+
+The note's first draft said the fix must preserve a "35 % size overshoot". `kindle_gain` is
+`s + 0.35·sin(πs)` on a smoothstepped `s`, so its peak is **1.009 at t ≈ 0.46 s** — the 0.35 is the
+sine's amplitude, not the sum's peak, and the shader's `clamp(took, 0, 1)` costs 0.9 % for one frame.
+Caught by computing the curve instead of reading the constant. The note and its `Validation targets`
+carry the correction.
+
+### The critique and the verdict
+
+Full critique: `/home/ladvien/l18/critique.md`. **GREAT** on all five faces; nothing reverted.
+
+| line | before → after |
+|---|---|
+| flame height across the 0.6 s catch | flat 155–174 px (noise) → 6, 11, 17, … 157, 166, settled ~158 px |
+| fit to `kindle_gain` | n/a (no growth) → **0.98 px RMSE over 10 samples** |
+| settled flame, 13 capture cameras | — → **all identical**; `hero.png` byte-identical (md5 `994dfca…`) |
+| clipping, `lum ≥ 250` | 0.0000 % ×12, `pool16` 0.0025 % → unchanged |
+| flame peak luminance across the catch | 120 → 161 DN (the only thing that moved) → still 120 → 161 DN |
+
+Two things checked and struck rather than fixed: the flame's **apparent** foot rises 8 px during the
+catch, which is the shader's own `smoothstep(0, 0.06, y)` base band scaling with the flame (0.6 px at a
+10 px flame, 9.5 px at 158 px), not a shift; and one 1-px detached island above the tip on 1 frame in 41.
+
+### Benchmark
+
+`bench_lights`, after: `mean_us=501 p50_us=492 min_us=275`, `flicker_p50_us=144`, `pool_p50_us=351`.
+**No before/after comparison is meaningful here and none is claimed:** the change is one multiply per
+vertex in a shader, and `bench_lights` is headless and CPU-only — it executes no shader at all. The base
+worktree's first build was killed at the 300 s job ceiling mid-`zeno`/`yazi`/`swash`, so a base binary
+did not exist to compare against; a same-machine comparison of a shader change is a capture, and the
+captures' settled state is pixel-identical.
+
+### The gate
+
+On the final tree: `cargo build --release`, `cargo build`, `cargo test` (**34 lib + 8/3/28 behaviour + 1
+readme + 14 doctests**), `cargo test --features serde`, `cargo build --examples --all-features`,
+`cargo clippy --all-targets --all-features -- -D warnings`,
+`RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`, `cargo fmt --check`,
+`cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
+
+### Environment
+
+GPU idle (no tenant). `/tmp` was full, so every capture and build ran through the private-tmpfs
+`unshare -rm` wrapper (`/home/ladvien/l18/shoot.sh`, taken from iteration 17). **New trap:** `xvfb-run
+-a` twice picked a display another process held and the capture died with `XOpenDisplayFailed`; walking
+an explicit `-n` number per run fixed it, and that is now in the wrapper.
+
+### Top 5 remaining, ranked
+
+1. **A per-flame fuel-bed `D` in the fragment stage** (the blocker for 2). The allocation decision comes
+   first: a wider `MeshTag` or a second instance attribute.
+2. **The flame's interior is a stripe with a smooth envelope** — width sd 3.7 % of mean width, 1.06–1.45
+   hot patches per row. Unblocked by 1.
+3. **The tip must pinch and shed** — the same mechanism as 1 and 2.
+4. **The flicker amplitude, still uncited** (blocked 17 iterations; Maynard 2013 unobtainable).
+5. `Rank::Weighted`, and the flagstones' 256 draw calls.
+
+### One tracked change this pass did not make
+
+`.omp/skills/bevy-lights-build-loop/SKILL.md` still carries the unstaged edit adding *"Your work is saved
+even if you are killed"*, in the working tree when this pass began, as iterations 14–17 also logged.
+Left **uncommitted** again: a tracked change this pass did not write belongs to its author. Its guidance
+was followed — the research note was committed alone before any code, then the implementation, then the
+docs, each landing as its own commit.
