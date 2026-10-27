@@ -93,6 +93,17 @@ Measured on those frames, the count of saturated flame pixels runs **0 → 4 430
 frames 5, 10, 20 and 40, then holds at about 19 000: the flame grows into its fire rather than appearing
 whole.
 
+**A trap: `LIGHTS_SHOT_FROM=1` does not actually reach the catch on big.** The catch runs on
+`Time<Real>` (`update_flames` advances `Flame::kindled` by `Real` delta), and the first frames of a run
+are pipeline compilation — which is *real* seconds, not the fixed 1/60 s the harness steps `Time` by. On
+big the flame material's pipeline takes longer than `KINDLE_SECONDS` to compile, so by the first captured
+frame the catch is already over: measured on the courtyard at `LIGHTS_SHOT_FROM=1`, the frame mean goes
+`0.00 → 5.33 → 36.03 → 53.53` over four frames with the flames already full size. That is why
+`docs/media/showcase.gif` has never shown a catch, in this build or the committed one. To see a catch,
+spawn the `FlameSite` **after** the run has warmed up (a site added at frame 40 renders through the
+already-compiled pipeline, and its kindle starts then), which is how iteration 18 measured it:
+`/home/ladvien/l18/kindle2/` (before) and `kindle2_after/` (after).
+
 ## The bench's two lines
 
 `bench_lights` prints two lines now. The first is the whole frame; the second separates the crate's two hot

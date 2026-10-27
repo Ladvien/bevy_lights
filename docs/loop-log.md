@@ -1883,6 +1883,19 @@ readme + 14 doctests**), `cargo test --features serde`, `cargo build --examples 
 `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`, `cargo fmt --check`,
 `cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all pass.
 
+### Media: the showcase GIF cannot show a catch, and that is a documentation bug
+
+Re-encoded `docs/media/showcase.gif` twice and confirmed the capture path cannot reach the catch on big:
+the catch runs on `Time<Real>` while the first frames are pipeline compilation, which takes longer than
+`KINDLE_SECONDS`. `LIGHTS_SHOT_FROM=1` therefore starts after the catch has already finished — frame means
+`0.00, 5.33, 36.03, 53.53` with every flame already full size. The **committed** GIF has the same shape
+(`6.25, 36.34, 55.54, …`), so it has never shown a catch either, and its caption promises one. The
+re-encode was **reverted** (`git checkout docs/media/showcase.gif`) rather than shipped: it changed the
+crop and the file size and showed nothing new. `docs/DEMOS.md` now records the trap and the working recipe
+(spawn the `FlameSite` after warm-up), which is the honest fix until an example exposes a "light this fire
+now" key to the harness. **Top-5 item for the next pass: a capture path that can show the catch** — the
+README's first feature is the one its hero GIF cannot demonstrate.
+
 ### Environment
 
 GPU idle (no tenant). `/tmp` was full, so every capture and build ran through the private-tmpfs
@@ -1892,13 +1905,18 @@ an explicit `-n` number per run fixed it, and that is now in the wrapper.
 
 ### Top 5 remaining, ranked
 
-1. **A per-flame fuel-bed `D` in the fragment stage** (the blocker for 2). The allocation decision comes
+1. **A capture path that can show the catch** — the README's first feature is the one its hero GIF cannot
+   demonstrate: the catch runs on `Time<Real>` and the pipeline warm-up outlasts it. A switch that lights a
+   fire on frame N, with `LIGHTS_SHOT_FROM` past warm-up, is example work and would make the showcase show
+   what its caption claims. Ranked first because it is small, it is the README, and the fix this iteration
+   shipped is currently invisible in every committed artefact.
+2. **A per-flame fuel-bed `D` in the fragment stage** (the blocker for 3). The allocation decision comes
    first: a wider `MeshTag` or a second instance attribute.
-2. **The flame's interior is a stripe with a smooth envelope** — width sd 3.7 % of mean width, 1.06–1.45
-   hot patches per row. Unblocked by 1.
-3. **The tip must pinch and shed** — the same mechanism as 1 and 2.
-4. **The flicker amplitude, still uncited** (blocked 17 iterations; Maynard 2013 unobtainable).
-5. `Rank::Weighted`, and the flagstones' 256 draw calls.
+3. **The flame's interior is a stripe with a smooth envelope** — width sd 3.7 % of mean width, 1.06–1.45
+   hot patches per row. Unblocked by 2.
+4. **The tip must pinch and shed** — the same mechanism as 2 and 3.
+5. **The flicker amplitude, still uncited** (blocked 17 iterations; Maynard 2013 unobtainable), and
+   `Rank::Weighted` with the flagstones' 256 draw calls.
 
 ### One tracked change this pass did not make
 
