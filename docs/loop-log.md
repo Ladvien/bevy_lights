@@ -2412,3 +2412,11 @@ No improvement attempted. Section 1.5 of the skill: tracked changes this pass di
 `git status --short` at pass start: `.omp/skills/bevy-lights-build-loop/SKILL.md`, `README.md`, `examples/bench_lights.rs`, `examples/courtyard.rs`, `examples/readme_quick_start.rs`, `src/flame.rs`, `src/flicker.rs`, `src/lib.rs`, `src/model/fire.rs`, `src/model/mod.rs`, `src/pool.rs`, `tests/flicker.rs`, `tests/pool.rs` (the per-light flicker `depth` work, unchanged since iteration 49). Nothing was built, touched or reverted.
 
 Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
+
+## Iteration 51 — 2026-10-27 — stopped: foreign uncommitted changes in `src/` (thirty-first pass)
+
+No improvement attempted. Section 1.5 of the skill: tracked changes this pass did not make mean stop and log.
+
+`git status --short` at pass start: `.omp/skills/bevy-lights-build-loop/SKILL.md`, `README.md`, `examples/bench_lights.rs`, `examples/courtyard.rs`, `examples/readme_quick_start.rs`, `src/flame.rs`, `src/flicker.rs`, `src/lib.rs`, `src/model/fire.rs`, `src/model/mod.rs`, `src/pool.rs`, `tests/flicker.rs`, `tests/pool.rs` (the per-light flicker `depth` work). GPU free ~5 GB. Nothing was built, touched or reverted.
+
+Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
