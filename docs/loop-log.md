@@ -2503,3 +2503,11 @@ home-still: `distill_search` returned only 0.5-score noise for flame-luminosity 
 3. **A capture path that can show the catch** (the catch runs on `Time<Real>`).
 4. A luminance-measured flicker amplitude: convert Gergely 2020 and Mandin & Most into the corpus once scribe is healthy, and look for a pool-fire radiance-fluctuation paper (Maynard 2013 is unobtainable).
 5. Per-flame fuel-bed `D` in the fragment stage; `Rank::Weighted` against the flagstones' 256 draws; `bench_lights` has no `depth` cases.
+
+## Iteration 58 — 2026-10-27 — stopped: GPU and RAM held by another tenant
+
+No improvement attempted. Section 2 of the skill: VRAM free under 2 GB means log it and wait rather than fight another holder.
+
+Tree clean on `main` at pass start. `nvidia-smi`: 72 MiB VRAM free of 24 GB. `gpu-tenant status`: tenant `3d`, held by `golem-mcp@big` (`animate_mesh`), with grants renewed back to back since 12:52 (four in nine minutes), so no window was in sight. Other residents: vLLM EngineCore 14.9 GB, ollama 3.3 GB, homelab-voice 2.1 GB, laya 1.5 GB. `MemAvailable` 1.7 GiB, and the reaper warned at 13:00 that big is close to wedging; a release `--all-features` build plus an Xvfb capture would have risked the machine. Nothing was built, touched or reverted.
+
+Next pass: run when `gpu-tenant status` shows at least 2 GB VRAM free and `MemAvailable` above ~4 GiB; the iteration-57 backlog stands (1: a bowl that shades its own rim).
