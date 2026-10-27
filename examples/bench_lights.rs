@@ -78,7 +78,7 @@ fn main() {
         let z = (index as i32 / 64) as f32 * 2.0;
         app.world_mut().spawn((
             PointLight { intensity: 0.0, range: 8.0, ..default() },
-            Flicker { base: 8_000.0, phase: index as f32 * 0.7, diameter: None },
+            Flicker { base: 8_000.0, phase: index as f32 * 0.7, diameter: None, ..default() },
             Transform::from_xyz(x, 1.8, z),
         ));
     }
@@ -177,7 +177,7 @@ mod tests {
         for index in 0..lights {
             app.world_mut().spawn((
                 PointLight { intensity: 0.0, ..default() },
-                Flicker { base: 8_000.0, phase: index as f32, diameter: None },
+                Flicker { base: 8_000.0, phase: index as f32, diameter: None, ..default() },
                 Transform::from_xyz(index as f32, 1.8, 0.0),
             ));
         }
