@@ -2558,3 +2558,15 @@ Numbers (elevated camera, pool 4, frame 36, same seed): frame mean 54.74 → 54.
 3. **Bearers are placeholder capsules**: arms, shoulders, a hand that grips; a production or technical source for torch proportions.
 4. **Identify the 1.5 m tongue at `7,1.6,7`, frames 32–40**: confirm it is the catch's flare and that a hand-held torch flaring to that size is what the envelope intends (`kindle_gain` peak against `TORCH_FLAME_HEIGHT`).
 5. A capture path that can show the catch; a luminance-measured flicker amplitude; `bench_lights` has no `depth` cases.
+
+## Iteration 61 — 2026-10-27 — stopped: tracked change in the tree that this pass did not make
+
+No improvement attempted. Section 1, step 5 of the skill: tracked changes the pass did not make mean stop and log them; do not commit or revert them.
+
+`git status --short` on `main` at pass start: ` M .omp/skills/bevy-lights-build-loop/SKILL.md` (+36 lines: a new "Filed issues come before new features" section, issue triage before item choice). Not committed, not reverted. It needs the owner to commit it (or discard it); the next pass will then see a clean tree and apply it.
+
+Environment at the time: `MemAvailable` ~12 GiB, VRAM free ~2.0 GB (tenant `none`; golem-mcp's last grant ran to 19:30Z), load average 20. Resources would have been marginal but not blocking.
+
+Open issues at pass start (read, none acted on): #4 flicker mean the light budget was written against (enhancement), #3 host-declared flame origin (enhancement), #2 flame occlusion/ownership (enhancement), #1 publish 0.2.0 (release, owner's call, skipped). No bug issues are filed.
+
+Next pass: iteration 60's backlog stands (1: a bowl that shades its own rim), ranked with #2–#4 under the new issue rule once the tree is clean.
