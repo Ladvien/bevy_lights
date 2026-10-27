@@ -125,9 +125,15 @@ fn stub_source(name: &str) -> String {
              }\n"
         }
         "bevy_pbr::render::mesh_view_bindings" => {
+            // `world_position` and `exposure` are in the real `View` (`bevy_render/src/view.wesl`) and were missing here.
+            // A shader reading them failed the *parse* rather than passing silently, so this hole was safe; it is closed
+            // because the next shader to read the camera position would have hit it. Declared in the real struct's order,
+            // so a shader that indexes or reads the wrong field type-checks against the same layout it will run with.
             "struct View {\n\
              \x20   world_from_view: mat4x4<f32>,\n\
              \x20   clip_from_world: mat4x4<f32>,\n\
+             \x20   world_position: vec3<f32>,\n\
+             \x20   exposure: f32,\n\
              };\n\
              @group(0) @binding(0) var<uniform> view: View;\n"
         }

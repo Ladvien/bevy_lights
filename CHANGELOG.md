@@ -4,6 +4,17 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Fixed
+
+- **`tools/wesl-check`'s `View` stub was missing `world_position` and `exposure`.** `view.world_position`
+  is in the real `View` (`bevy_render-0.20.0/src/view.wesl`) and the stub declared only
+  `world_from_view` and `clip_from_world`, so any flame shader that read the camera's own position failed
+  the validator's parse — proven both ways: a one-line probe reading the field fails on the old stub with
+  `invalid accessor world_position`, and compiles on the extended one. The stub now carries both fields in
+  the real struct's order. Nothing in the crate read them before; this closes the hole before something
+  does. `AGENTS.md` records the rule: a stub's *bodies* are never run, but its *fields* are type-checked,
+  so a subset stub rejects valid code and a superset accepts invalid code.
+
 ### Added
 
 - **`model::reach::flame_light_offset(height)`** — where a fire's own light belongs, relative to its

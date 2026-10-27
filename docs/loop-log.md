@@ -1925,3 +1925,124 @@ even if you are killed"*, in the working tree when this pass began, as iteration
 Left **uncommitted** again: a tracked change this pass did not write belongs to its author. Its guidance
 was followed — the research note was committed alone before any code, then the implementation, then the
 docs, each landing as its own commit.
+
+## Iteration 19 — 2026-10-26 — the flame from above: found, attempted, reverted; the validator's stub was a hole
+
+Outcome: **the shader change is reverted** (5 rounds, the skill's ceiling, verdict **NOT YET**). What ships is the
+research note and a real fix to `tools/wesl-check`'s `View` stub. The defect below is the largest visible artifact
+this crate has, it is now measured from 0 to 85 degrees, and the next pass starts from round 5 rather than round 1.
+
+### What ranked first, and the runner-up
+
+1. **A flame is invisible from a steep camera.** Picked: it is category 1 (a visible artifact, and a *physically
+   wrong result*), it hits a camera angle most games use and film never does, and it is the crate's own ancestor's
+   documented weakness shipping unmitigated. Measured at a fixed 4 m over a brazier: the flame above the coal bed was
+   **159 px at 0°, 196 px at 15°, and completely gone at 75° and 85°**, with a torch's flame at 85° a **1-pixel
+   sliver**. Cause, exact: an upright camera-facing quad is an *axial* billboard (RTR4 §13.6.3), so its normal is
+   horizontal and the area it presents falls as `cos(elevation)` — 26 % at 75°, 9 % at 85°. Its light keeps working
+   at every angle, so the drawn source disappears while its cast light stays: a motivated-source failure in the
+   direction the light does not have.
+2. **A brazier's coal bed clips to a flat white slab from above** — 74 px at `min channel ≥ 245` at 85°, 0 px at the
+   hero camera, because `examples/courtyard` sets the coals' `emissive` to `blackbody × 1.4` as a *constant* while
+   the ground and box faces brighten with the viewing angle. Discovered while measuring #1 and it *masks* #1: at 85°
+   the thing a player reads is a white rectangle. **This is the next pass's first item**, because it is smaller, it is
+   example-side, and it hides whatever the shader does.
+3. A per-flame fuel-bed `D` in the fragment stage (iterations 16–18's blocker: `MeshTag`'s 32 bits are spent).
+4. The flame's interior is a stripe with a smooth envelope. Blocked by 3.
+5. The flicker amplitude, still uncited (blocked 18 iterations).
+
+### Sources
+
+- craft: `10.7456_tojdac.1674124` (Doğaner — a visible source is how the viewer "logically find where the light
+  comes from"), and `Ga` §11.4.3 (Gregory — a billboard's normal must point at the camera's *focal point*).
+- production: `GP` ch. 6 §6.1 (Nguyen, the crate's own ancestor, names this exact failure and the constraints it
+  needed) and `s2011-advances-pdf-slides` (SIGGRAPH 2011's fire talk — many overlapping puffs precisely so the
+  "particle nature" is hidden, which one quad cannot do).
+- technical: `book_real_time_rendering_4th_akenine` §13.6, §13.6.2, §13.6.3 — the billboard taxonomy, the axial
+  failure in the reference's own words, and the cross-section workaround; and `10.1017_jfm.2018.707` (Xia & Zhang —
+  the flame is axisymmetric, which is *why* the cross-section is a disc).
+- Note: `docs/research/flame-overhead.md`, committed alone as `6e4aaba`.
+
+### The five rounds, and why it was reverted
+
+1. **Tilt the quad's `up` toward horizontal** (the literal "world-oriented billboard"). Worse than nothing: at 60°
+   the flame becomes a leaning plate smearing across the coal slab. Geometric, not tunable.
+2. **Keep the quad upright, draw the projected disc inside it.** The disc landed coplanar with the coal bed and was
+   depth-rejected.
+3. **Lift the disc to the plume's centre and fade the base band by `cross`** (the base band erased the whole disc —
+   every fragment of a cross-section in an upright quad is at the quad's base height). Torch's flame appeared.
+4. **Isotropic quad overhead** — the radial used `FLAME_ASPECT` for both axes and drew an ellipse.
+5. **Stretch the quad's height by `1/cos(e)`** to cancel the upright face's own foreshortening, with the disc's
+   vertical semi-axis at `R·sin(e)`. The arithmetic finally worked: brazier added light **143 px → 2962 px, 81×57**.
+
+The verdict is **NOT YET** on two lines of `## What great looks like`:
+- *A fire at every angle* — PARTLY. The disc is drawn and measurable, but at 85° it is swamped by the clipped coal
+  bed (17 DN of added light over a bed already at 255/244/227).
+- *No pop as the camera rises* — NOT YET. Between 50° and 76° the silhouette is a `mix` of a **full-size** tongue and
+  a full-size disc, so at 75° a teardrop lies diagonally across the brazier with a puff fading in over it. The fix is
+  a dissolve weighted by `cross` — the tongue shrinking as the disc arrives — and it is unbuilt.
+
+PASS, measured: **ground level is unchanged, pixel for pixel** — `magick compare -metric AE` gives **0** differing
+pixels at 45° and 0.58 at 0° between the base build and the changed build, because `OVERHEAD_START` at 50° makes every
+term exactly its old value; and the cost is one `asin`, one `sin`, one `length()` and one flat varying.
+
+### The bug that did ship: the WESL validator's `View` stub was missing a field
+
+The `View` stub in `tools/wesl-check/src/main.rs` declared `world_from_view` and `clip_from_world`. The real struct
+(`bevy_render-0.20.0/src/view.wesl`) also has `world_position`, `exposure` and more, so a shader reading the camera's
+position **failed the validator's parse** — which is how this was found, on the first shader that needed it. Proven
+both ways: a one-line probe reading `view.world_position` fails on the old stub (`invalid accessor world_position`)
+and compiles on the extended one. The stub now carries both fields in the real struct's order, and `AGENTS.md` gains
+the rule — a stub's *bodies* are never run, but its *fields* are type-checked, so a subset stub rejects valid code
+and a superset accepts invalid code.
+
+### Benchmark
+
+`bench_lights`, base worktree (`d0f9519`) against the final tree, **interleaved** so the machine's load is shared,
+two paired rounds on the same host:
+
+| round | current `p50_us` | base `p50_us` | current `pool_p50_us` | base `pool_p50_us` | current `flicker_p50_us` | base |
+|---|---|---|---|---|---|---|
+| 1 | 573 | 612 | 459 | 445 | 221 | 225 |
+| 2 | 624 | 654 | 457 | 470 | 239 | 239 |
+
+**No regression.** The two builds are indistinguishable, which is what the change predicts: the only production
+difference is in `tools/wesl-check`, which is not linked into the crate, and the shader change is reverted. A first
+unpaired pair read 756 against 635 µs — that was machine load, not the change, and the interleaved rounds are the
+honest number.
+
+### The gate
+
+On the final tree: `cargo build --release`, `cargo build`, `cargo test` (**34 lib + 8/3/28 behaviour + 1 readme +
+14 doctests**), `cargo test --features serde`, `cargo build --examples --all-features`,
+`cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps
+--all-features`, `cargo fmt --check`, `cargo build --lib --target wasm32-unknown-unknown`, `tools/wesl-check` — all
+pass.
+
+### Environment
+
+GPU idle throughout (476/24576 MiB, no tenant). `/tmp` was **100 % full (956 KB free)** again, so every capture,
+build and the base worktree's compile ran through the private-tmpfs `unshare -rm` wrapper
+(`/home/ladvien/l19/shoot.sh`) with `TMPDIR=/home/ladvien/tmp`, and the base worktree kept its `target/` at
+`/home/ladvien/l19/base-target` (its first build took 13 min 12 s, so an A/B build is a real cost to budget for).
+Xvfb picked a held display once and was fixed by the wrapper's rotating explicit `-n`.
+
+### Top 5 remaining, ranked
+
+1. **A brazier's coal bed clips to a flat white slab from a steep camera** (74 px at ≥245 at 85°, 0 px at the hero
+   camera). It is the brightest thing in frame at exactly the camera the flame just became visible from, and it
+   masks the flame. `examples/courtyard`'s `emissive: blackbody × 1.4` is a constant; it needs to stop being one.
+2. **The flame from above, round 6**: re-apply round 5's arithmetic (the `1/cos(e)` stretch with the `R·sin(e)`
+   semi-axis) and add the dissolve — the tongue must *shrink* as the disc arrives, not sit at full size behind it.
+   Everything needed is in `docs/research/flame-overhead.md`.
+3. A per-flame fuel-bed `D` in the fragment stage (blocked on a wider `MeshTag` or a second instance attribute —
+   `GpuComponentArrayBuffer` exists in Bevy 0.20 and is the unexamined option).
+4. The flame's interior is a stripe with a smooth envelope. Unblocked by 3.
+5. The flicker amplitude, still uncited 19 iterations, and `Rank::Weighted` with the flagstones' draw calls.
+
+### One tracked change this pass did not make
+
+`.omp/skills/bevy-lights-build-loop/SKILL.md` still carries the unstaged edit adding *"Your work is saved even if
+you are killed"*, in the working tree when this pass began, as iterations 14–18 also logged. Left **uncommitted**
+again: a tracked change this pass did not write belongs to its author. Its guidance was followed — the research note
+was committed alone before any code.
