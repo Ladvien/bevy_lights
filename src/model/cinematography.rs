@@ -261,6 +261,57 @@ pub fn white_balanced(kelvin: f32, balance_kelvin: f32, strength: f32) -> [f32; 
     [out[0].max(0.0) * scale, out[1].max(0.0) * scale, out[2].max(0.0) * scale]
 }
 
+/// A blackbody's **luminance** at `kelvin`, in candelas per square metre: the number a surface's
+/// emissive needs, where [`blackbody_colour`] gives only its hue.
+///
+/// [`blackbody_colour`] normalises to its brightest channel, so it says what colour a source is and
+/// throws its magnitude away. That is the right answer for a **light**, whose intensity a host sets in
+/// lumens. It is the wrong answer for a **surface**, because `StandardMaterial::emissive` is a
+/// *radiance*: Bevy documents its units as cd/m² (`bevy_pbr-0.20.0/src/pbr_material.rs`, on
+/// `emissive`) and multiplies it by the camera's exposure. A glowing surface written from
+/// `blackbody_colour` alone has a temperature that sets its hue and a strength someone guessed.
+///
+/// Here the temperature sets both. Planck's law is integrated across the visible band against the CIE
+/// `ȳ` curve, weighted by the luminous efficacy of 683 lm/W, and divided by π because a blackbody
+/// emitter is Lambertian and emits into a hemisphere. The result is absolute, not normalised: a
+/// **1200 K** surface radiates about **177 cd/m²** and a 1500 K one about **9 050 cd/m²**, a factor of
+/// 51 for 300 K, which is why a fire's glow moves so fast with temperature and why a coal bed is so
+/// much brighter than a stove's ironwork.
+///
+/// The band and the sampling are [`blackbody_colour`]'s own (380–780 nm at 10 nm), and each step is
+/// weighted by its own width, so the two functions are one model read two ways rather than two
+/// spectra that happen to look alike.
+///
+/// ```
+/// # use bevy_lights::model::cinematography::*;
+/// let coal = blackbody_luminance(1200.0);
+/// let ember = blackbody_luminance(1000.0);
+/// // Luminance climbs steeply with temperature: 200 K more is two orders of magnitude, not a shade.
+/// assert!(coal > ember * 20.0, "a coal at 1200 K is far brighter than one at 1000 K: {coal} vs {ember}");
+/// // Absolute, not a share of anything: a surface this hot is a light source.
+/// assert!((coal - 176.5).abs() < 2.0, "a 1200 K blackbody radiates {coal} cd/m²");
+/// ```
+pub fn blackbody_luminance(kelvin: f32) -> f32 {
+    /// The luminous efficacy of radiation at 555 nm, in lumens per watt: what turns a spectrum's
+    /// radiant power into the candelas a camera records.
+    const LUMINOUS_EFFICACY: f32 = 683.0;
+    /// `2hc²` (W·m²), the numerator of Planck's law, times the 1e-9 [`planck`] strips to keep f32
+    /// comfortable and the 10 nm sample width: what converts the sum below into W/m³ of spectral
+    /// radiance integrated over the band. [`blackbody_colour`] never needs it, because it normalises.
+    const SPECTRAL_SCALE: f32 = 1.191_043e-16 * 1e9 * 1e-8;
+
+    let kelvin = if kelvin.is_nan() { 6500.0 } else { kelvin.clamp(1000.0, 40_000.0) };
+    let mut luminous = 0.0f32;
+    for step in 0..=40 {
+        let nm = 380.0 + step as f32 * 10.0;
+        luminous += planck(kelvin, nm * 1e-9) * cie_y(nm);
+    }
+    // The integral of the spectrum against `ȳ`, in W/(m²·sr), times the efficacy: candelas per square
+    // metre. There is no π here — `planck` is already a *radiance*, so the Lambertian division that
+    // would turn an exitance into one has nothing to undo.
+    LUMINOUS_EFFICACY * SPECTRAL_SCALE * luminous
+}
+
 /// A turn in radians, so a caller passing a circle's fraction does not import a constant.
 pub const TURN: f32 = TAU;
 
