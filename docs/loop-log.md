@@ -3062,3 +3062,11 @@ No improvement attempted. Section 1, step 5 of the skill: a tracked change this 
 Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues.
 
 Needs the owner: either let a pass resume `loop/iter-115` (capture, critique, bench, gate, ship) or discard the tree.
+
+## Iteration 117 — 2026-10-27 — stopped: the iteration-115 tree is still stranded
+
+No improvement attempted, same stop as iteration 116 (section 1, step 5). The checkout is still on `loop/iter-115` at `0638bca` with the same nine modified files (+412/−110) and untracked `examples/occlusion.rs`; the newest write is 17:22:38, unchanged since iteration 116 looked. No omp process outside this pass has this repo as its cwd. Not committed, not reverted.
+
+Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues.
+
+Needs the owner: let a pass resume `loop/iter-115` (capture, critique, bench, gate, ship; the tree is the issue-#2 occlusion work) or discard it.
