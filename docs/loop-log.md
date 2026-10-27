@@ -2172,3 +2172,11 @@ saved even if you are killed"*, in the working tree when this pass began, as ite
 logged. Left **uncommitted** again: a tracked change this pass did not write belongs to its author. Its
 guidance was followed, and it earned its keep this pass — the recovery above used the checkpoint it
 describes.
+
+## Iteration 21 — 2026-10-27 — stopped: foreign uncommitted changes in `src/`
+
+No improvement attempted. Section 1.5 of the skill: tracked changes this pass did not make mean stop and log, not commit or revert.
+
+`git status --short` at pass start: `src/flame.rs`, `src/flicker.rs`, `src/lib.rs`, `src/model/fire.rs`, `src/model/mod.rs`, `src/pool.rs` modified (119 insertions, 38 deletions; newest mtime 11:44 today, after the iteration-20 merge), plus the long-standing `SKILL.md` edit. The src diff is an unfinished-looking feature: a per-light `depth` on `Flicker`/`FlameSite`, `flicker_swing(diameter, depth, t, phase)`, `FLICKER_DEPTH` exported, and `Flicker` losing its `Default` derive. No pass, `wiggum` or `omp` process was running, and the work is in no `refs/wiggum` snapshot yet. Left untouched in the working tree.
+
+Next pass: the owner either commits that work (with its research note and CHANGELOG entry, since it changes the flicker model's defaults and API) or discards it; then the iteration-20 backlog stands (bowl that shades its own rim; flame from above, round 6; a capture path for the catch; per-flame fuel-bed `D`; flicker amplitude citation).
