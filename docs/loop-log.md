@@ -2517,3 +2517,44 @@ Next pass: run when `gpu-tenant status` shows at least 2 GB VRAM free and `MemAv
 No improvement attempted. Tree clean on `main`. `free -g`: 31 GB total, 29 used, `MemAvailable` ~1.4 GiB (the skill's bar for a release `--all-features` build plus an Xvfb capture is ~4 GiB). `gpu-tenant status`: tenant `3d` held by `golem-mcp@big` (`animate_mesh`, renewed 13:00, 4 min left), VRAM free 14.9 GB at the first look. A build at this RAM level risks wedging big (iteration 58's reaper warning). Nothing was built, touched or reverted.
 
 Next pass: run when `MemAvailable` is above ~4 GiB and `gpu-tenant status` shows at least 2 GB VRAM free; the iteration-57 backlog stands (1: a bowl that shades its own rim).
+
+## Iteration 60 — 2026-10-27 — a carried flame needs something carrying it
+
+Outcome: **GREAT** on the one target (no flame without a source). Scope: example geometry in `examples/courtyard.rs`; no crate API, shader or lighting change. Benchmark not run: `bench_lights` builds no bearers and nothing on its path changed.
+
+### What ranked first, and the runner-up
+
+1. **Floating flames** (category 1, a light with no source). At the elevated camera (`0,14,14 → 0,0.5,0`) every bearer's flame hung 0.42 m out from its capsule with no hand, stick or lantern under it; found on the first frame inspected, which the previous baseline angles (ground, edge, top-down) had hidden.
+2. Runner-up: iteration 57's item 1, a bowl that shades its own rim — a geometry change needing its own campaign, and big had no RAM headroom for one (load average ~32, `MemAvailable` 1.4–5 GiB).
+
+### Sources
+
+Craft: `10.7456_tojdac.1674124` (Doğaner: "these objects determine the motivation of the light in the scene"). **No production or technical source was consulted** — torch proportions are design defaults, recorded in `docs/research/carried-fire.md`'s amendment (`Research: carried fire needs a held object`) under `Pending index`. That is short of the skill's three-source bar; the item was example props, and the gap is named rather than hidden.
+
+### Critique and verdict
+
+Evidence `/tmp/l60/{before,alt,after}/`. Elevated (`hi.png`): flames now sit on stick or lantern body, held by a fist, joined to the body by an arm; the lanterns read as a different object from the torches. Edge, close and near cameras (`e`, `close`, `near`): same. Flaws at zoom: the arms are rod-thin cylinders and the shoulder joins the capsule's surface mid-chest, so a bearer reads as a stylised figure, not a body; arm radius raised 0.035 → 0.05 after the first round. At `close.png` a near-side flame overlaps its bearer's body and hides the stick. Verdict: **GREAT** for "every flame has a visible source"; the figures themselves stay placeholder capsules.
+
+Numbers (elevated camera, pool 4, frame 36, same seed): frame mean 54.74 → 54.72 (−0.03 %), 1 803 of 921 600 pixels changed above 8 % — the pools did not move.
+
+### Other findings
+
+- A temporal sequence at `7,1.6,7` showed a 1.5 m translucent tongue crossing the frame at frames 32–40 (0.5–0.67 s): inside `KINDLE_SECONDS` (0.6 s), so the catch's designed flare; not verified further. Not a regression, but unconfirmed which fire it was.
+- The Xvfb trap recurred: a reused `-n` display number made a run panic with `XOpenDisplayFailed`, and a later one wrote no image. A fresh `-n` per run fixed both.
+- `cargo test --features serde` took over 20 minutes to compile under load 31 on 12 cores (twice killed by a timeout, once by a wait); it passed when left alone.
+
+### Gate (final tree)
+
+`cargo build --release`, `cargo build`, `cargo test` (39 lib + 9/3/29 behaviour + 1 readme + 19 doctests), `cargo test --features serde`, `cargo build --examples --all-features`, `cargo clippy --all-targets --all-features -- -D warnings`, `RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features`, `cargo fmt --check`, wasm lib build, `tools/wesl-check` — all pass.
+
+### Media
+
+`docs/media/showcase.gif` re-encoded (same recipe and caption, 60 frames, 2.3 MB): the bearers' torches now show sticks and lanterns. Flicker not re-measured through the encode: nothing in the lighting changed.
+
+### Top 5 remaining, ranked
+
+1. **A bowl that shades its own rim** (iteration 20's item 1).
+2. **The flame from above, round 6** (`flame-overhead.md`).
+3. **Bearers are placeholder capsules**: arms, shoulders, a hand that grips; a production or technical source for torch proportions.
+4. **Identify the 1.5 m tongue at `7,1.6,7`, frames 32–40**: confirm it is the catch's flare and that a hand-held torch flaring to that size is what the envelope intends (`kindle_gain` peak against `TORCH_FLAME_HEIGHT`).
+5. A capture path that can show the catch; a luminance-measured flicker amplitude; `bench_lights` has no `depth` cases.
