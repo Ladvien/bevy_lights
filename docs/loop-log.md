@@ -2188,3 +2188,11 @@ No improvement attempted. Section 1.5 of the skill: tracked changes this pass di
 At pass start `git status --short` showed the same set as iteration 21: `src/flame.rs`, `src/flicker.rs`, `src/lib.rs`, `src/model/fire.rs`, `src/model/mod.rs`, `src/pool.rs` (119 insertions, 38 deletions, the per-light flicker `depth` work) plus the long-standing `SKILL.md` edit. File mtimes are 11:44 today, minutes before this pass began at ~11:47, so someone is probably editing the tree now. No `wiggum`/`omp` pass was running. Nothing was touched, built or reverted. GPU free 19.8 GB, so the environment is not the blocker.
 
 Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
+
+## Iteration 23 — 2026-10-27 — stopped: foreign uncommitted changes in `src/` (third pass)
+
+No improvement attempted. Section 1.5 of the skill: tracked changes this pass did not make mean stop and log.
+
+`git status --short` at pass start is unchanged from iterations 21 and 22: `src/flame.rs`, `src/flicker.rs`, `src/lib.rs`, `src/model/fire.rs`, `src/model/mod.rs`, `src/pool.rs` (119 insertions, 38 deletions, the per-light flicker `depth` work) plus the `SKILL.md` edit. Nothing was touched, built or reverted. GPU is free (tenant=none), `/tmp` has 11 GB free, so the environment is not the blocker.
+
+Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
