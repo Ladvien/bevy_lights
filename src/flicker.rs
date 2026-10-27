@@ -9,7 +9,7 @@ use bevy::time::Time;
 
 use crate::LightsSystems;
 use crate::chain_sets;
-use crate::model::{FLICKER_DEPTH, KINDLE_SECONDS, flicker_swing, kindle_gain};
+use crate::model::{FLICKER_DEPTH, KINDLE_SECONDS, flicker_depth, flicker_mean, flicker_swing, kindle_gain};
 
 /// [`FlickerPlugin`]: modulates every [`Flicker`] light and advances every [`Kindle`].
 pub struct FlickerPlugin;
@@ -56,7 +56,7 @@ pub struct Flicker {
     /// [`FLICKER_DEPTH`] (`0.15`, the default) is the crate's inherited flicker, `0.70..=1.00`. A calm
     /// lantern is [`CALM_FLICKER_DEPTH`](crate::CALM_FLICKER_DEPTH) (`0.05`); a gusting torch
     /// [`WHIPPING_FLICKER_DEPTH`](crate::WHIPPING_FLICKER_DEPTH) (`0.3`). `base` is the *peak*: to hit a
-    /// budget on average, set it to `budget / `[`flicker_mean`](crate::flicker_mean)`(depth)`. Clamped to
+    /// budget on average, set it to `budget / `[`flicker_mean`](crate::flicker_mean)`(depth)`, or build the fire with [`Flicker::at_mean`], and change it later with [`Flicker::set_depth`] (keeps the mean). Clamped to
     /// `0..=`[`MAX_FLICKER_DEPTH`](crate::MAX_FLICKER_DEPTH). **Set the same
     /// value on the [`FlameSite`](crate::FlameSite) drawn on the fire**, so the flame and the ground
     /// under it dip together.
@@ -66,6 +66,45 @@ pub struct Flicker {
 impl Default for Flicker {
     fn default() -> Self {
         Self { base: 0.0, phase: 0.0, diameter: None, depth: FLICKER_DEPTH }
+    }
+}
+
+impl Flicker {
+    /// A fire whose budget is written at its **mean**: `base` is solved as
+    /// `mean / `[`flicker_mean`]`(depth)`, so the light averages `mean` at any `depth`. Set the other
+    /// fields with struct update: `Flicker { phase: 1.3, ..Flicker::at_mean(lumens, 0.3) }`.
+    ///
+    /// `depth` is stored clamped, as [`flicker_depth`] reads it.
+    ///
+    /// ```
+    /// # use bevy_lights::*;
+    /// let fire = Flicker::at_mean(1000.0, WHIPPING_FLICKER_DEPTH);
+    /// assert!((fire.mean() - 1000.0).abs() < 1e-3);
+    /// assert!(fire.base > 1000.0); // the peak sits above the mean
+    /// ```
+    pub fn at_mean(mean: f32, depth: f32) -> Self {
+        let depth = flicker_depth(depth);
+        Self { base: mean / flicker_mean(depth), depth, ..Self::default() }
+    }
+
+    /// The light's mean intensity before the kindle: `base · `[`flicker_mean`]`(depth)`.
+    pub fn mean(&self) -> f32 {
+        self.base * flicker_mean(self.depth)
+    }
+
+    /// Writes `base` so the light averages `mean` at the current `depth`. A system that rewrites a
+    /// light's lumens every frame calls this and cannot forget the depth.
+    pub fn set_mean(&mut self, mean: f32) {
+        self.base = mean / flicker_mean(self.depth);
+    }
+
+    /// Changes `depth` and **keeps the mean**: `base` is re-solved so the fire breathes differently
+    /// and gives the same light on average. A `base` of `0.0` (a put-out fire) stays `0.0`. `depth`
+    /// is stored clamped, as [`flicker_depth`] reads it.
+    pub fn set_depth(&mut self, depth: f32) {
+        let mean = self.mean();
+        self.depth = flicker_depth(depth);
+        self.set_mean(mean);
     }
 }
 

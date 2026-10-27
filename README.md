@@ -94,7 +94,7 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         PointLight { color: LinearRgba::rgb(r, g, b).into(), intensity: lumens, range: 10.0, ..default() },
         // `diameter` sizes the flicker by the fuel bed (`f = 1.5/√D` Hz); `None` uses the un-sized rate.
-        Flicker { base: lumens, phase: 0.0, diameter: Some(0.34), ..default() },
+        Flicker { phase: 0.0, diameter: Some(0.34), ..Flicker::at_mean(lumens, FLICKER_DEPTH) },
         Kindle::default(),
         // `kindle` grows the flame with its light, on the same 0.6 s envelope, and `diameter` matches
         // the `Flicker`'s so the drawn flame breathes at the same rate the light does. `depth` is how
@@ -143,8 +143,8 @@ fn night_fill() -> DirectionalLight {
 ```
 
 A light you want to be able to *re-light* is re-inserted with `Kindle::default()`, which writes
-`Kindled` again. A fire you want dimmer or brighter changes its `Flicker::base`, never the light's
-`intensity`: the crate writes the intensity every frame.
+`Kindled` again. A fire you want dimmer or brighter is changed through the `Flicker` (`set_mean`, never the light's
+`intensity`: the crate writes the intensity every frame).
 
 `examples/courtyard.rs` is the full showcase, `examples/bench_lights.rs` the CPU bench.
 
@@ -158,7 +158,7 @@ and a deeper flicker is a darker trough rather than a brighter crest. At the def
 of `FLICKER_DEPTH` that is 0.70–1.00 of base with a mean of 0.85 — the window a lumen budget written
 against the mean assumes. `Flicker::depth` is how far that fire dips, so a lantern can ask for 0.03 and
 a gusting torch for 0.3; `flicker_depth` clamps the value to `0..=MAX_FLICKER_DEPTH` (0.5, the deepest
-whose trough is still zero) and reads a `NaN` as the default. `CALM_FLICKER_DEPTH` (0.05) and `WHIPPING_FLICKER_DEPTH` (0.3) name the two ends, and `flicker_mean(depth)` is the multiplier's mean, so a budget is `base = lumens / flicker_mean(depth)` rather than a hand-divided `0.85`.
+whose trough is still zero) and reads a `NaN` as the default. `CALM_FLICKER_DEPTH` (0.05) and `WHIPPING_FLICKER_DEPTH` (0.3) name the two ends, and `flicker_mean(depth)` is the multiplier's mean, so a budget is written with `Flicker::at_mean(lumens, depth)` (or `PoolCandidate::at_mean`) rather than a hand-divided `0.85`. A system that rewrites a light's lumens every frame calls `Flicker::set_mean`, and a fire that changes how it breathes calls `Flicker::set_depth`, which keeps the mean: a deeper depth never silently dims the fire.
 
 Give a fire its fuel-bed size (`Flicker { diameter: Some(0.34) }`) and its flicker runs at the measured
 puffing rate, `1.5/√D` Hz — a brazier at 2.6 Hz, a pyre at 0.75 — so a large fire breathes more slowly

@@ -313,3 +313,44 @@ fn a_budget_solved_through_flicker_mean_is_the_light_the_fire_averages() {
         assert!((mean / budget - 1.0).abs() < 0.03, "depth {depth}: mean {mean} against budget {budget}");
     }
 }
+
+/// The time-average of what a fire's light does, from the crate's own swing, over 300 s at 50 Hz.
+fn averaged(fire: &Flicker) -> f32 {
+    let n = 15_000;
+    (0..n)
+        .map(|i| fire.base * flicker_swing(fire.diameter, fire.depth, i as f32 / 50.0, fire.phase))
+        .sum::<f32>()
+        / n as f32
+}
+
+/// A fire built at its mean averages that mean at every named depth, and changing its depth keeps it.
+#[test]
+fn a_fire_built_at_its_mean_averages_it_and_keeps_it_through_a_depth_change() {
+    for depth in [CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH] {
+        let mut fire = Flicker { phase: 0.9, diameter: Some(0.34), ..Flicker::at_mean(1000.0, depth) };
+        assert!((fire.base * flicker_mean(depth) / 1000.0 - 1.0).abs() < 1e-4);
+        assert!((averaged(&fire) / 1000.0 - 1.0).abs() < 0.01, "depth {depth}");
+        for next in [CALM_FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, MAX_FLICKER_DEPTH] {
+            fire.set_depth(next);
+            assert!((averaged(&fire) / 1000.0 - 1.0).abs() < 0.01, "{depth} -> {next}");
+        }
+    }
+}
+
+/// A put-out fire stays out through `set_depth`; a stray depth is clamped and leaves a finite base; a
+/// per-frame `set_mean` follows the fire's current depth.
+#[test]
+fn set_depth_and_set_mean_hold_at_the_edges() {
+    let mut out = Flicker::at_mean(0.0, FLICKER_DEPTH);
+    out.set_depth(WHIPPING_FLICKER_DEPTH);
+    assert_eq!(out.base, 0.0);
+    let mut fire = Flicker::at_mean(500.0, FLICKER_DEPTH);
+    for stray in [9.0, -3.0, f32::NAN] {
+        fire.set_depth(stray);
+        assert!(fire.base.is_finite() && (0.0..=MAX_FLICKER_DEPTH).contains(&fire.depth));
+        assert!((fire.mean() - 500.0).abs() < 1e-2, "{stray}: {}", fire.mean());
+    }
+    fire.set_depth(WHIPPING_FLICKER_DEPTH);
+    fire.set_mean(1200.0);
+    assert!((averaged(&fire) / 1200.0 - 1.0).abs() < 0.01);
+}
