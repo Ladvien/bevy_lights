@@ -3054,3 +3054,7 @@ Acceptance 1–4 pinned: 300 s at 50 Hz time-average of `base · flicker_swing` 
 3. The flame from above, round 6 (`flame-overhead.md`).
 4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 5. #4 ask 3 (site takes its light's depth) needs a site-to-light link.
+
+## Operator note, 2026-10-27: iteration 115's occlusion work is parked, not lost
+
+Issue #2's occlusion work was left uncommitted on a loop branch, and iterations 116 to 126 each stopped on the dirty tree. It is parked as two substantive commits on `loop/iter-115` (pushed): `ee759b3`, the research note, and `1260f0e`, which holds `src/flame.rs`, `src/flame.wesl`, `examples/occlusion.rs`, `tools/wesl-check`, and the README, CHANGELOG and `docs/research/flame-occlusion.md` edits. The branch sits directly on `main` at `3f0581e` and merges without conflict, but nothing in it has been built, tested or captured. Taking #2 can start from `git cherry-pick ee759b3 1260f0e` (not the eleven log commits between them, which only record the stop), then the usual gate and a look at the captures.
