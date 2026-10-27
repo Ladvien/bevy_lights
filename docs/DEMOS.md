@@ -60,7 +60,8 @@ things that made the first attempts look wrong:
 # 1. Capture at 2 saved frames per simulated second => 30 fps of content (60 fps sim, EVERY=2).
 LIGHTS_FRAMES=260 LIGHTS_SHOT_DIR=/tmp/show LIGHTS_SHOT_FROM=9 LIGHTS_SHOT_EVERY=2 \
 LIGHTS_FOCUS_WALK=18 ./target/release/examples/courtyard
-# 2. Take the first 60 saved frames (2 s: the kindle, then the fires breathing) and encode at FPS=30.
+# 2. Take the first 60 saved frames (2 s: the lights still kindling, then the fires breathing) and
+#    encode at FPS=30. The flames are already full size here — see "Seeing a flame catch".
 FPS=30 WIDTH=480 FONT=… BOLD=… tools/gif.sh /tmp/show/short docs/media/showcase.gif "…"
 ```
 
@@ -77,6 +78,14 @@ trade for this subject.
 **Verified:** one brazier's pool in the encoded GIF reads **2.50 Hz** against the law's 2.57, peak-to-peak
 74 % of its mean. Measure a *single* pool, not the frame: four pools at different phases cancel and the
 number reads 1.5 Hz whatever the truth is.
+
+Re-checked against the committed `showcase.gif` on 2026-10-27, on 20 x 20 px windows of lit ground beside
+a brazier that never clip (a clipped window is a flame's own edge and says nothing about the light): the
+strongest component above 2 Hz is **2.27 Hz** in the brightest of them, 6.6 % of that window's mean, and
+2.38 Hz in the widest swing (34 % peak to peak). A whole-frame mean at 2.57 Hz is 0.35 % of its mean,
+which is the point of the paragraph above. The spread from 2.50 to 2.27 is the crop's own noise floor
+over a two-second file, not a different rate: at 30 fps and 60 frames the periodogram's bins are 0.5 Hz
+apart, and every number here comes from reading between them.
 
 ## Seeing a flame catch
 
