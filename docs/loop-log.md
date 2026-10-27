@@ -2962,3 +2962,31 @@ No improvement attempted. Section 1, step 5 of the skill: a tracked change this 
 Open issues, re-fetched: #4 flicker mean (enhancement), #3 host-declared flame origin (enhancement), #2 flame occlusion/ownership (enhancement), #1 publish 0.2.0 (release, skipped). No bug issues filed.
 
 Needs the owner: commit the skill edit or discard it. Until then every pass stops here. Iteration 60's backlog stands (1: a bowl that shades its own rim), to be ranked with #2–#4.
+
+## Iteration 111 — 2026-10-27 — flicker_mean and named depths (issue #4)
+
+Outcome: API addition, no rendering change. Scope: `src/model/fire.rs` (`flicker_mean`, `CALM_FLICKER_DEPTH` 0.05, `WHIPPING_FLICKER_DEPTH` 0.3), re-exports, `Flicker::depth` docs, `docs/research/flicker-depth.md` (Parameters, Deviations), README, CHANGELOG, `tests/flicker.rs`.
+
+### Ranking
+
+Open issues: #4 flicker mean (enhancement), #3 host-declared flame origin (enhancement), #2 flame occlusion/ownership (enhancement), #1 publish 0.2.0 (release, seen, skipped). No bug issues. Candidates: (1) #4, category 3 API friction: a host cannot write a lumen budget against a fire's mean without hand-dividing by 0.85; (2) iteration 60's item 1, a bowl that shades its own rim (needs a capture campaign; GPU had ~5 GiB free). #4 won as concrete, testable and finishable in one pass; #2 and #3 need a design for a site-to-light link and rank next.
+
+### Sources
+
+Craft/technical: `docs/research/flicker-depth.md`'s own cited sources, unchanged — the additions are algebra (`1 − depth`) and two design-default names for that note's existing 0.03/0.3 examples. No new production source was consulted; no new amplitude measurement exists (Maynard 2013 still unobtainable).
+
+### Not done from #4
+
+Ask 3 (`FlameSite` takes its light's depth): a site and the light it motivates are different entities (a pool light belongs to the pool), and no link between them exists. Recorded in the research note's Deviations. Asks 1, 2 and 4's assertion (a budget solved through `flicker_mean` is the average the light really puts out) are done; #4 is left open.
+
+### Verification
+
+No shader, system or default changed, so no capture or benchmark was run (`flicker_swing` and the flicker systems are untouched). Full gate passed: `cargo build --release`, `cargo build`, `cargo test`, `cargo test --features serde` (39 lib + 10/3/29 behaviour + 1 readme + 20 doctests), examples, clippy `-D warnings`, doc `-D warnings`, fmt, wasm lib build, `tools/wesl-check`. Skipped: GIF re-encode (nothing shown changed).
+
+### Top 5 remaining, ranked
+
+1. #3 host-declared flame origin, which also supplies the site-to-light link #4's ask 3 needs.
+2. #2 flame occlusion / whose torch it is.
+3. A bowl that shades its own rim (iteration 20's item 1).
+4. The flame from above, round 6 (`flame-overhead.md`).
+5. Bearers are placeholder capsules; a luminance-measured flicker amplitude.

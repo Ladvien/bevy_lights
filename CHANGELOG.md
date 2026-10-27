@@ -21,6 +21,13 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **`flicker_mean`, `CALM_FLICKER_DEPTH` and `WHIPPING_FLICKER_DEPTH`** (issue #4). `flicker_mean(depth)`
+  is the mean of a fire's multiplier (`1 − depth`, read through `flicker_depth`), so a host writes a lumen
+  budget against the fire's mean and solves `Flicker::base = budget / flicker_mean(depth)` instead of
+  dividing by a literal `0.85` that goes stale when a fire chooses a depth. The two constants (`0.05`,
+  `0.3`, design defaults) name the calm and gusting ends of `docs/research/flicker-depth.md`. Nothing
+  existing changes. Not done: a `FlameSite` that follows its light's depth, which needs a site-to-light
+  link the crate does not have (see issue #3).
 - **`Flicker::depth`, `FlameSite::depth`, `PoolCandidate::depth`; `flicker_swing` takes a depth** (landed in
   `33fd290`, recorded here). How far a fire dips was the crate's inherited `0.15` for every fire; a host
   now chooses it per fire (a calm lantern `0.03`, a guttering torch `0.3`). The multiplier runs

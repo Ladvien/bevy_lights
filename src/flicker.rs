@@ -54,7 +54,10 @@ pub struct Flicker {
     /// flicker is a darker trough.
     ///
     /// [`FLICKER_DEPTH`] (`0.15`, the default) is the crate's inherited flicker, `0.70..=1.00`. A calm
-    /// lantern is `0.03`; a gusting torch `0.3`. Clamped to `0..=`[`MAX_FLICKER_DEPTH`](crate::MAX_FLICKER_DEPTH). **Set the same
+    /// lantern is [`CALM_FLICKER_DEPTH`](crate::CALM_FLICKER_DEPTH) (`0.05`); a gusting torch
+    /// [`WHIPPING_FLICKER_DEPTH`](crate::WHIPPING_FLICKER_DEPTH) (`0.3`). `base` is the *peak*: to hit a
+    /// budget on average, set it to `budget / `[`flicker_mean`](crate::flicker_mean)`(depth)`. Clamped to
+    /// `0..=`[`MAX_FLICKER_DEPTH`](crate::MAX_FLICKER_DEPTH). **Set the same
     /// value on the [`FlameSite`](crate::FlameSite) drawn on the fire**, so the flame and the ground
     /// under it dip together.
     pub depth: f32,
