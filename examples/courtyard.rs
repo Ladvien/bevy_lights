@@ -49,9 +49,11 @@ mod common;
 
 use std::f32::consts::TAU;
 
+use bevy::asset::RenderAssetUsages;
 use bevy::camera::Exposure;
 use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::prelude::*;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_lights::*;
 
 use common::{Draw, ExampleHarness, camera, camera_placement, seed};
@@ -90,6 +92,52 @@ const POOL_EDGE_LUX: f32 = 250.0;
 /// flicker by. A bigger bed breathes more slowly. `LIGHTS_BED` overrides it; `LIGHTS_UNSIZED=1` gives
 /// the fires no size at all (the crate's inherited rate), which is the comparison this feature is.
 const BRAZIER_BED: f32 = 0.34;
+
+// ---- The fuel bed's char field: a bed of coals is a surface with a temperature field on it, not a
+// ---- uniform emitter. `docs/research/fuel-bed.md` has the defect, the sources and the measurements.
+
+/// The side of the generated char field, in texels: the bed is 0.34 m and the nearest camera in the
+/// showcase is 4 m away, so a texel is about 2.7 mm — far under a pixel at every captured angle.
+const COAL_FIELD: u32 = 128;
+/// The char field's seed: the example's own, so a capture's coals are reproducible like its figures.
+const COAL_FIELD_SEED: u32 = 7;
+/// The share of the bed's full emissive its **hottest** fuel carries. Above the 1.4 the flat bed used,
+/// so giving the bed structure does not dim the source: a fire is supposed to be the brightest thing in
+/// frame, and the fix is what is *under* the brightness, not less of it.
+const COAL_FIELD_HIGH: f32 = 1.45;
+/// The share of the bed's full emissive its **charred** part carries: charcoal still glows, but at a
+/// third of the fuel, which is well under the point it clips.
+const COAL_FIELD_LOW: f32 = 0.30;
+
+/// The bed's full emissive, as a multiple of a blackbody at [`FIRE_KELVIN`] normalised to 1: the
+/// brightest thing in the frame that is not the flame, times [`COAL_FIELD_HIGH`] on its hottest coals.
+const COAL_EMISSIVE: f32 = 1.45;
+
+/// The char field as an image a `StandardMaterial` can sample: [`char_field`] over the bed, mapped to a
+/// share by [`char_share`].
+///
+/// One channel, because both of the bed's textures are the same field — `base_color_texture` and
+/// `emissive_texture` sample the same image, so a charred texel is both darker *and* dimmer, which is
+/// what char is. An `R8Unorm` image is a share in `0..=1` with no colour space in between, so the value
+/// a caller passed in is the value the shader multiplies by.
+fn char_field_image(seed: u32) -> Image {
+    let mut data = Vec::with_capacity((COAL_FIELD * COAL_FIELD) as usize);
+    for y in 0..COAL_FIELD {
+        for x in 0..COAL_FIELD {
+            let u = x as f32 / (COAL_FIELD - 1) as f32;
+            let v = y as f32 / (COAL_FIELD - 1) as f32;
+            let share = char_share(char_field(u, v, seed), COAL_FIELD_LOW, COAL_FIELD_HIGH);
+            data.push((share * 255.0).round() as u8);
+        }
+    }
+    Image::new(
+        Extent3d { width: COAL_FIELD, height: COAL_FIELD, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        data,
+        TextureFormat::R8Unorm,
+        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
+    )
+}
 
 /// The fuel bed the braziers are given, or nothing for the un-sized rate.
 fn brazier_bed() -> Option<f32> {
@@ -370,17 +418,33 @@ fn spawn_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let stone_material = materials.add(stone(Srgba::rgb(0.32, 0.30, 0.28)));
     let bowl_material = materials.add(stone(Srgba::rgb(0.10, 0.09, 0.09)));
     // The coals glow at the fire's own temperature, brighter than the stone can reflect: the source
     // the light is motivated by, and the same colour as the flame on it.
     let [cr, cg, cb] = blackbody_colour(FIRE_KELVIN, 1.0);
-    // The coals are hot, not white-hot: at this exposure 1.4 is the brightest thing in the frame that
-    // is not the flame, and 3.0 clipped to a white slab with no shape in it.
+    // A bed of coals is a *surface with a temperature field on it*, not a uniform emitter: burnt-through
+    // char is dark and glowing fuel is bright, interleaved at the scale of a coal. A constant emissive
+    // was the brightest thing in the frame at every camera and clipped to a flat white slab from above,
+    // where it also hid the flame standing in it — `docs/research/fuel-bed.md` has the measurements.
+    //
+    // The field is generated here rather than shipped as an image: it is three octaves of the same
+    // value noise the flame shader uses, seeded from the run, so a capture is reproducible and the
+    // example stays one binary. It drives the bed's *albedo* as well as its emissive, because both of
+    // the bed's brightnesses are wrong when it is flat: char absorbs the fire's own light instead of
+    // reflecting it, and the diffuse term is most of what clips from overhead.
+    let bed_field = images.add(char_field_image(COAL_FIELD_SEED));
     let coal_material = materials.add(StandardMaterial {
+        // Char, not coal: the darkest part of the field, and the part that reflects least.
         base_color: Srgba::rgb(0.14, 0.10, 0.09).into(),
-        emissive: LinearRgba::rgb(cr * 1.4, cg * 1.4, cb * 1.4),
+        base_color_texture: Some(bed_field.clone()),
+        // The hottest fuel, at this exposure the brightest thing in frame that is not the flame. The
+        // field scales it per texel, so the bed's mean sits under the clip point and its hottest coals
+        // do not.
+        emissive: LinearRgba::rgb(cr * COAL_EMISSIVE, cg * COAL_EMISSIVE, cb * COAL_EMISSIVE),
+        emissive_texture: Some(bed_field),
         ..default()
     });
     let coal_bed = meshes.add(Cuboid::new(0.34, 0.05, 0.34));

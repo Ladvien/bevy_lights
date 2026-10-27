@@ -5,12 +5,14 @@
 //! are packed — are testable without an app, a window or a GPU, and are the part of the crate a
 //! host is most likely to want to reuse in its own systems.
 
+pub mod char;
 pub mod cinematography;
 pub mod fire;
 pub mod pool;
 pub mod reach;
 pub mod tag;
 
+pub use char::{char_field, char_share};
 pub use cinematography::{
     HIGH_KEY, LOW_KEY, MOON_KEY, blackbody_colour, fill_for, fire_lumens, key_to_fill, stops, white_balanced,
 };
