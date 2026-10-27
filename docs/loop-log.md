@@ -2452,3 +2452,11 @@ No improvement attempted. Section 1.5 of the skill: tracked changes this pass di
 `git status --short` at pass start lists the same per-light flicker `depth` work as iterations 21–54 (13 files across `src/`, `examples/`, `tests/`, `README.md`, plus the `SKILL.md` edit). GPU free ~19 GB. Nothing was built, touched or reverted.
 
 Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
+
+## Iteration 56 — 2026-10-27 — stopped: foreign uncommitted changes in `src/` (thirty-sixth pass)
+
+No improvement attempted. Section 1.5 of the skill: tracked changes this pass did not make mean stop and log.
+
+`git status --short` at pass start lists the same per-light flicker `depth` work as iterations 21–55 (13 files across `src/`, `examples/`, `tests/`, `README.md`, plus the `SKILL.md` edit). Nothing was built, touched or reverted.
+
+Next pass: the owner commits that work (with its research note and CHANGELOG entry) or discards it; then the iteration-20 backlog stands.
