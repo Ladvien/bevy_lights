@@ -23,7 +23,7 @@ fn setup(mut commands: Commands) {
     commands.spawn((
         PointLight { color: LinearRgba::rgb(r, g, b).into(), intensity: lumens, range: 10.0, ..default() },
         // `diameter` sizes the flicker by the fuel bed (`f = 1.5/√D` Hz); `None` uses the un-sized rate.
-        Flicker { base: lumens, phase: 0.0, diameter: Some(0.34), ..default() },
+        Flicker { phase: 0.0, diameter: Some(0.34), ..Flicker::at_mean(lumens, FLICKER_DEPTH) },
         Kindle::default(),
         // `kindle` grows the flame with its light, on the same 0.6 s envelope, and `diameter` matches
         // the `Flicker`'s so the drawn flame breathes at the same rate the light does. `depth` is how
