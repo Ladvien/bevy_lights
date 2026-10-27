@@ -49,9 +49,11 @@ mod common;
 
 use std::f32::consts::TAU;
 
+use bevy::asset::RenderAssetUsages;
 use bevy::camera::Exposure;
 use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::prelude::*;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_lights::*;
 
 use common::{Draw, ExampleHarness, camera, camera_placement, seed};
@@ -90,6 +92,56 @@ const POOL_EDGE_LUX: f32 = 250.0;
 /// flicker by. A bigger bed breathes more slowly. `LIGHTS_BED` overrides it; `LIGHTS_UNSIZED=1` gives
 /// the fires no size at all (the crate's inherited rate), which is the comparison this feature is.
 const BRAZIER_BED: f32 = 0.34;
+
+// ---- The fuel bed's char field: a bed of coals is a surface with a temperature field on it, not a
+// ---- uniform emitter. `docs/research/fuel-bed.md` has the defect, the sources and the measurements.
+
+/// The side of the generated char field, in texels: the bed is 0.34 m and the nearest camera in the
+/// showcase is 4 m away, so a texel is about 2.7 mm — far under a pixel at every captured angle.
+const COAL_FIELD: u32 = 128;
+/// The char field's seed: the example's own, so a capture's coals are reproducible like its figures.
+const COAL_FIELD_SEED: u32 = 7;
+
+/// The three stops of the bed's radiance ramp, which is what a bed of coals actually is: a *field of
+/// temperatures* over a surface, not one colour at three brightnesses.
+///
+/// A blackbody at 1900 K has **no blue at all** — `blackbody_colour` returns `[1.0, 0.181, 0.0]`, and
+/// its blue stays at zero below about 2000 K — so multiplying one fire colour by a field can only ever
+/// produce crimson, whatever the field does. The bed needs three colours, and its charred part needs
+/// one that is not a fire colour at all.
+const COAL_CHAR: [f32; 3] = [0.10, 0.045, 0.020];
+const COAL_EMBER: [f32; 3] = [2.2, 0.32, 0.05];
+const COAL_FUEL: [f32; 3] = [9.0, 1.70, 0.25];
+
+/// The char field as an image a `StandardMaterial` can sample: [`char_field`] over the bed, mapped by
+/// [`char_radiance`] to the bed's radiance.
+///
+/// `Rgba32Float`, not `R8Unorm`: the bed's hottest coals are a radiance of **7.0** linear, four times
+/// what a display can show, and that headroom is the whole point — it is what lets the tonemapper keep
+/// the fuel white-hot while the char beside it stays dark. An 8-bit texture clamps at 1.0 and the bed
+/// clips to a single flat colour again, exactly the defect this exists to fix. `StandardMaterial`'s
+/// `base_color_texture` is sampled as linear RGB with no colour-space conversion, so the values here
+/// are the radiances the shader multiplies by.
+fn coal_radiance_image(seed: u32) -> Image {
+    let mut data = Vec::with_capacity((COAL_FIELD * COAL_FIELD * 4) as usize);
+    for y in 0..COAL_FIELD {
+        for x in 0..COAL_FIELD {
+            let u = x as f32 / (COAL_FIELD - 1) as f32;
+            let v = y as f32 / (COAL_FIELD - 1) as f32;
+            let rgb = char_radiance(char_field(u, v, seed), COAL_CHAR, COAL_EMBER, COAL_FUEL);
+            data.extend_from_slice(&rgb);
+            data.push(1.0);
+        }
+    }
+    let bytes = data.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<u8>>();
+    Image::new(
+        Extent3d { width: COAL_FIELD, height: COAL_FIELD, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        bytes,
+        TextureFormat::Rgba32Float,
+        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
+    )
+}
 
 /// The fuel bed the braziers are given, or nothing for the un-sized rate.
 fn brazier_bed() -> Option<f32> {
@@ -370,17 +422,36 @@ fn spawn_scene(
     mut commands: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
+    mut images: ResMut<Assets<Image>>,
 ) {
     let stone_material = materials.add(stone(Srgba::rgb(0.32, 0.30, 0.28)));
     let bowl_material = materials.add(stone(Srgba::rgb(0.10, 0.09, 0.09)));
-    // The coals glow at the fire's own temperature, brighter than the stone can reflect: the source
-    // the light is motivated by, and the same colour as the flame on it.
-    let [cr, cg, cb] = blackbody_colour(FIRE_KELVIN, 1.0);
-    // The coals are hot, not white-hot: at this exposure 1.4 is the brightest thing in the frame that
-    // is not the flame, and 3.0 clipped to a white slab with no shape in it.
+    // A bed of coals is a *surface with a temperature field on it*, not a uniform emitter: burnt-through
+    // char is dark and glowing fuel is bright, interleaved at the scale of a coal. A constant emissive
+    // was the brightest thing in the frame at every camera and clipped to a flat white slab from above,
+    // where it also hid the flame standing in it — `docs/research/fuel-bed.md` has the measurements.
+    //
+    // The bed is **unlit**, and its glow rides on `base_color`: a glowing coal is not a reflector, it is
+    // an emitter, and Bevy's unlit path returns `base_color` *without* running `apply_pbr_lighting`. A
+    // measurement chose that. With the bed's emissive set to `0` and its field's share at 0.05, the
+    // slab's pixels still read 251/192/141 — unchanged to the DN — because the white was never the
+    // emissive: it was the bed's *diffuse* answer to its own point light, 0.55 m above it at ~58 000 lx
+    // on an albedo of 0.14. Unlit removes exactly that, leaving the bed reporting only the temperature
+    // it is at. Physically that is the rule the note cites — "Blackbody emitters are perfectly diffuse;
+    // they emit radiance equally in all directions" — and a bed cannot reflect the fire that is
+    // standing on it, because that fire is itself.
+    //
+    // The field is generated here rather than shipped as an image: it is three octaves of the same
+    // value noise the flame shader uses, seeded from the run, so a capture is reproducible and the
+    // example stays one binary.
+    let bed_field = images.add(coal_radiance_image(COAL_FIELD_SEED));
     let coal_material = materials.add(StandardMaterial {
-        base_color: Srgba::rgb(0.14, 0.10, 0.09).into(),
-        emissive: LinearRgba::rgb(cr * 1.4, cg * 1.4, cb * 1.4),
+        unlit: true,
+        // White: the texture *is* the bed's radiance, texel by texel, so the material's own colour
+        // must not tint it. Multiplying by a fire colour here is what made the first attempt a
+        // crimson bed — a 1900 K blackbody has no blue to lose.
+        base_color: Color::WHITE,
+        base_color_texture: Some(bed_field),
         ..default()
     });
     let coal_bed = meshes.add(Cuboid::new(0.34, 0.05, 0.34));
