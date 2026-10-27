@@ -728,11 +728,23 @@ fn a_handed_out_light_takes_the_props_own_fire_phase_and_size() {
     focus_at(&mut app, Vec3::ZERO);
     // One candidate near, one far, each with its own fire: different phases and one sized bed.
     app.world_mut().spawn((
-        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, phase: Some(2.5), diameter: Some(0.34) },
+        PoolCandidate {
+            offset: Vec3::Y * 2.0,
+            intensity: 100.0,
+            phase: Some(2.5),
+            diameter: Some(0.34),
+            ..default()
+        },
         Transform::from_translation(Vec3::new(1.0, 0.0, 0.0)),
     ));
     app.world_mut().spawn((
-        PoolCandidate { offset: Vec3::Y * 2.0, intensity: 100.0, phase: Some(4.1), diameter: None },
+        PoolCandidate {
+            offset: Vec3::Y * 2.0,
+            intensity: 100.0,
+            phase: Some(4.1),
+            diameter: None,
+            ..default()
+        },
         Transform::from_translation(Vec3::new(9.0, 0.0, 0.0)),
     ));
     settle(&mut app);

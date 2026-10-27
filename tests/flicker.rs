@@ -65,7 +65,7 @@ fn a_kindling_light_is_heard_once_and_settles_inside_its_flicker_window() {
     let mut app = app();
     app.world_mut().spawn((
         PointLight { intensity: 0.0, ..default() },
-        Flicker { base: 1000.0, phase: 0.0, diameter: None },
+        Flicker { base: 1000.0, phase: 0.0, diameter: None, ..default() },
         Kindle::default(),
     ));
     // Two seconds, more than three times the kindle's length.
@@ -88,7 +88,7 @@ fn a_light_present_on_the_very_first_frame_is_heard_once() {
     let mut app = bare_app();
     app.world_mut().spawn((
         PointLight { intensity: 0.0, ..default() },
-        Flicker { base: 1000.0, phase: 0.0, diameter: None },
+        Flicker { base: 1000.0, phase: 0.0, diameter: None, ..default() },
         Kindle::default(),
     ));
     for _ in 0..30 {
@@ -103,7 +103,7 @@ fn a_spot_light_flickers_too() {
     let mut app = app();
     app.world_mut().spawn((
         SpotLight { intensity: 0.0, ..default() },
-        Flicker { base: 5000.0, phase: 1.3, diameter: None },
+        Flicker { base: 5000.0, phase: 1.3, diameter: None, ..default() },
     ));
     let mut seen = Vec::new();
     for _ in 0..12 {
@@ -133,7 +133,7 @@ fn a_culled_light_keeps_its_intensity_and_still_kindles() {
         .world_mut()
         .spawn((
             PointLight { intensity: 1234.0, ..default() },
-            Flicker { base: 1000.0, phase: 0.0, diameter: None },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None, ..default() },
             Kindle::default(),
             // What a camera's visibility pass leaves on a light it culled: false.
             ViewVisibility::default(),
@@ -160,7 +160,7 @@ fn a_hidden_light_is_not_written() {
         .world_mut()
         .spawn((
             PointLight { intensity: 0.0, ..default() },
-            Flicker { base: 1000.0, phase: 0.0, diameter: None },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None, ..default() },
             Visibility::Hidden,
         ))
         .id();
@@ -181,7 +181,7 @@ fn re_inserting_the_kindle_writes_a_second_message() {
         .world_mut()
         .spawn((
             PointLight { intensity: 0.0, ..default() },
-            Flicker { base: 1000.0, phase: 0.0, diameter: None },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None, ..default() },
             Kindle::default(),
         ))
         .id();
@@ -201,7 +201,7 @@ fn a_light_without_a_kindle_reaches_its_plain_flicker_at_once() {
     let mut app = app();
     app.world_mut().spawn((
         PointLight { intensity: 0.0, ..default() },
-        Flicker { base: 1000.0, phase: 0.0, diameter: None },
+        Flicker { base: 1000.0, phase: 0.0, diameter: None, ..default() },
     ));
     app.update();
     let intensity = intensities(&mut app)[0];
@@ -222,14 +222,14 @@ fn a_sized_fire_flickers_at_the_puffing_laws_rate_and_an_unsized_one_at_the_inhe
         .world_mut()
         .spawn((
             PointLight { intensity: 0.0, ..default() },
-            Flicker { base: 1000.0, phase: 0.0, diameter: Some(0.34) },
+            Flicker { base: 1000.0, phase: 0.0, diameter: Some(0.34), ..default() },
         ))
         .id();
     let plain = app
         .world_mut()
         .spawn((
             PointLight { intensity: 0.0, ..default() },
-            Flicker { base: 1000.0, phase: 0.0, diameter: None },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None, ..default() },
         ))
         .id();
     app.update();
