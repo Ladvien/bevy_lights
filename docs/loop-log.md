@@ -3094,3 +3094,11 @@ No improvement attempted, same stop as iterations 116–119 (section 1, step 5).
 Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues. GPU tenant none, ~4.3 GiB VRAM in use.
 
 Needs the owner: let a pass resume `loop/iter-115` (capture, critique, bench, gate, ship; the tree is the issue-#2 occlusion work) or discard it.
+
+## Iteration 121 — 2026-10-27 — stopped: the iteration-115 tree is still stranded
+
+No improvement attempted, same stop as iterations 116–120 (section 1, step 5). The checkout is on `loop/iter-115` at `cc15e65` with the same nine modified files (+412/−110) and untracked `examples/occlusion.rs`; the newest write is still 17:22:38. No omp, cargo or courtyard process for this repo is running (only other repos' CI runners). Not committed, not reverted.
+
+Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues. GPU ~4.9 GiB VRAM in use, ~19 GiB free.
+
+Needs the owner: let a pass resume `loop/iter-115` (capture, critique, bench, gate, ship; the tree is the issue-#2 occlusion work) or discard it.
