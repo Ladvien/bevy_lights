@@ -3126,3 +3126,11 @@ No improvement attempted, same stop as iterations 116–123 (section 1, step 5).
 Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues. GPU ~17 GiB VRAM free.
 
 Needs the owner: let a pass resume `loop/iter-115` (the tree is the issue-#2 occlusion work) or discard it.
+
+## Iteration 125 — 2026-10-27 — stopped: the iteration-115 tree is still stranded
+
+No improvement attempted, same stop as iterations 116–124 (section 1, step 5). The checkout is on `loop/iter-115` at `fc7940e` with the same nine modified files and untracked `examples/occlusion.rs` (issue-#2 occlusion work, ungated). Not committed, not reverted.
+
+Open issues: #4, #3, #2 (enhancements), #1 (release, skipped). No bug issues. GPU ~19 GiB VRAM free.
+
+Needs the owner: let a pass resume `loop/iter-115` or discard it.
