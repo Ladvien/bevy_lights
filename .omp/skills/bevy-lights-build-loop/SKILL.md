@@ -68,7 +68,18 @@ Preflight home-still now, so research is not blocked later:
 Build first (`cargo build --release --examples --all-features`; the WESL shader is embedded at build
 time, so a stale build silently captures the old shader). Keep everything under `/tmp/lN/` (`N` the
 iteration), the baseline under `/tmp/lN/before/`. Keep a worktree of the starting commit for later
-comparisons: `git worktree add /tmp/base HEAD`.
+comparisons, **detached, at a commit, and off `/tmp`**: `git worktree add --detach ~/lN_base <sha>`,
+built with `CARGO_TARGET_DIR=~/lN_base-target`.
+
+**Never name a branch there, and never `main`.** A worktree with a branch checked out holds that
+branch, and while `main` is held nothing can check it out: on 2026-10-27 `git checkout main` in this
+loop's clone failed for exactly that reason.
+
+**The baseline is yours to remove, and removing it is part of finishing.** Before you write the
+pass's last log line, whether it shipped or refused, run `git worktree remove ~/lN_base` (plain:
+never `--force`) and `rm -rf ~/lN_base-target`. If git refuses because the baseline has a change in
+it, name the file in the log and leave it. Abandoned baselines left 37 GB of build output on
+2026-10-27.
 
 On **big** (Linux, RTX 3090). Check the GPU first: `gpu-tenant status`. If VRAM free is under 2 GB, log
 it and wait rather than fighting another holder.
