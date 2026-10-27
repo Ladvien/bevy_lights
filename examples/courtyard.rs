@@ -168,6 +168,9 @@ const TORCH_HAND: Vec3 = Vec3::new(0.42, 0.35, 0.16);
 /// A carried torch's flame, and the bigger flame of a lantern.
 const TORCH_FLAME_HEIGHT: f32 = 0.35;
 const LANTERN_FLAME_HEIGHT: f32 = 0.5;
+/// A torch's stick, and a lantern's body: the held object that ends at the flame's foot.
+const TORCH_STICK: f32 = 0.55;
+const LANTERN_BODY: f32 = 0.14;
 
 /// The world height of a carried fire's light over the ground: the hand's height plus the flame's own
 /// centre.
@@ -552,6 +555,14 @@ fn spawn_scene(
     let cloth = materials.add(stone(Srgba::rgb(0.20, 0.19, 0.22)));
     let head = meshes.add(Sphere::new(0.11));
     let skin = materials.add(stone(Srgba::rgb(0.42, 0.33, 0.28)));
+    // What the flame is held by: a flame with nothing under it is a light with no source
+    // (`docs/research/carried-fire.md`, iteration 60). Dark wood and iron, so the fire's own pool is what lights them.
+    let wood = materials.add(stone(Srgba::rgb(0.09, 0.06, 0.04)));
+    let iron = materials.add(stone(Srgba::rgb(0.05, 0.05, 0.055)));
+    let stick = meshes.add(Cylinder::new(0.02, TORCH_STICK));
+    let lamp = meshes.add(Cylinder::new(0.07, LANTERN_BODY));
+    let fist = meshes.add(Sphere::new(0.05));
+    let arm = meshes.add(Cylinder::new(0.05, 1.0));
     for index in 0..BEARERS {
         let radius = draw.range(3.0, 15.0);
         let centre = Vec3::new(0.0, 0.0, 0.0);
@@ -592,6 +603,44 @@ fn spawn_scene(
                 // read off that same geometry, not typed a second time.
                 let flame_height = if lantern { LANTERN_FLAME_HEIGHT } else { TORCH_FLAME_HEIGHT };
                 let at = Vec3::new(TORCH_HAND.x, TORCH_HAND.y, TORCH_HAND.z);
+                // The held object ends at the flame's foot (`at`): a stick below a torch's flame, a lantern's
+                // body below a lantern's. The fist closes on it, and an arm joins the fist to the shoulder.
+                let (held, held_material, held_centre, grip) = if lantern {
+                    (lamp.clone(), iron.clone(), LANTERN_BODY * 0.5, LANTERN_BODY + 0.03)
+                } else {
+                    (stick.clone(), wood.clone(), TORCH_STICK * 0.5, TORCH_STICK * 0.5)
+                };
+                bearer.spawn((
+                    Name::new("Held object"),
+                    Mesh3d(held),
+                    MeshMaterial3d(held_material),
+                    Transform::from_translation(at - Vec3::Y * held_centre),
+                    NotShadowCaster,
+                    NotShadowReceiver,
+                ));
+                let hand = at - Vec3::Y * grip;
+                bearer.spawn((
+                    Name::new("Fist"),
+                    Mesh3d(fist.clone()),
+                    MeshMaterial3d(skin.clone()),
+                    Transform::from_translation(hand),
+                    NotShadowCaster,
+                    NotShadowReceiver,
+                ));
+                let shoulder = Vec3::new(0.13, 0.45, 0.04);
+                let reach = hand - shoulder;
+                bearer.spawn((
+                    Name::new("Arm"),
+                    Mesh3d(arm.clone()),
+                    MeshMaterial3d(cloth.clone()),
+                    Transform {
+                        translation: shoulder + reach * 0.5,
+                        rotation: Quat::from_rotation_arc(Vec3::Y, reach.normalize()),
+                        scale: Vec3::new(1.0, reach.length(), 1.0),
+                    },
+                    NotShadowCaster,
+                    NotShadowReceiver,
+                ));
                 bearer.spawn((
                     Name::new("Torch fire"),
                     PoolCandidate {
