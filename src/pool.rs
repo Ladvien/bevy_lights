@@ -206,6 +206,17 @@ pub struct PoolCandidate {
     pub depth: Option<f32>,
 }
 
+impl PoolCandidate {
+    /// A candidate whose budget is written at its **mean**: `intensity` is solved as
+    /// `mean / `[`flicker_mean`](crate::flicker_mean)`(depth)` and `depth` is set, so the light the
+    /// pool hands out averages `mean` (at gain 1) at any depth. Set the other fields with struct
+    /// update: `PoolCandidate { offset, ..PoolCandidate::at_mean(lumens, 0.3) }`.
+    pub fn at_mean(mean: f32, depth: f32) -> Self {
+        let depth = crate::model::flicker_depth(depth);
+        Self { intensity: mean / crate::model::flicker_mean(depth), depth: Some(depth), ..Self::default() }
+    }
+}
+
 /// One of the crate's spawned real lights. Marks an entity the pool owns and drives.
 ///
 /// A host styles these rather than fighting them: recolour them for the palette, give them a marker

@@ -3034,3 +3034,23 @@ No shader or default changed: no capture, benchmark (bench has no flame path) or
 3. The flame from above, round 6 (`flame-overhead.md`).
 4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 5. #4 ask 3 (site takes its light's depth) needs a site-to-light link.
+
+## Iteration 114 — 2026-10-27 — Flicker::at_mean, set_mean, set_depth (issue #5)
+
+Outcome: API addition, no rendering change. Scope: `Flicker::{at_mean, mean, set_mean, set_depth}` (`src/flicker.rs`), `PoolCandidate::at_mean` (`src/pool.rs`), two behaviour tests in `tests/flicker.rs`, README (quick start builds its light with `at_mean`), CHANGELOG.
+
+### Ranking
+
+Open issues: #5 (enhancement: a deeper depth silently dims a light), #4 (partly done), #3 (answered), #2 (partly done), #1 publish (release, seen, skipped). No bug issues. #5 first: it is the newest and makes #4's correct solve impossible to forget; self-contained and testable. Runner-up: #2 occlusion fade (needs a design and GPU captures).
+
+### Verification
+
+Acceptance 1–4 pinned: 300 s at 50 Hz time-average of `base · flicker_swing` is within 1 % of the mean at calm/default/whipping depths and after `set_depth` to each of calm/whipping/max; a base of 0 stays 0; NaN/out-of-range depth clamps with a finite base. No shader, system or default changed: no capture, benchmark or GIF. Full gate passed (build release/debug, test, test --features serde, examples, clippy, doc, fmt, wasm lib, wesl-check). The quick-start light is now 15 % dimmer than before (it was peak = `lumens`, now mean = `lumens`), which is the point.
+
+### Top 5 remaining, ranked
+
+1. #2 occlusion fade (`FlameSite::depth_fade`) and `visible_from`.
+2. A bowl that shades its own rim.
+3. The flame from above, round 6 (`flame-overhead.md`).
+4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+5. #4 ask 3 (site takes its light's depth) needs a site-to-light link.
