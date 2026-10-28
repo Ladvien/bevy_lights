@@ -7,7 +7,7 @@
 //!
 //! # What to look for
 //!
-//! - **The four braziers** (`Brazier`): each a box of coals with a shadow-casting `PointLight` at
+//! - **The four braziers** (`Brazier`): each an iron bowl of coals with a shadow-casting `PointLight` at
 //!   +0.9 m and a [`FlameSite`] on its rim. They all start with [`Kindle::default()`], so the first
 //!   0.6 s is the whole courtyard catching at once; the `kindled` lines on stdout are the four
 //!   [`Kindled`] messages.
@@ -108,6 +108,12 @@ const COAL_FIELD_SEED: u32 = 7;
 
 /// How far below the lip the coal bed's top face sits, in metres. See `docs/research/brazier-bowl.md`.
 const BED_BELOW_LIP: f32 = 0.05;
+/// The char-field value whose radiance the lining's glow is tinted from: a dull ember.
+const LINING_EMBER_FIELD: f32 = 0.35;
+/// The lining's glow at the bed's edge, as a fraction of that ember's radiance.
+const LINING_GLOW: f32 = 0.8;
+/// How fast the glow dies up the wall, as a fraction of the profile's `v`.
+const LINING_GLOW_FALL: f32 = 0.15;
 /// Sides of the bowl's revolved profile.
 const BOWL_SEGMENTS: usize = 32;
 
@@ -163,6 +169,31 @@ fn bowl_mesh(lining: bool) -> Mesh {
         .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
         .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
         .with_inserted_indices(Indices::U32(indices))
+}
+
+/// The heat the soot lining takes from the bed, as an emissive texture over the lining's profile: the
+/// mesh's `v` runs from the lip (0) down the wall to the bed (0.5) and on to the centre (1), and the wall
+/// glows from the bed's edge upward with a falloff of `LINING_GLOW_FALL` of the profile. The radiance at the
+/// bed's edge is `LINING_GLOW` of a dull ember's. Design defaults, `docs/research/brazier-bowl.md`.
+fn lining_glow_image() -> Image {
+    const ROWS: u32 = 64;
+    let ember = coal_radiance(LINING_EMBER_FIELD);
+    let mut data: Vec<f32> = Vec::with_capacity((ROWS * 4 * 4) as usize);
+    for row in 0..ROWS {
+        let v = row as f32 / (ROWS - 1) as f32;
+        let glow = if v < 0.5 { LINING_GLOW * (-(0.5 - v) / LINING_GLOW_FALL).exp() } else { LINING_GLOW };
+        for _ in 0..4 {
+            data.extend_from_slice(&[ember[0] * glow, ember[1] * glow, ember[2] * glow, 1.0]);
+        }
+    }
+    let bytes = data.iter().flat_map(|f| f.to_le_bytes()).collect::<Vec<u8>>();
+    Image::new(
+        Extent3d { width: 4, height: ROWS, depth_or_array_layers: 1 },
+        TextureDimension::D2,
+        bytes,
+        TextureFormat::Rgba32Float,
+        RenderAssetUsages::RENDER_WORLD | RenderAssetUsages::MAIN_WORLD,
+    )
 }
 
 /// The char field as an image a `StandardMaterial` can sample as its **emissive**: [`char_field`] over
@@ -277,7 +308,7 @@ fn sky_colour() -> Color {
     let [r, g, b] = white_balanced(SKY_KELVIN, BALANCE_KELVIN, 1.0);
     LinearRgba::rgb(r, g, b).into()
 }
-/// The brazier boxes' places: the courtyard's four inner corners, 5 m out from the centre.
+/// The braziers' places: the courtyard's four inner corners, 5 m out from the centre.
 const BRAZIERS: [Vec3; 4] = [
     Vec3::new(5.0, 0.0, 5.0),
     Vec3::new(-5.0, 0.0, 5.0),
@@ -501,6 +532,11 @@ fn spawn_scene(
         base_color: Srgba::rgb(0.016, 0.0145, 0.013).into(),
         perceptual_roughness: 0.95,
         reflectance: 0.0,
+        // The wall nearest the bed is heated by it and glows dull red; the glow dies toward the rim, which
+        // is what makes the inside a gradient instead of one tone (`docs/research/brazier-bowl.md`).
+        emissive: LinearRgba::new(1.0, 1.0, 1.0, 1.0),
+        emissive_texture: Some(images.add(lining_glow_image())),
+        emissive_exposure_weight: 1.0,
         ..default()
     });
     // A bed of coals is a *surface with a temperature field on it*, not a uniform emitter: burnt-through
@@ -558,7 +594,7 @@ fn spawn_scene(
     // differently got a bed that did not match the fire standing on it — and `LIGHTS_UNSIZED`, whose
     // whole point is to compare two flicker rates, drew the same box either way.
     let bed_side = brazier_bed().unwrap_or(BRAZIER_BED);
-    let coal_bed = meshes.add(Cuboid::new(bed_side, 0.05, bed_side));
+    let coal_bed = meshes.add(Circle::new(bed_side * 0.5));
 
     // The ground: one plane, so the pool's falloff has somewhere to read, and polished enough that a
     // fire puts a highlight on it rather than a flat wash.
@@ -606,7 +642,8 @@ fn spawn_scene(
                     Name::new("Coal bed"),
                     Mesh3d(coal_bed.clone()),
                     MeshMaterial3d(coal_material.clone()),
-                    Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 - BED_BELOW_LIP - 0.025, 0.0),
+                    Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 - BED_BELOW_LIP, 0.0)
+                        .with_rotation(Quat::from_rotation_x(-std::f32::consts::FRAC_PI_2)),
                     NotShadowCaster,
                 ));
                 // The fire's size, from its pool: POOL_LUX at BRAZIER_POOL metres out, from a light
