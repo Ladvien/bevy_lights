@@ -39,7 +39,7 @@
 //!             Kindle::default(),
 //!             // `diameter` matches the `Flicker`'s, so the drawn flame breathes with the light.
 //!             FlameSite { height: 0.9, phase: 0.0, kindle: 0.0, diameter: Some(0.34),
-//!                 depth: FLICKER_DEPTH }));
+//!                 depth: FLICKER_DEPTH, depth_fade: false }));
 //!         commands.spawn((MyFocus, Transform::default()));
 //!         // A carried fire: one entity holds the `FlameSite` and the `PoolCandidate`, so the light it
 //!         // is handed sits in the flame the host can see. `offset` is the flame's own centre, measured
@@ -50,7 +50,8 @@
 //!                 intensity: 8_000.0,
 //!                 ..default()
 //!             },
-//!             FlameSite { height, phase: 9.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH },
+//!             FlameSite { height, phase: 9.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH,
+//!                 depth_fade: false },
 //!             Transform::from_xyz(4.0, 0.0, 2.0)));
 //!     });
 //! # }
