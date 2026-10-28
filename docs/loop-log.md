@@ -3481,3 +3481,17 @@ Conclusion, with 141 (intensity), 142 (knee), 143 (ramp hue): the patch is the f
 3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 4. Banding in the GIF's pool gradients.
 5. A hue-correct hot core (needs the host's tonemapper; design only).
+
+## Iteration 145 — 2026-10-28 — Re-captured the overhead fire to size backlog item 1; nothing shipped
+
+Open issues: #4 (criterion 3 delivered in 130, `FlameSite::fire` landed), #3 answered, #1 publish (release, seen, skipped); no bug issues; `gh` reachable. GPU free, 16 GiB RAM, /tmp 55 %. Tree clean at start. Corpus re-scan and home-still preflight not run (no crate change).
+
+Captured the courtyard at 66° (eye 6.63,4.85,5) and 85° (eye 5.3,9,5) and a side view, frame 90, 1280x720 (`/tmp/l145/before/`). 85°: the fire reads as a bright orange point in a lit ring, with no flaw at full frame. 66° at 4x zoom (`/tmp/l145/c66.png`): the flame is a soft, dim orange fan behind and above the coal bed, and the bed's small disc (about 260 px across at 4x) is the sharpest, brightest thing in the frame; the tongue does not read as a volume standing on the bed. That is the "layered volume" gap of the backlog, and it is a shader rewrite of the overhead branch of `src/flame.wesl` (lines 283-327) that needs its own research round (`docs/research/flame-overhead.md`) and several capture rounds; it was not started, so nothing was changed, gated or benched.
+
+### Top 5 remaining, ranked
+
+1. Layered volume in the overhead flame at ~66°: an inner and an outer shell so the tongue stands on the bed instead of fanning behind it (evidence above).
+2. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+4. Banding in the GIF's pool gradients.
+5. A hue-correct hot core (needs the host's tonemapper; design only).
