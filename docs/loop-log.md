@@ -3514,3 +3514,21 @@ So the disc is simply weak at this angle: its mask (`smoothstep(0, .26, disc) * 
 3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 4. Banding in the GIF's pool gradients.
 5. A hue-correct hot core (needs the host's tonemapper; design only).
+
+## Iteration 147 — 2026-10-28 — Overhead disc gain x1.6: visible but NOT YET; reverted, nothing shipped
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. GPU free, 14 GiB RAM, /tmp 56 %. Tree clean at start. Corpus re-scan and home-still preflight not run (no new source).
+
+Took iteration 146's item 1. Experiment (`/tmp/l147/{before,after}/c66.png`, courtyard, eye 6.63,4.85,5 look 5,1.2,5, frame 90, 3x crop of 400x300+440+270): in the overhead branch of `src/flame.wesl`, mask `smoothstep(0,.26,disc)*licks` x1.6 clamped to 1.4, and heat `disc` x1.3. `wesl-check` ok. Side views unchanged by construction (`overhead.x` = 0).
+
+Critique: after, the flame body gains defined lick edges and a pale core instead of a dim fan, a real improvement. Still: the tongue sits behind and above the bed rather than standing on it (no volume), the scene's ground is a near-uniform saturated orange (scene exposure, not a crate defect) so contrast stays low, and the bed disc remains the sharpest feature. Verdict NOT YET (not showcase). Reverted with `git checkout src/flame.wesl`; no gate or bench run (no change shipped); no baseline worktree.
+
+**Next** (untried): combine the gain with an inner/outer shell (two disc radii at different heat), and capture against a darker courtyard exposure so contrast can be judged; the gain alone is a candidate component (x1.6 mask, x1.3 heat).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame volume: the x1.6/x1.3 gain (above) plus inner and outer shells; judge under darker exposure; needs a research note round.
+2. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+4. Banding in the GIF's pool gradients.
+5. A hue-correct hot core (needs the host's tonemapper; design only).
