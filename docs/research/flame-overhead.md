@@ -67,12 +67,10 @@ and the production answer — a body of particles — is quoted in the SIGGRAPH 
 same concealment: "Rendering is working quite hard to try to hide the particle nature of the system." A hundred
 overlapping puffs cannot all be edge-on at once; one quad can.
 
-## What was attempted, and why it was reverted
+## What was attempted, and what shipped
 
-**The shader change is reverted this iteration.** The defect, its cause and the measurements stand; the visual fix
-did not reach GREAT, so the crate is back at the commit this pass started from and `src/flame.wesl` is unchanged.
-Five rounds were spent, which is the skill's ceiling. What each round established is recorded here so the next
-attempt starts from the fifth, not the first.
+**Round 6 ships (iteration 139); rounds 1-5 (iteration 19) were reverted.** The defect, its cause and the measurements
+stand. Rounds 1-5 are kept because each one rules something out; round 6 is the section after them.
 
 ### What was measured, before
 
@@ -112,56 +110,55 @@ before its core does. The torch-bearers' flames at 85° were a **1-pixel sliver*
    went from **143 px of ≥3 DN** (round 3) to **2962 px in an 81×57 bbox** (round 5), and the torch's 1-pixel
    sliver became a compact puff at 85°.
 
-### Why round 5 is still NOT YET
+### Why round 5 was NOT YET
 
-Judged at 4× against this note's `## What great looks like`:
+At 85° the brazier's disc was swamped by a clipped white coal slab (an example defect, fixed since by the char-field bed,
+`fuel-bed.md`), and between 50° and 76° the tongue's full-size teardrop sat under the disc instead of giving way to it.
+Round 5's arithmetic (a `1/cos` stretch with an `R·sin(e)` semi-axis) was right; its construction was not.
 
-- **A fire at every angle — PARTLY.** The brazier's disc is drawn and measurable, and the torch's is a visible puff.
-  But at 85° the brazier's disc is **swamped by its own coal bed**, which is a clipped white slab 32×9 px in the middle
-  of it: the flame's added light peaks at 17 DN against a bed already at 255/244/227, so the thing a player reads at
-  that camera is a white rectangle with a slightly warmer halo. That is the *second* defect this iteration found, and
-  it is not the flame's — `examples/courtyard` sets the coals' `emissive` to `blackbody × 1.4` as a constant, and at
-  85° the ground and box faces are bright enough that the slab is the brightest thing in frame; at the crate's own
-  hero camera the same slab never clips at all (0 pixels ≥ 230/240). Fixing it means the coal bed's emissive has to
-  stop being a constant, which is a scene-and-exposure question, not a shader one.
-- **No pop as the camera rises — NOT YET.** Between 50° and 76° the silhouette is a blend of tongue and disc, and at
-  60–75° the *drawn* shape is still the tongue's teardrop with the disc fading in over it: the capture at 75° shows a
-  teardrop lying diagonally on the brazier rather than a puff. The blend needs the tongue to shrink as the disc
-  arrives, not to sit at full size behind it.
-- **The footprint stays on the fire — PASS.** The disc is centred on the coals; the added-light bbox straddles them.
-- **The same fire from the side — PASS, measured.** At 0° and 45° the frame is **pixel-identical** to the base build
-  (`magick compare -metric AE` = 0 and 0.58 pixels-of-one-channel respectively); `OVERHEAD_START` at 50° makes every
-  term exactly its old value below it.
-- **Cheap — PASS.** One `asin`, one `sin` and one `length()`; one flat varying; no second draw.
+### Round 6: what shipped
 
-So the verdict is **NOT YET**, and per the skill the code is reverted rather than shipped.
+1. **The coal bed was already fixed** (iteration 137), so the first prerequisite of the round-5 list was met: at 85° the
+   bed is a textured ember field, not a slab.
+2. **The upright stretched quad was the real fault, not the blend.** A world-space quad stretched by `1/cos(e)` is
+   `stretch · size` tall in the world, so its upper vertices rise towards a camera 4 m up and are magnified by
+   perspective; the screen image was a trapezoid whose bed-side edge was nowhere near the plume's centre (debug capture,
+   solid colour). And a plane through the brazier's origin is **inside the bowl**, which the depth test hides. Sliding
+   the stretched quad along its view rays onto a camera-facing plane keeps the corner pixels but not the interior: the
+   perspective-correct `uv` is then no longer the flame's image on screen, which is what moved the flame up and off
+   the bed in three captures.
+3. **Past `OVERHEAD_START` the quad is a camera-facing quad through the plume's centre** (`SOURCE_HEIGHT`, the point the
+   depth fade already uses), `OVERHEAD_HEIGHT` flame heights tall. The upright flame is drawn on it as the image it has on
+   screen: a world height `h` lands `h·cos(e)` above the centre, so the tongue is sampled at
+   `SOURCE_HEIGHT + sy / cos(e)`. Below 50° the vertex stage keeps the upright quad, so level frames do not change.
+4. **The cross-section** is an ellipse `R` wide and `R·sin(e)` tall (floor `OVERHEAD_SQUASH`), faded in by
+   `smoothstep(OVERHEAD_START, OVERHEAD_FULL, e)`. Its edge and its brightness are rippled by **its own fbm in the
+   ellipse's coordinates**: reusing the tongue's `n1`, which runs along the flame's height (a few pixels long from above),
+   drew horizontal streaks across the bowl at 80° and 85°.
+5. **The tongue gives way**: its foot softens by `0.30·topdown` (a hard horizontal line across the bed was the tongue's seat)
+   and it is dimmed by `OVERHEAD_TONGUE` at full overhead.
 
-### What the next attempt should do differently
-
-1. **Fix the coal bed first.** A clipped white slab at the camera the flame just became visible from is the bigger
-   defect, it is in the example rather than the shader, and it hides whatever the shader does. The measured line: the
-   flame must add light to a bed that is not already at the ceiling (`min channel ≥ 245` at 85°, 0 px at the hero
-   camera).
-2. **Shrink the tongue as the disc arrives.** `body` and `body_round` must be a *dissolve* weighted by `cross`, not a
-   `mix` of two full-size silhouettes; at 75° the tongue's teardrop is still full size underneath the disc.
-3. **Keep round 5's arithmetic** — the `1/cos(e)` stretch with the `R·sin(e)` semi-axis is what made the disc the
-   right size in the world, and it is the part worth carrying forward.
-4. **Measure with added light, not pixel counts.** The coal slab clips and is static, so any warm-pixel or
-   temporal-variance metric is dominated by it; frame-minus-base in the bed's window is the only honest number here,
-   and it is what the numbers above use.
+Measured on `examples/courtyard`, brazier at 4 m, 1280×720, frame 60 (`/tmp/l139/`): a bare coal bed at 75°, 80° and 85°
+before; a bright core with an orange halo centred on the bed at every angle from 50° to 86° after, the tongue shortening
+into it over a sweep of eleven angles with no step (window means move by under 5 DN between neighbouring angles, which is
+the camera's own travel). At 0°, 30° and 45° the frame differs from the build before by 1 channel of 1 pixel
+(`magick compare -metric AE`: 0.004, 0.007, 0.004), i.e. is unchanged.
 
 ## Parameters
 
-Every number below is from the reverted attempt: it is the tuning the next pass should start from, not a claim about
-shipped behaviour.
+Round 6's values, all in `src/flame.wesl`; each is a design default calibrated in captures unless a source is named.
 
 | parameter | value | source |
 |---|---|---|
 | `OVERHEAD_START` | 0.873 rad (50°) | design default: below a third-person camera's usual pitch of ~50° the flame is the upright tongue exactly as before, so no ground-level frame changes |
 | `OVERHEAD_FULL` | 1.326 rad (76°) | design default: the elevation at which an upright quad has lost `cos 76° = 76 %` of its area, calibrated in captures |
 | `squash` floor | 0.18 | design default: `sin(10°)`, keeps the ellipse from becoming a line at a camera that is nearly level |
-| disc radius `R` | `FLAME_HALF_WIDTH = 0.20` of the flame's height, rippled `±25 %` by `n1` | the plume's own widest half-width, already in the shader; the ripple is the existing turbulence |
-| overhead quad aspect | 0.9 | design default: `4·FLAME_HALF_WIDTH = 0.8` plus a margin for the rippled rim |
+| disc radius `R` | `FLAME_HALF_WIDTH = 0.20` of the flame's height, rippled `±25 %` by the disc's own fbm | the plume's own widest half-width, already in the shader |
+| `OVERHEAD_HEIGHT` | 1.0 flame heights | design default: covers the foreshortened tongue (±0.35) and the ellipse (±0.2) at every elevation past 50° |
+| `OVERHEAD_COS_FLOOR` | 0.05 | design default: `cos` is floored when a screen distance is turned back into a world height, so a camera straight down does not divide by zero |
+| `OVERHEAD_TONGUE` | 0.6 | design default: the share of the tongue's brightness that is gone at full overhead, judged in captures |
+| tongue foot softening | `+0.30·topdown` on the 0.06 foot | design default: removes the hard line across the bed |
+| disc brightness | `clamp(1.2·(ripple − 0.5) + 1.0, 0, 1.3)` | design default |
 | overhead rim cooling | `1 − 0.45·radial` | design default, from the tongue's `1 − 0.85·u` reduced because a cross-section has no long axis to fall off along |
 
 ## Validation targets
@@ -189,11 +186,16 @@ shipped behaviour.
 - **The cross-section is drawn inside the upright quad rather than as a second quad.** A second horizontal quad
   would cost a second draw and a second material, and would need its own depth and blend ordering against the coal
   bed it sits in — for a shape that is one `length()` away in the shader.
-- **The flame is still not a volume, and the blend is the reverted attempt's worst flaw.** Between 50 and 76 degrees
-  the silhouette was a `mix` of a full-size tongue and a full-size disc, so at 75° the capture shows a teardrop lying
-  diagonally across the brazier with a disc fading in over it, rather than one shape turning into another. The fix is
-  a dissolve weighted by `cross` — the tongue shrinking as the disc arrives — and it is unbuilt.
-- **The `wesl-check` stub fix is kept even though the shader change is not.** The stub declared only `world_from_view`
+- **The flame is still not a volume.** From above it is a rippled ellipse with a hot core and a foreshortened tongue, not a
+  body of fire with internal structure; its edge is soft (`smoothstep(0, 0.35)`), which is how a translucent flame ends
+  but is the main thing a sharper art director would ask to be crisper.
+- **The camera's elevation is taken from the ray to the plume's centre** (`view.world_from_view[3]`), which is exact for a
+  perspective camera. For an orthographic camera that translation is the near/far midpoint, so a flame well off the view axis
+  reads an elevation a little off its true one; the error is the flame's offset over the camera's distance, small at any
+  far plane a game uses (the occlusion example's is 6000).
+- **Hard switch at 50° to the camera-facing quad.** The tongue is sampled so that its image is the upright quad's to within
+  a pixel, and the cross-section's weight is 0 at 50°, so there is no visible step; but the geometry changes at that angle.
+- **The `wesl-check` stub fix** (an earlier iteration's). The stub declared only `world_from_view`
   and `clip_from_world`; a shader reading `view.world_position` failed to compile rather than passing silently, so the
   gap was safe here, but it is a real hole in the tool and the next shader change will read that field at once. The
   stub now carries `world_position` and `exposure` in the real struct's order, with the values non-zero.
