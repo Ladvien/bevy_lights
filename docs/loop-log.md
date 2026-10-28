@@ -3748,3 +3748,19 @@ Verified on main 5ad7db0: `cargo build --release`, `cargo test` (all suites pass
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
 5. A time envelope for the overhead fade, only if a host reports it.
+
+## Iteration 161 — 2026-10-28 — no change shipped (backlog unchanged, distill still down)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (bd91ac7), 17 GiB RAM, VRAM 4/24 GB used, /tmp 60 %. `hs status` (live): distill and qdrant down (embedded 0), scribe .110 backend unavailable, bmb scribe idle; no `distill_search`. A new download, "Frequency and Phase Characteristics of Candle Flame Oscillation", appeared in the catalog an hour ago; it is a frequency paper, so it does not give the luminance depth that backlog item 2 needs, and it is not yet converted or indexed.
+
+Candidates: the same five as iteration 160. (1) Overhead flame at EV 9: two construction attempts already NOT YET (`docs/attempts/`), no new idea in hand. (2) Flicker amplitude: blocked on distill. (3) Bearers as capsules: example-only. (4) GIF banding: `dither=none` is a documented trade. (5) Overhead-fade envelope: no host has reported it. Nothing met the bar for a researched, GREAT-signed change; none started on speculation.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude (blocked on distill; the candle-flame oscillation paper just downloaded is the one to convert first).
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
+5. A time envelope for the overhead fade, only if a host reports it.
