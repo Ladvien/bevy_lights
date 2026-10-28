@@ -21,7 +21,9 @@ use bevy::time::Real;
 
 use crate::LightsSystems;
 use crate::chain_sets;
-use crate::model::{flicker_swing, kindle_gain, pack_flame_tag, set_flame_brightness};
+use crate::flicker::Flicker;
+use crate::model::{FLICKER_DEPTH, flicker_swing, kindle_gain, pack_flame_tag, set_flame_brightness};
+use crate::pool::PoolCandidate;
 
 /// The flame shader, embedded in the binary by [`FlamePlugin`].
 const FLAME_SHADER_PATH: &str = "embedded://bevy_lights/flame.wesl";
@@ -111,9 +113,9 @@ impl Material for FlameMaterial {
 /// frame it sees it; nothing else is needed. Two sites with different [`FlameSite::phase`] values
 /// burn out of step forever.
 ///
-/// The site is **not** tied to a light. A fire whose light has to sit somewhere other than the fire
+/// The site is **not** tied to a light unless [`FlameSite::fire`] says so. A fire whose light has to sit somewhere other than the fire
 /// (a sconce's pool held out over the wall face, a window glow) is a light in one place and a site
-/// parented to the bracket in another; give both the same `phase`, `diameter` and `depth` and they
+/// parented to the bracket in another; set `fire` to the light, or give both the same `phase`, `diameter` and `depth`, and they
 /// breathe together. A light with no fire on it simply has no site.
 // `Visibility` (which pulls in `InheritedVisibility` and `ViewVisibility`), because a site always becomes a parent: `dress_flames` spawns
 // the `Flame` under it, and Bevy's propagation warns (B0004) and culls wrongly when a parent of a
@@ -162,6 +164,19 @@ pub struct FlameSite {
     /// does not care writes) is the flame exactly as it always was, with no depth read at all. May be changed at
     /// any time; [`FlamePlugin`] moves the flame to the right material.
     pub depth_fade: bool,
+    /// The light this flame is the fire of, when the host has one: the entity carrying the [`Flicker`] (or, for a prop the
+    /// pool lights, the [`PoolCandidate`]) whose breath this flame must share. The flame's **brightness** then reads
+    /// that entity's `diameter`, `depth` and `phase` every frame instead of this site's own, so a flame and its light
+    /// cannot disagree about how deep the fire dips and a `Flicker::set_depth` moves both together. A prop's
+    /// candidate with no depth is [`FLICKER_DEPTH`](crate::FLICKER_DEPTH) and one with no phase keeps this site's, the
+    /// pool's own rules.
+    ///
+    /// The site and its light need not be related in the hierarchy (a torch's flame and its light are often
+    /// siblings), which is why this is a link and not a read of the parent. `None` (the default a host that does not
+    /// care writes), an entity that was despawned, and an entity with neither component all leave the site's own
+    /// `diameter`, `depth` and `phase` in charge, exactly as before. The link is only read: the host owns both
+    /// lifetimes. The shape's noise phase does not follow it (`docs/research/flame-fire-link.md`).
+    pub fire: Option<Entity>,
 }
 
 /// The drawn flame: the child mesh [`FlamePlugin`] spawns under each [`FlameSite`].
@@ -350,7 +365,7 @@ fn update_flames(
         &mut MeshMaterial3d<FlameMaterial>,
         &ChildOf,
     )>,
-    sites: Query<(&FlameSite, Option<&ChildOf>)>,
+    sites: Sites,
 ) {
     if !assets.built {
         return;
@@ -361,8 +376,8 @@ fn update_flames(
     let dt = real.delta_secs();
     let t = time.elapsed_secs();
     for (mut flame, mut transform, mut tag, mut material, parent) in &mut flames {
-        let (site, owner) = sites.get(parent.parent()).map_or((None, None), |(s, o)| (Some(s), o));
-        let source = owner.map(ChildOf::parent).filter(|owner| !sites.contains(*owner));
+        let (site, owner) = sites.sites.get(parent.parent()).map_or((None, None), |(s, o)| (Some(s), o));
+        let source = owner.map(ChildOf::parent).filter(|owner| !sites.sites.contains(*owner));
         if flame.source != source {
             flame.source = source;
         }
@@ -377,7 +392,8 @@ fn update_flames(
             // `Changed<MeshTag>` re-extraction set, so a write here costs a render-world re-extract for
             // that flame. The byte holds 1/255 of the swing, so at 60 fps a 2.6 Hz fire skips some
             // frames; a fire that never changes costs nothing at all.
-            let brightness = flicker_swing(site.diameter, site.depth, t, site.phase);
+            let (diameter, depth, phase) = sites.fire_of(site);
+            let brightness = flicker_swing(diameter, depth, t, phase);
             let packed = set_flame_brightness(tag.value, brightness);
             if packed != tag.value {
                 tag.value = packed;
@@ -414,6 +430,35 @@ fn update_flames(
             };
             made.params.y = look.max_height;
             made.params.w = look.strength;
+        }
+    }
+}
+
+/// The flame sites, and the lights their [`FlameSite::fire`] links may name: one parameter, since `update_flames` reads both.
+#[derive(bevy::ecs::system::SystemParam)]
+struct Sites<'w, 's> {
+    sites: Query<'w, 's, (&'static FlameSite, Option<&'static ChildOf>)>,
+    lights: Query<'w, 's, (Option<&'static Flicker>, Option<&'static PoolCandidate>)>,
+}
+
+impl Sites<'_, '_> {
+    /// The `(diameter, depth, phase)` a site's flame breathes by: its light's when [`FlameSite::fire`] names one that still
+    /// has a [`Flicker`] or a [`PoolCandidate`], otherwise the site's own. A `Flicker` wins over a candidate on the same
+    /// entity, since the pool's own light is the `Flicker`. A candidate's missing depth is [`FLICKER_DEPTH`] and its missing
+    /// phase the site's, as the pool reads them.
+    fn fire_of(&self, site: &FlameSite) -> (Option<f32>, f32, f32) {
+        let own = (site.diameter, site.depth, site.phase);
+        let Some((flicker, candidate)) = site.fire.and_then(|light| self.lights.get(light).ok()) else {
+            return own;
+        };
+        match (flicker, candidate) {
+            (Some(flicker), _) => (flicker.diameter, flicker.depth, flicker.phase),
+            (None, Some(candidate)) => (
+                candidate.diameter,
+                candidate.depth.unwrap_or(FLICKER_DEPTH),
+                candidate.phase.unwrap_or(site.phase),
+            ),
+            (None, None) => own,
         }
     }
 }
@@ -466,6 +511,7 @@ mod tests {
                     diameter: None,
                     depth: FLICKER_DEPTH,
                     depth_fade: false,
+                    fire: None,
                 },
                 Transform::default(),
             ))
@@ -493,6 +539,7 @@ mod tests {
                 diameter: Some(0.34),
                 depth: FLICKER_DEPTH,
                 depth_fade: false,
+                fire: None,
             },
             Transform::default(),
         ));
@@ -529,6 +576,7 @@ mod tests {
                 diameter: None,
                 depth: FLICKER_DEPTH,
                 depth_fade: false,
+                fire: None,
             },
             Transform::default(),
         ));
@@ -555,6 +603,7 @@ mod tests {
                 diameter: Some(0.34),
                 depth: FLICKER_DEPTH,
                 depth_fade: false,
+                fire: None,
             },
             Transform::default(),
         ));
@@ -572,6 +621,111 @@ mod tests {
         assert!((0.70..=1.0).contains(&brightness), "{brightness} outside the swing window");
     }
 
+    /// Issues #4 and #3: a flame whose site names its light breathes by the light's depth, diameter and phase, not
+    /// by the site's own, so the two cannot be set apart; and the light's `set_depth` reaches the flame.
+    #[test]
+    fn a_flame_breathes_by_the_light_its_site_names() {
+        let mut app = dressing_app();
+        let light =
+            app.world_mut().spawn(Flicker { phase: 1.3, diameter: Some(0.3), depth: 0.30, ..default() }).id();
+        let site = FlameSite {
+            height: 0.35,
+            phase: 2.5,
+            kindle: 0.0,
+            diameter: None,
+            depth: FLICKER_DEPTH,
+            depth_fade: false,
+            fire: Some(light),
+        };
+        app.world_mut().spawn((site, Transform::default()));
+        for _ in 0..40 {
+            app.update();
+        }
+        let max_height = app.world().resource::<FlameAssets>().max_height;
+        let brightness = |app: &mut App| {
+            let t = app.world().resource::<Time>().elapsed_secs();
+            (unpack_flame_tag(flame_children(app)[0].1, max_height).2, t)
+        };
+        let (got, t) = brightness(&mut app);
+        let theirs = flicker_swing(Some(0.3), 0.30, t, 1.3);
+        let own = flicker_swing(None, FLICKER_DEPTH, t, 2.5);
+        assert!((own - theirs).abs() > 2.0 / 255.0, "the fixture must tell the two apart: {own} vs {theirs}");
+        assert!((got - theirs).abs() < 1.0 / 255.0, "brightness {got} against the light's {theirs}");
+
+        app.world_mut().get_mut::<Flicker>(light).expect("the light").set_depth(0.05);
+        app.update();
+        let (got, t) = brightness(&mut app);
+        let calmer = flicker_swing(Some(0.3), 0.05, t, 1.3);
+        assert!((got - calmer).abs() < 1.0 / 255.0, "brightness {got} after set_depth, wanted {calmer}");
+    }
+
+    /// A prop the pool lights has a `PoolCandidate` rather than a `Flicker`; the flame reads the depth the pool hands
+    /// its slot, `FLICKER_DEPTH` for a candidate with none, and its own phase for a candidate with none.
+    #[test]
+    fn a_flame_reads_a_pool_candidate_the_way_the_pool_does() {
+        let mut app = dressing_app();
+        let candidate = app.world_mut().spawn(PoolCandidate { depth: Some(0.30), ..default() }).id();
+        let bare = app.world_mut().spawn(PoolCandidate::default()).id();
+        let site = |fire| FlameSite {
+            height: 0.35,
+            phase: 2.5,
+            kindle: 0.0,
+            diameter: None,
+            depth: 0.0,
+            depth_fade: false,
+            fire: Some(fire),
+        };
+        let deep = app.world_mut().spawn((site(candidate), Transform::default())).id();
+        let plain = app.world_mut().spawn((site(bare), Transform::default())).id();
+        for _ in 0..40 {
+            app.update();
+        }
+        let max_height = app.world().resource::<FlameAssets>().max_height;
+        let t = app.world().resource::<Time>().elapsed_secs();
+        for (site, depth) in [(deep, 0.30), (plain, FLICKER_DEPTH)] {
+            let tag =
+                flame_children(&mut app).into_iter().find(|(parent, _)| *parent == site).expect("a flame").1;
+            let wanted = flicker_swing(None, depth, t, 2.5);
+            let got = unpack_flame_tag(tag, max_height).2;
+            assert!((got - wanted).abs() < 1.0 / 255.0, "depth {depth}: brightness {got}, wanted {wanted}");
+        }
+    }
+
+    /// A link to nothing (despawned, or an entity with no fire on it) falls back to the site's own numbers.
+    #[test]
+    fn a_dangling_fire_link_falls_back_to_the_sites_own_values() {
+        let mut app = dressing_app();
+        let gone = app.world_mut().spawn_empty().id();
+        app.world_mut().despawn(gone);
+        let bare = app.world_mut().spawn_empty().id();
+        for fire in [gone, bare] {
+            app.world_mut().spawn((
+                FlameSite {
+                    height: 0.35,
+                    phase: 2.5,
+                    kindle: 0.0,
+                    diameter: Some(0.34),
+                    depth: 0.25,
+                    depth_fade: false,
+                    fire: Some(fire),
+                },
+                Transform::default(),
+            ));
+        }
+        for _ in 0..40 {
+            app.update();
+        }
+        let max_height = app.world().resource::<FlameAssets>().max_height;
+        let t = app.world().resource::<Time>().elapsed_secs();
+        let wanted = flicker_swing(Some(0.34), 0.25, t, 2.5);
+        let flames = flame_children(&mut app);
+        assert_eq!(flames.len(), 2);
+        for (_, tag) in flames {
+            let got = unpack_flame_tag(tag, max_height).2;
+            assert!((got - wanted).abs() < 1.0 / 255.0, "brightness {got}, wanted {wanted}");
+        }
+    }
+
     /// A sized fire and an un-sized one must not read the same, or the size a host gives the light would
     /// not reach the flame. The two forms part company only once the clock has moved: at t = 0 every
     /// fire's swing is 0.85, whatever its size.
@@ -587,6 +741,7 @@ mod tests {
                     diameter,
                     depth: FLICKER_DEPTH,
                     depth_fade: false,
+                    fire: None,
                 },
                 Transform::default(),
             ));
@@ -655,6 +810,7 @@ mod tests {
             diameter: None,
             depth: FLICKER_DEPTH,
             depth_fade,
+            fire: None,
         };
         let plain = app.world_mut().spawn(site(false)).id();
         let faded = app.world_mut().spawn(site(true)).id();
@@ -697,6 +853,7 @@ mod tests {
                     diameter: None,
                     depth: FLICKER_DEPTH,
                     depth_fade: false,
+                    fire: None,
                 },
                 Transform::from_xyz(0.0, 1.5, 0.0),
                 ChildOf(prop),
@@ -730,6 +887,7 @@ mod tests {
             diameter: None,
             depth: FLICKER_DEPTH,
             depth_fade: false,
+            fire: None,
         };
         let mut app = dressing_app();
         let torch = app.world_mut().spawn(Transform::default()).id();
@@ -809,6 +967,7 @@ mod kindle_tests {
             diameter: None,
             depth: FLICKER_DEPTH,
             depth_fade: false,
+            fire: None,
         };
         app.world_mut().spawn((site, Transform::default()));
         app.update();
@@ -843,6 +1002,7 @@ mod kindle_tests {
                 diameter: None,
                 depth: FLICKER_DEPTH,
                 depth_fade: false,
+                fire: None,
             },
             Transform::default(),
         ));
@@ -901,6 +1061,7 @@ mod catch_colour_tests {
                 diameter: None,
                 depth: FLICKER_DEPTH,
                 depth_fade: false,
+                fire: None,
             },
             Transform::default(),
         ));
@@ -934,6 +1095,7 @@ mod catch_colour_tests {
                 diameter: None,
                 depth: FLICKER_DEPTH,
                 depth_fade: false,
+                fire: None,
             },
             Transform::default(),
         ));
@@ -945,6 +1107,7 @@ mod catch_colour_tests {
                 diameter: None,
                 depth: FLICKER_DEPTH,
                 depth_fade: false,
+                fire: None,
             },
             Transform::from_xyz(5.0, 0.0, 0.0),
         ));
