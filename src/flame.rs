@@ -21,8 +21,10 @@ use bevy::time::Real;
 
 use crate::LightsSystems;
 use crate::chain_sets;
-use crate::flicker::Flicker;
-use crate::model::{FLICKER_DEPTH, flicker_swing, kindle_gain, pack_flame_tag, set_flame_brightness};
+use crate::flicker::{Flicker, Kindle};
+use crate::model::{
+    FLICKER_DEPTH, KINDLE_SECONDS, flicker_swing, kindle_gain, pack_flame_tag, set_flame_brightness,
+};
 use crate::pool::PoolCandidate;
 
 /// The flame shader, embedded in the binary by [`FlamePlugin`].
@@ -176,6 +178,12 @@ pub struct FlameSite {
     /// care writes), an entity that was despawned, and an entity with neither component all leave the site's own
     /// `diameter`, `depth` and `phase` in charge, exactly as before. The link is only read: the host owns both
     /// lifetimes. The shape's noise phase does not follow it (`docs/research/flame-fire-link.md`).
+    ///
+    /// The flame's **catch** follows the named entity's [`Kindle`] too: while it runs, the flame's drawn size is
+    /// [`kindle_gain`](crate::kindle_gain) of its `elapsed`, so a fire re-lit by inserting `Kindle::default()` shrinks to
+    /// a point and grows with its light instead of burning on at full height over a dark floor, and it is whole once the
+    /// kindle settles (`docs/research/flame-relight.md`). The site's own [`kindle`](FlameSite::kindle) does not apply
+    /// while a linked kindle runs.
     pub fire: Option<Entity>,
 }
 
@@ -399,7 +407,26 @@ fn update_flames(
                 tag.value = packed;
             }
         }
+        // A linked fire's catch is its light's `Kindle`, on the same `kindle_gain` the light's intensity uses, so a
+        // fire put out and lit again is born small again in step with its light. While that kindle runs it owns the
+        // scale and the site's own catch is finished; a `Kindle` already settled leaves the site's own catch alone.
+        if let Some(elapsed) =
+            site.and_then(|site| sites.kindle_of(site)).filter(|elapsed| *elapsed < KINDLE_SECONDS)
+        {
+            let scale = Vec3::splat(kindle_gain(elapsed).max(0.001));
+            if transform.scale != scale {
+                transform.scale = scale;
+            }
+            if flame.kindled < f32::MAX {
+                flame.kindled = f32::MAX;
+            }
+            continue;
+        }
         if flame.kindled >= f32::MAX {
+            // Done catching. A link whose `Kindle` has gone leaves the scale where it stopped; put it back.
+            if transform.scale != Vec3::ONE {
+                transform.scale = Vec3::ONE;
+            }
             continue;
         }
         flame.kindled = (flame.kindled + dt).min(f32::MAX);
@@ -439,9 +466,15 @@ fn update_flames(
 struct Sites<'w, 's> {
     sites: Query<'w, 's, (&'static FlameSite, Option<&'static ChildOf>)>,
     lights: Query<'w, 's, (Option<&'static Flicker>, Option<&'static PoolCandidate>)>,
+    kindles: Query<'w, 's, &'static Kindle>,
 }
 
 impl Sites<'_, '_> {
+    /// The `elapsed` of the [`Kindle`] on the entity a site's [`FlameSite::fire`] names, when it has one.
+    fn kindle_of(&self, site: &FlameSite) -> Option<f32> {
+        self.kindles.get(site.fire?).ok().map(|kindle| kindle.elapsed)
+    }
+
     /// The `(diameter, depth, phase)` a site's flame breathes by: its light's when [`FlameSite::fire`] names one that still
     /// has a [`Flicker`] or a [`PoolCandidate`], otherwise the site's own. A `Flicker` wins over a candidate on the same
     /// entity, since the pool's own light is the `Flicker`. A candidate's missing depth is [`FLICKER_DEPTH`] and its missing
@@ -724,6 +757,66 @@ mod tests {
             let got = unpack_flame_tag(tag, max_height).2;
             assert!((got - wanted).abs() < 1.0 / 255.0, "brightness {got}, wanted {wanted}");
         }
+    }
+
+    /// A fire put out and lit again: re-inserting `Kindle` on the light the site names takes the flame back to a point and
+    /// grows it on the light's own `kindle_gain`; once the kindle settles the flame is whole again. A host that never
+    /// links, and a link to a light with no `Kindle`, keep a settled flame at full size.
+    #[test]
+    fn a_relit_fire_catches_its_flame_with_its_light() {
+        let mut app = dressing_app();
+        let light = app.world_mut().spawn(Kindle { elapsed: KINDLE_SECONDS }).id();
+        let site = |fire| {
+            (
+                FlameSite {
+                    height: 0.35,
+                    phase: 0.0,
+                    kindle: 0.0,
+                    diameter: None,
+                    depth: FLICKER_DEPTH,
+                    depth_fade: false,
+                    fire,
+                },
+                Transform::default(),
+            )
+        };
+        let linked = app.world_mut().spawn(site(Some(light))).id();
+        let free = app.world_mut().spawn(site(None)).id();
+        for _ in 0..5 {
+            app.update();
+        }
+        let scales = |app: &mut App| {
+            app.world_mut()
+                .query_filtered::<(&Transform, &ChildOf), With<Flame>>()
+                .iter(app.world())
+                .map(|(t, c)| (c.parent(), t.scale.x))
+                .collect::<Vec<_>>()
+        };
+        assert!(scales(&mut app).iter().all(|(_, s)| *s == 1.0), "a settled fire draws whole");
+
+        // The host re-lights the fire; the flame follows the light's elapsed time, frame by frame.
+        for step in [0.0, 0.15, 0.3, 0.45] {
+            app.world_mut().entity_mut(light).insert(Kindle { elapsed: step });
+            app.update();
+            assert_eq!(flame_children(&mut app).len(), 2);
+            let scales = scales(&mut app);
+            let scale_of = |site| scales.iter().find(|(parent, _)| *parent == site).map(|(_, s)| *s);
+            let wanted = kindle_gain(step).max(0.001);
+            let got = scale_of(linked).unwrap_or_default();
+            assert!((got - wanted).abs() < 1e-6, "linked flame {got} at elapsed {step}, wanted {wanted}");
+            assert_eq!(scale_of(free), Some(1.0), "the unlinked flame is untouched");
+        }
+
+        // Settled again: back to exactly whole, and a removed `Kindle` mid-way does not strand the flame small.
+        app.world_mut().entity_mut(light).insert(Kindle { elapsed: 0.2 });
+        app.update();
+        app.world_mut().entity_mut(light).remove::<Kindle>();
+        app.update();
+        app.update();
+        assert!(
+            scales(&mut app).iter().all(|(_, s)| *s == 1.0),
+            "a flame is whole once its light's kindle is gone"
+        );
     }
 
     /// A sized fire and an un-sized one must not read the same, or the size a host gives the light would

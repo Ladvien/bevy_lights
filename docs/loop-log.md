@@ -3116,3 +3116,31 @@ Craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technica
 3. The flame from above, round 6 (`flame-overhead.md`).
 4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 5. #3 origin-from-light and `Kindle` through the `fire` link.
+
+## Iteration 131 — 2026-10-27 — A re-lit fire's flame catches with its light (issue #4/#3 follow-up)
+
+Outcome: behaviour change behind `FlameSite::fire`. While the named entity's `Kindle` runs, the flame's scale is `kindle_gain(elapsed)` (floored at 0.001) and exactly 1 after, even if the `Kindle` is removed mid-way (`src/flame.rs`, `update_flames`, `Sites::kindle_of`). The site's own `kindle` seconds are not used during a linked kindle. One test, `a_relit_fire_catches_its_flame_with_its_light`; README bullet, CHANGELOG, `docs/research/flame-relight.md`. No shader or default change.
+
+### Ranking
+
+Open issues: #4 (criterion 3 done), #3 answered, #2 (ask 3 open), #1 publish (release, seen, skipped). No bug issues. Picked the deferred `Kindle` half of the fire link: a re-lit fire's light flared from nothing while its flame stayed full height (a source preceding its light), and it is self-contained and testable. Runner-up: #2 ask 3 `visible_from` (needs a CPU visibility design the occlusion note rejected).
+
+### Sources
+
+Craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technical `10.1017_jfm.2018.707` (quoted in `flame-kindle.md`). Distill was not queried.
+
+### Verification
+
+- Gate: build release/debug, test, test --features serde, examples, clippy, doc, fmt, wasm lib, wesl-check passed.
+- Default unchanged: `courtyard` 300 frames seeds 1 and 2 vs baseline (iteration 130's merge `cafd99a`): `compare -metric AE` 0 and 0.0013 (one-pixel GPU noise). Full frame viewed (`/tmp/l131/after/s1.png`): unchanged.
+- Bench (CPU only, flame has no path in it): first run 611/603 vs 417/422 (mean/p50) under load; re-run interleaved at load 5: min_us 262 vs 266, p50_us 427 vs 425, 410/416 vs 431.
+- Not captured: a live relight on the GPU (no example re-lights a fire); the verdict rests on the unit test's frame-by-frame scale. Verdict: unchanged-default GREAT; relight not visually judged.
+- Baseline worktree `~/l131_base` and its target removed.
+
+### Top 5 remaining, ranked
+
+1. #2 ask 3, `visible_from`; a time envelope for the fade.
+2. A courtyard demo that re-lights a brazier, to judge the relight by eye.
+3. A bowl that shades its own rim.
+4. The flame from above, round 6 (`flame-overhead.md`).
+5. Bearers are placeholder capsules; a luminance-measured flicker amplitude.

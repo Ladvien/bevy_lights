@@ -34,7 +34,7 @@ one, and the frequencies measured in this file. The same courtyard at 640 × 360
   pop.
 - **Flames drawn where the fire is** (`FlamePlugin`): one additive billboard material and one draw per
   flame, each breathing on the same curve as the light it motivates — and at that light's own rate,
-  phase and depth when the site is given them.
+  phase and depth when the site is given them, and catching again when its light is re-lit (`FlameSite::fire`).
 - **The maths as plain functions** (`bevy_lights::model`): the flicker law and its depth, the kindle,
   the pool's hold-and-fade rules, the cinematographer's key against fill, the blackbody, and the
   temperature field of a fuel bed — no `bevy` in any of them, so a host can reuse them in its own
