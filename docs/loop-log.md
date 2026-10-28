@@ -3844,3 +3844,9 @@ Candidates: the same five as iteration 165; none has a new idea or an unblocked 
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
 5. A time envelope for the overhead fade, only if a host reports it.
+
+## Iteration 167 — 2026-10-28 — no change shipped (backlog unchanged, distill still down)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (768985d). `hs status` (live): distill and qdrant refuse connections (embedded 0), scribe .110 backend unavailable, bmb scribe idle; the candle-flame oscillation paper is downloaded but not converted. No `distill_search`. Candidates and top 5 unchanged from iteration 166; none has a new idea or an unblocked path, so nothing was started on speculation.
