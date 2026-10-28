@@ -3584,3 +3584,19 @@ Item 1 (overhead disc stack) needs the corpus and distill for its research note,
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 151 — 2026-10-28 — Still no luminance-depth source and distill down; nothing shipped
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (38c75c3), 18 GiB RAM, /tmp 56 %, GPU 4 GB used of 24 (free). `hs status`: distill (`192.168.1.110:7434`) and qdrant refuse connections, scribe on .110 reports the VLM backend unreachable, bmb scribe idle; `hs restart` was not repeated (two earlier passes tried it, no change). `catalog_recent` shows no new lighting documents beyond the Chen candle download of iteration 150.
+
+Item 2 (cited flicker amplitude): one `paper_search`, "fluctuation of flame radiation intensity pool fire flicker amplitude relative", returned McCaffrey 1979 (NBS IR 79-1910: pulsation about 3 Hz, but the fluctuation ratio is for temperature and velocity, not luminance), Maynard 2013 (pulsation frequency from image-intensity analysis; frequency only per abstract) and pool-fire radiation papers from 1977-1993 with no abstract and no open PDF. None reports a relative luminance depth for a single flame, so the ±15 % design default stays uncited. Item 1 (overhead disc stack) still needs the craft/production/technical triple from distill plus a darkened-exposure judging round, and distill is down. No code, capture, baseline worktree or bench was run.
+
+**Next:** when `hs status` shows distill healthy, run item 1. For item 2, fetch Maynard's thesis (`https://escholarship.org/uc/item/851832j6`) and check whether its image-intensity series gives a normalised amplitude before spending another search.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame volume via a stack of 3 discs at rising heights; new research round; judge under darker exposure. Carry the 147/148 gain and inner shell as components.
+2. A cited, luminance-measured flicker amplitude (the ±15 % depth is a design default from Sanctuary; bounded, not validated, by `flicker-depth.md`).
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
