@@ -3730,3 +3730,21 @@ Recipe: `docs/DEMOS.md` (`LIGHTS_FRAMES=260 EVERY=2 FROM=9 FOCUS_WALK=18`, xvfb 
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports it.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 160 — 2026-10-28 — no change shipped (backlog blocked or already traded off; main verified green)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (5ad7db0), 19 GiB RAM, VRAM 4/24 GB used, /tmp 60 %. `hs status` (live): distill and qdrant down (embedded 0), scribe .110 unavailable, bmb scribe idle; no research possible via distill.
+
+Candidates: (1) overhead flame at EV 9: two construction attempts already NOT YET (`docs/attempts/`), no new idea in hand; (2) flicker amplitude: blocked on distill; (3) bearers as capsules: example-only, not crate behaviour; (4) GIF banding: `dither=none` is a documented trade (`docs/DEMOS.md`, trap two), changing it re-opens the crawl. Nothing met the bar for a researched, GREAT-signed change, and none was started on speculation.
+
+Verified on main 5ad7db0: `cargo build --release`, `cargo test` (all suites pass, incl. readme), `cargo clippy --all-targets --all-features -D warnings`, `cargo fmt --check`, `tools/wesl-check` (both DEPTH_PREPASS variants ok).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude (blocked on distill / Maynard 2013).
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
+5. A time envelope for the overhead fade, only if a host reports it.
