@@ -3938,3 +3938,9 @@ Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at s
 Outcome: log only; no `src/`, shader, default or media change.
 
 Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (89e3c87). No `wiggum/parked-*` branches. The top 5 from iteration 170 stand unchanged; none has a new idea or an unblocked path, so nothing was started on speculation.
+
+## Iteration 181 — 2026-10-28 — no change shipped (backlog unchanged)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped; latest Sanctuary comment reports a null and asks for no code); no bug issues. Tree clean at start (7f9f51b). No `wiggum/parked-*` branches. The top 5 from iteration 170 stand unchanged; none has a new idea or an unblocked path, so nothing was started on speculation.
