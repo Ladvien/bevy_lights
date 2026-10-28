@@ -3926,3 +3926,9 @@ Open issues: #1 publish (release, seen, skipped; its Sanctuary comment of 2026-1
 Outcome: log only; no `src/`, shader, default or media change.
 
 Open issues: #1 publish (release, seen, skipped). Tree clean at start (c2fdc09). Parked work: only the iteration-115 flame-occlusion WIP for issue #2, which is no longer open, so stale and ignored. The top 5 from iteration 170 stand unchanged; none has a new idea or an unblocked path, so nothing was started on speculation.
+
+## Iteration 179 — 2026-10-28 — no change shipped (backlog unchanged)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (62c39ac). No `wiggum/parked-*` branches. The top 5 from iteration 170 stand unchanged; none has a new idea or an unblocked path, so nothing was started on speculation.
