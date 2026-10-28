@@ -3550,3 +3550,19 @@ Critique: the plume gains a pale, defined core inside an orange skirt, clearly b
 3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 4. Banding in the GIF's pool gradients.
 5. A hue-correct hot core (needs the host's tonemapper; design only).
+
+## Iteration 149 — 2026-10-28 — Research infrastructure down; nothing shipped
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (54ba294), GPU free, 16 GiB RAM, /tmp 56 %.
+
+Both remaining backlog items need a research round first (item 1: `docs/research/flame-overhead.md` for the disc stack; item 2: the flicker amplitude, which `docs/research/flame-flicker.md` records as uncited). Home-still preflight: `hs status` shows distill (`192.168.1.110:7434`) and qdrant down, connection refused; `hs restart` run once ("distill containers restarted") and still refused after ~75 s; `distill_search` fails with connection refused; `paper_search` fails with `bridge: HTTP Error 404`; scribe on 192.168.1.110 is down (VLM backend unreachable), bmb scribe idle. The local corpus (`~/.cache/bevy_lights_corpus/markdown`, 362 stems) is a different library and holds no flame-flicker source. No source means no research note, and no research note means no code (AGENTS.md); no capture, no benchmark, no change.
+
+**Next:** when `hs status` shows distill healthy, run item 1 or 2 below. Without a restored distill, `paper_search` is the only route to a citation for the amplitude.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame volume via a stack of 3 discs at rising heights; new research round; judge under darker exposure. Carry the 147/148 gain and inner shell as components.
+2. A cited, luminance-measured flicker amplitude (the ±15 % depth is a design default from Sanctuary).
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
