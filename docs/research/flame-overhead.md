@@ -177,6 +177,10 @@ judged in captures. **Shipped values:** lobes `fbm(dir*0.9 + (0.6 t, 3.7))`, rad
 
 **Result** (`courtyard`, frame 90, 1280x720, eyes 6.63,4.85,5 / 5.5,6.5,5.2 / 5.3,9,5, seeds 7 and 3). Three rounds: with layers at `-0.10, 0.07, 0.24` the change was barely visible; widening them to the values above made the fire wrap and stand on the coals at 66° (the skirt now overlaps the bed's near half instead of fanning behind it) and gave a defined pale core with a lit halo at 76° and 85°. Ground level is unchanged: 0° identical, 30° and 50° differ by 1 channel of 1 pixel (`magick compare -metric AE`). Critique: at 66° the plume above the layers is still a soft fan, the three layers read as stacked translucent cut-outs rather than one body, and the ground is a near-uniform saturated orange so contrast stays low (scene exposure). Verdict **NOT YET**, so reverted; the next step is a fourth, sharper construction or a darker exposure to judge it, not more constants.
 
+### Round 9: five discs, lower gain (iteration 155) — NOT YET, not shipped
+
+Same sources as round 8. Applied `docs/attempts/overhead-stack-round8.patch`, then changed the stack to five discs (`STEP 0.16`, `TAPER 0.12`, `COOL 0.15`, gain 1.6/1.3): at 66° the plume stands taller and wraps the coals more convincingly than round 8's three discs, but at 76° and 85° it fills the bed with an opaque cauliflower burst. A second try (`TAPER 0.16`, `COOL 0.2`, gain 1.15/1.1, `docs/attempts/overhead-stack-round9.patch`) lets the coals show again and is within a few DN of the unmodified shader at 76° and 85°. Neither reads as a fire from directly above rather than a blob; the ground around the brazier is saturated salmon, so a slightly brighter core cannot be judged apart from it. Reverted. The next step is not another constant: it is a tongue-quad construction (upright leaning ribbons seen end-on) or a darker courtyard exposure to judge against.
+
 ## Parameters
 
 Round 6's values, all in `src/flame.wesl`; each is a design default calibrated in captures unless a source is named.

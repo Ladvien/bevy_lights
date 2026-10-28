@@ -1,0 +1,69 @@
+diff --git a/src/flame.wesl b/src/flame.wesl
+index 27b93d6..2bbddac 100644
+--- a/src/flame.wesl
++++ b/src/flame.wesl
+@@ -77,6 +77,15 @@ const OVERHEAD_TONGUE: f32 = 0.6;
+ const OVERHEAD_COS_FLOOR: f32 = 0.05;
+ // The squash floor of the cross-section's ellipse: sin(10 degrees), so a camera nearly level does not flatten it to a line.
+ const OVERHEAD_SQUASH: f32 = 0.18;
++// The stack of cross-sections the overhead flame is drawn as: three discs, the first `OVERHEAD_LAYER_BASE` flame heights above the
++// plume's centre and each next `OVERHEAD_LAYER_STEP` higher, narrower by `OVERHEAD_LAYER_TAPER` and dimmer by `OVERHEAD_LAYER_COOL`
++// per layer. `OVERHEAD_GAIN` and `OVERHEAD_HEAT_GAIN` lift the layers' brightness over a lit ground (design defaults).
++const OVERHEAD_LAYER_BASE: f32 = -0.25;
++const OVERHEAD_LAYER_STEP: f32 = 0.16;
++const OVERHEAD_LAYER_TAPER: f32 = 0.16;
++const OVERHEAD_LAYER_COOL: f32 = 0.2;
++const OVERHEAD_GAIN: f32 = 1.15;
++const OVERHEAD_HEAT_GAIN: f32 = 1.1;
+ 
+ // The flame's own stage IO: only the quad's uv and the fire's phase cross to the fragment.
+ struct FlameVertexOutput {
+@@ -309,22 +318,33 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
+     var mask = smoothstep(0.0, 0.30, body) * smoothstep(0.0, 0.06 + 0.30 * in.overhead.x, y) * tongue;
+     // Hottest along the axis and low down: red rim and tip, the host's fire, a yellow core.
+     var heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);
+-    // From above the plume's cross-section is what is seen: a horizontal disc of the plume's widest radius, rippled by the same
+-    // turbulence, drawn as the ellipse it projects to (`R` wide, `R * sin(elevation)` tall) and faded in with the camera's rise.
++    // From above the plume's cross-section is what is seen, and the plume is a column of them: a stack of horizontal discs at rising
++    // heights, each narrower and cooler than the one under it, drawn as the ellipses they project to (`R` wide, `R * sin(elevation)`
++    // tall) and lifted up the screen by `height * cos(elevation)`. The stack is what gives the fire vertical volume from above
++    // (`docs/research/flame-overhead.md`, round 8). It fades in with the camera's rise.
+     if in.overhead.x > 0.0 {
+-        let q = vec2<f32>(x, sy / max(in.overhead.z, OVERHEAD_SQUASH));
+-        // Lobed: the radius is a noise of the direction from the axis (periodic in angle, no seam), scrolling in time, and a second
+-        // noise of the direction streaks the brightness along the radius, so the outline has tongues that lean and part
+-        // (`docs/research/flame-overhead.md`, round 7).
+-        let rq = length(q);
+-        let dir = q / max(rq, 1e-4);
+-        let lobes = fbm(dir * 0.9 + vec2<f32>(t * 0.6, 3.7));
+-        let radius = FLAME_HALF_WIDTH * (0.85 + 0.8 * (lobes - 0.5));
+-        let disc = 1.0 - rq / radius;
+-        let streak = fbm(dir * 1.6 + vec2<f32>(5.1, -t * 1.5 + rq * 4.0));
+-        let licks = mix(1.0, clamp(0.5 + 1.1 * streak, 0.0, 1.3), smoothstep(0.1, 0.6, rq / radius));
+-        mask = max(mask, smoothstep(0.0, 0.26, disc) * licks * in.overhead.x);
+-        heat = max(heat, clamp(disc, 0.0, 1.0) * (1.0 - 0.45 * rq / radius) * in.overhead.x);
++        var disc_mask = 0.0;
++        var disc_heat = 0.0;
++        for (var k = 0; k < 5; k += 1) {
++            let f = f32(k);
++            let lift = (OVERHEAD_LAYER_BASE + OVERHEAD_LAYER_STEP * f) * in.overhead.y;
++            let q = vec2<f32>(x, (sy - lift) / max(in.overhead.z, OVERHEAD_SQUASH));
++            // Lobed: the radius is a noise of the direction from the axis (periodic in angle, no seam), scrolling in time, and a second
++            // noise of the direction streaks the brightness along the radius, so the outline has tongues that lean and part
++            // (round 7). Each layer reads its own noise, so the layers are not copies of one another.
++            let rq = length(q);
++            let dir = q / max(rq, 1e-4);
++            let lobes = fbm(dir * 0.9 + vec2<f32>(t * 0.6 + 1.9 * f, 3.7 + 2.3 * f));
++            let radius = FLAME_HALF_WIDTH * (1.0 - OVERHEAD_LAYER_TAPER * f) * (0.85 + 0.8 * (lobes - 0.5));
++            let disc = 1.0 - rq / radius;
++            let streak = fbm(dir * 1.6 + vec2<f32>(5.1 + 1.7 * f, -t * (1.5 + 0.4 * f) + rq * 4.0));
++            let licks = mix(1.0, clamp(0.5 + 1.1 * streak, 0.0, 1.3), smoothstep(0.1, 0.6, rq / radius));
++            let cool = 1.0 - OVERHEAD_LAYER_COOL * f;
++            disc_mask = max(disc_mask, min(smoothstep(0.0, 0.16, disc) * licks * OVERHEAD_GAIN, 1.4) * cool);
++            disc_heat = max(disc_heat, clamp(disc, 0.0, 1.0) * (1.0 - 0.45 * rq / radius) * OVERHEAD_HEAT_GAIN * cool);
++        }
++        mask = max(mask, disc_mask * in.overhead.x);
++        heat = max(heat, disc_heat * in.overhead.x);
+     }
+     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
+     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));

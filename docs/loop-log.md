@@ -3646,3 +3646,19 @@ Critique: the plume above the layers is still a soft fan at 66°, the layers rea
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 155 — 2026-10-28 — Overhead flame: five-disc stack, NOT YET; not shipped
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (6d08917), 17 GiB RAM, /tmp 57 %, GPU 4 GB used of 24. Home-still not re-probed (distill down for the last eight passes); sources are the ones `flame-overhead.md` already quotes; corpus re-scan not run.
+
+Took item 1 from iteration 154. Applied the round-8 patch and widened it to five discs, then a lower-gain variant. Captures `/tmp/l155/{before,after,r2}/` (a66, a76, a85, plus a0/a30/a50/b66 for the upright check), crops `/tmp/l155/c_all.png`, `c_r2.png`; `wesl-check` ok for both. Five discs at 66°: a taller plume that stands on the coals, better than round 8. At 76° and 85°: an opaque burst over the bed (cauliflower, not fire). Lower gain: back to within a few DN of the unmodified shader at 76°/85°. Verdict NOT YET for both; reverted the shader, kept `docs/attempts/overhead-stack-round9.patch` and a round 9 entry in the research note. No gate, bench or commit of code (nothing shipped).
+
+Fifth pass at the same gap with disc constants; stop tuning discs. The ground around the brazier is saturated salmon, which hides any contrast gain.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame: a tongue-quad construction (upright leaning ribbons seen end-on), or first add a darker exposure switch to `courtyard` so the flame can be judged against dark ground.
+2. A cited, luminance-measured flicker amplitude (±15 % is a design default).
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
