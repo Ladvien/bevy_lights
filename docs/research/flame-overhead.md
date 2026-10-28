@@ -144,6 +144,31 @@ into it over a sweep of eleven angles with no step (window means move by under 5
 the camera's own travel). At 0°, 30° and 45° the frame differs from the build before by 1 channel of 1 pixel
 (`magick compare -metric AE`: 0.004, 0.007, 0.004), i.e. is unchanged.
 
+### Round 7: structure in the cross-section (iteration 140)
+
+Round 6's deviation list names its own next step: from above the flame "is a rippled ellipse with a hot core ... its edge is
+soft, which is the main thing a sharper art director would ask to be crisper". The capture at 75° and 85° (`/tmp/l140/before/z75.png`)
+agrees: a soft orange halo over a hard-edged coal bed, with a brightness ripple and no licks.
+
+**Craft source** (cinematography), the existing citation: a practical must let the viewer "logically find where the light comes from"
+(Doğaner, `10.7456_tojdac.1674124`). A blur reads as a lamp; a fire reads as a fire when its outline has tongues that lean and
+part, which is the one thing a viewer checks about a source at a glance.
+
+**Production source:** Gregory, *Game Engine Architecture* 3rd ed. §11.4.3 and `s2011-advances-pdf-slides`, already quoted above: shipped fire hides
+its nature by structure, "rendering is working quite hard to try to hide the particle nature of the system". One soft disc is the opposite.
+
+**Technical source:** Xia & Zhang, `10.1017_jfm.2018.707`: the flame is a buoyant diffusion flame whose structure is set by "toroidal vortices"
+shed around an axis, so its plan view is rotationally symmetric on average and lobed instantaneously: licks radiate from the axis,
+not ripple across it. Akenine-Möller et al. §6.3's turbulence sum (already the shader's `fbm`) is the way to make them.
+
+**Model adopted.** The cross-section's radius is modulated by a function of the *direction* from the axis (a noise of the unit vector, so it is
+periodic in angle and has no seam), scrolling in time, with a larger amplitude than the round-6 ripple; its edge is `smoothstep(0, 0.18)` instead of
+`0.35`; and its brightness is streaked radially by a second noise of the direction, scrolled outward. Each constant is a design default,
+judged in captures. The tongue, the quad and the 50°/76° blend are unchanged, so frames below 50° are bit-identical.
+
+**Validation.** At 60°-85° the outline has at least three visible lobes and the edge is crisper than round 6's; no pixel with min channel
+>= 245 in the bed window; ground-level frames (0°, 30°, 45°) unchanged to 1 channel of 1 pixel.
+
 ## Parameters
 
 Round 6's values, all in `src/flame.wesl`; each is a design default calibrated in captures unless a source is named.
