@@ -3630,3 +3630,19 @@ Open issues: #1 publish (release, seen, skipped); no bug issues read this pass (
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 154 — 2026-10-28 — Overhead flame: three-disc stack, better but NOT YET; not shipped
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (7c8c01b), 19 GiB RAM, /tmp 56 %, GPU 4 GB used. `hs status` (live): distill and qdrant down, scribe on .110 down, bmb scribe idle; `hs restart` not repeated, so no new search; the sources were the ones `flame-overhead.md` already quotes (Doğaner craft; Gregory and `s2011-advances-pdf-slides` production; Xia & Zhang and RTR4 §13.6.3 technical). Corpus re-scan not run (distill down).
+
+Took item 1. Baseline binary copied to `/tmp/l154/courtyard_base`, captures `/tmp/l154/{before,after}/` (a0, a30, a50, a66, a76, a85, b66 = seed 3), comparisons `cmp_*.png`. Shader: the overhead disc became three discs at rising world heights, each lifted by `height * cos(elevation)`, narrower and dimmer per layer, with 147's gain and a crisper edge; `wesl-check` ok. Three rounds. Round 1 (layers -0.10/0.07/0.24 flame heights): barely visible. Rounds 2-3 (-0.25/0.05/0.35, edge 0.16, cool 0.25): at 66° the fire now wraps and stands on the coals, at 76° and 85° a defined pale core and halo; 0° identical, 30° and 50° 1 channel of 1 pixel off.
+
+Critique: the plume above the layers is still a soft fan at 66°, the layers read as stacked translucent cut-outs, and the ground is saturated orange so contrast is low. Verdict NOT YET. Reverted `src/flame.wesl`; patch kept at `docs/attempts/overhead-stack-round8.patch`. No gate or bench run (no code shipped). The baseline was a binary copy, no worktree. Research note: `docs/research/flame-overhead.md`, round 8.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame volume: apply `docs/attempts/overhead-stack-round8.patch` as the starting point and fix what stayed NOT YET (a sharper plume above the layers, a darker exposure to judge contrast); this is the fourth pass at the same gap, so judge a 4-5 disc or tongue-quad construction, not constants.
+2. A cited, luminance-measured flicker amplitude (±15 % is a design default).
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.

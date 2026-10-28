@@ -169,6 +169,14 @@ judged in captures. **Shipped values:** lobes `fbm(dir*0.9 + (0.6 t, 3.7))`, rad
 **Validation.** At 60°-85° the outline has at least three visible lobes and the edge is crisper than round 6's; no pixel with min channel
 >= 245 in the bed window; ground-level frames (0°, 30°, 45°) unchanged to 1 channel of 1 pixel.
 
+### Round 8: a stack of three discs (iteration 154) — NOT YET, not shipped
+
+**Sources, all already quoted above:** craft — Doğaner (`10.7456_tojdac.1674124`), a practical must be visibly where its light is; production — Gregory §11.4.3 and `s2011-advances-pdf-slides`, shipped fire is many overlapping layers so the single-sprite nature is hidden; technical — Xia & Zhang (`10.1017_jfm.2018.707`), a buoyant diffusion flame is a vertical column of toroidal vortices, so its cross-sections are a *series* along the axis, and Akenine-Möller §13.6.3's "horizontal cross section" workaround, applied more than once. distill was down, so no new search was run; no new default is cited, every constant below is a design default.
+
+**Model tried.** The single disc becomes three, at world heights `-0.25, +0.05, +0.35` flame heights from the plume centre (`OVERHEAD_LAYER_BASE -0.25`, `STEP 0.30`), each lifted up the screen by `height * cos(elevation)`, narrower by 20 % per layer (`TAPER`), dimmer by 25 % per layer (`COOL`), each with its own lobe and streak noise offset; round 7's gain (mask x1.6 clamped 1.4, heat x1.3) and a crisper edge (`smoothstep(0, 0.16)`). The patch is `docs/attempts/overhead-stack-round8.patch`.
+
+**Result** (`courtyard`, frame 90, 1280x720, eyes 6.63,4.85,5 / 5.5,6.5,5.2 / 5.3,9,5, seeds 7 and 3). Three rounds: with layers at `-0.10, 0.07, 0.24` the change was barely visible; widening them to the values above made the fire wrap and stand on the coals at 66° (the skirt now overlaps the bed's near half instead of fanning behind it) and gave a defined pale core with a lit halo at 76° and 85°. Ground level is unchanged: 0° identical, 30° and 50° differ by 1 channel of 1 pixel (`magick compare -metric AE`). Critique: at 66° the plume above the layers is still a soft fan, the three layers read as stacked translucent cut-outs rather than one body, and the ground is a near-uniform saturated orange so contrast stays low (scene exposure). Verdict **NOT YET**, so reverted; the next step is a fourth, sharper construction or a darker exposure to judge it, not more constants.
+
 ## Parameters
 
 Round 6's values, all in `src/flame.wesl`; each is a design default calibrated in captures unless a source is named.
@@ -213,6 +221,7 @@ Round 6's values, all in `src/flame.wesl`; each is a design default calibrated i
   would cost a second draw and a second material, and would need its own depth and blend ordering against the coal
   bed it sits in — for a shape that is one `length()` away in the shader.
 - **The flame is still not a volume.** Round 7 gave its outline lobes and its body radial streaks (edge `smoothstep(0, 0.26)`), but from above it is still one lobed disc with a hot core and a foreshortened tongue, not layered fire; the interior streaks are subtle.
+- **Round 8 (a three-disc stack) improved the overhead fire's read but stayed NOT YET and was not shipped**; the patch is kept in `docs/attempts/`.
 - **The camera's elevation is taken from the ray to the plume's centre** (`view.world_from_view[3]`), which is exact for a
   perspective camera. For an orthographic camera that translation is the near/far midpoint, so a flame well off the view axis
   reads an elevation a little off its true one; the error is the flame's offset over the camera's distance, small at any
