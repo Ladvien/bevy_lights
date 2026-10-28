@@ -3676,3 +3676,19 @@ Took item 1's prerequisite from iteration 155: a darker exposure switch, so the 
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 157 — 2026-10-28 — edge-on tongue slab from straight above
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (a8768f2), 17 GiB RAM, GPU 4 GB used. `hs status`: distill and qdrant still down, so no corpus re-scan or new search; no new source cited (design default, noted in `flame-overhead.md` round 11).
+
+Re-captured the overhead flame at `LIGHTS_EV100=9` (`/tmp/l157/before/`) before touching anything: on dark stone the shipped flame is a ragged orange burst with a pale core; honest verdict still NOT YET against 'tongues', but one concrete artifact: a faint 1 px horizontal slab right of the core at ~90° (the edge-on upright tongue). Fixed by fading the tongue to zero by sin(e) 0.996. Verified with `/tmp/l157/after/sp9.png` (slab gone); 76° (y65) 2 px different, 60° (y485) 0 px; wesl-check ok; fmt, clippy, wasm, `cargo test` ok. Bench not run: shader-only, CPU path unchanged.
+
+Verdict: artifact removed; the overhead flame as a whole remains NOT YET (burst, not tongues).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: tongue-quad construction (upright leaning ribbons seen end-on).
+2. A cited, luminance-measured flicker amplitude (Maynard 2013 unobtainable).
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports it.
+5. Banding in the GIF's pool gradients.

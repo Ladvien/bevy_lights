@@ -266,3 +266,7 @@ Judged at full frame and at 4× on the fire, at every camera the crate's own sho
 ### Round 10 — judging exposure (iteration 156)
 
 No shader change. `courtyard` gains `LIGHTS_EV100` (default 6). Captured the unmodified shader at 76° and 85° at EV 6, 9 and 11 (`/tmp/l156/cmp.png`): at EV 9 the ground reads as dark stone with a warm pool, and the overhead flame is a small ragged orange burst with a pale core on the dark coal bed, so its shape (a cauliflower, not tongues) can finally be judged against its surroundings; at EV 11 the stone is lost. Use `LIGHTS_EV100=9` for the next overhead attempt, which should be a tongue-quad construction, not disc constants.
+
+### Round 11 — the edge-on tongue (iteration 157)
+
+At `LIGHTS_EV100=9`, straight down (eye 5.3,9,5), the flame reads as a ragged burst with a pale core on a dark bed, and one defect shows at 24x zoom: a faint one-pixel horizontal slab right of the core, past the ellipse. It is the upright tongue seen edge-on: `rise` is clamped by `OVERHEAD_COS_FLOOR`, so the widest row is drawn as a line, and `OVERHEAD_TONGUE` leaves 40 % of it. Fix: the tongue's factor is also multiplied by `1 - smoothstep(0.970, 0.996, sin(elevation))` (design default; 0.970 is sin 76°, where every earlier term is already settled). Captures `/tmp/l157/{before,after}/`: the slab is gone at 90°, 76° differs by 2 pixels (GPU noise), 60° by 0. Not claimed: the burst is still not tongues; that stays NOT YET.
