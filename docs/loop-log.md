@@ -3878,3 +3878,9 @@ Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at s
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
 5. A time envelope for the overhead fade, only if a host reports it.
+
+## Iteration 171 — 2026-10-28 — no change shipped (backlog unchanged)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (7bf9990). Parked work: only the iteration-115 flame-occlusion WIP for issue #2, which is no longer open, so stale and ignored. The top 5 from iteration 170 stand: item 1 and 3 need a new construction/asset, item 2 needs a digitised paper figure, item 4 has no non-crawling dither, item 5 awaits a host report. Nothing was started on speculation.
