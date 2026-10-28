@@ -13,7 +13,7 @@ lights placed over thousands of virtual ones, and billboard shader flames.
 
 ![Four braziers, each with a real light of its own, and 48 torch-bearers sharing an 8-light pool](docs/media/showcase.gif)
 
-*Two seconds of `examples/courtyard`, 480 × 270 at 30 fps: four braziers — real lights, each with a
+*Two seconds of `examples/courtyard`, 400 × 225 at 30 fps: four braziers — real lights, each with a
 `Kindle` and a 0.34 m coal bed, which the puffing law sizes to `1.5/√0.34 ≈ 2.57 Hz` — and 48
 torch-bearers, each a `PoolCandidate`, sharing the example's eight pooled real lights. The clip opens
 while the courtyard is still lighting up and the fires breathe from there; the coals are the

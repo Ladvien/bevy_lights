@@ -52,7 +52,7 @@ captures the same thing twice.
 
 ## The README showcase
 
-`docs/media/showcase.gif` is the README's hero: two seconds, 30 fps, 480 px, ~2 MB. `TMPDIR` and
+`docs/media/showcase.gif` is the README's hero: two seconds, 30 fps, 400 px, 1.8 MB. `TMPDIR` and
 `LIGHTS_SHOT_DIR` both go to disk, not `/tmp` (see the top of this file). Its recipe, and the two
 things that made the first attempts look wrong:
 
@@ -62,7 +62,7 @@ LIGHTS_FRAMES=260 LIGHTS_SHOT_DIR=/tmp/show LIGHTS_SHOT_FROM=9 LIGHTS_SHOT_EVERY
 LIGHTS_FOCUS_WALK=18 ./target/release/examples/courtyard
 # 2. Take the first 60 saved frames (2 s: the lights still kindling, then the fires breathing) and
 #    encode at FPS=30. The flames are already full size here — see "Seeing a flame catch".
-FPS=30 WIDTH=480 FONT=… BOLD=… tools/gif.sh /tmp/show/short docs/media/showcase.gif "…"
+FPS=30 WIDTH=400 FONT=… BOLD=… tools/gif.sh /tmp/show/short docs/media/showcase.gif "…"
 ```
 
 **Trap one: the encoder's frame rate must match the capture's.** `LIGHTS_SHOT_EVERY=N` saves one frame per
