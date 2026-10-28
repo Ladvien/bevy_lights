@@ -3864,3 +3864,17 @@ Outcome: log only; no `src/`, shader, default or media change.
 Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (75fb1be). `hs status` (live): distill (Cuda) and qdrant are UP (18028 docs embedded), scribe .110 backend unavailable, bmb scribe idle. The candle-flame oscillation paper (`10.1038_s41598-018-36754-w`) is still downloaded but not converted: `scribe_convert` timed out at 30 s again and no Convert event appeared two minutes later; `hs scribe convert` takes a path, not a stem. Backlog item 2 (a cited, luminance-measured flicker amplitude) therefore still lacks its technical source. Candidates and top 5 unchanged from iteration 166; nothing was started on speculation.
 
 Next pass: if the paper's markdown exists, take item 2 now that distill is up.
+
+## Iteration 170 — 2026-10-28 — research note: candle-flame paper validates the rate law (no code change)
+
+Outcome: docs only; no `src/`, shader, default or media change, so no gate or bench was run.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (79e59eb). `hs status` (live): distill (Cuda) and qdrant up, scribe .110 backend unavailable, bmb scribe idle. The candle paper (`10.1038/s41598-018-36754-w`) is still unconverted, but it is open access, so it was read from PMC6344522 directly. Result in `docs/research/flicker-depth.md` ("Independent check of the rate law"): measured 10-12 Hz and f ∝ D^-0.49 agree with `flicker_rate` (13 Hz at a 1.3 cm bundle, within 20 %); the paper gives luminance only as unitless plots, so backlog item 2 (a measured amplitude) stays open. Not indexed in distill (not converted).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude (Chen 2019 has plots only; digitising its Fig. 2a would give one).
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
+5. A time envelope for the overhead fade, only if a host reports it.

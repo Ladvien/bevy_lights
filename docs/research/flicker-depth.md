@@ -103,12 +103,18 @@ never exceeds its base; the default reads exactly as it did before the commit.
   go past ~0.3; the clamp stays at the geometric limit because a lower cap would be an art decision
   imposed on the host, which is what this API removes.
 
+## Independent check of the rate law (iteration 170)
+
+Chen, Guo, Jia & Xiao 2019, *Frequency and Phase Characteristics of Candle Flame Oscillation*, Sci. Rep. 9:342, doi 10.1038/s41598-018-36754-w (open access; read from PMC6344522, the scribe conversion of the downloaded PDF still times out). It films bundles of 1-10 paraffin candles, 6 mm across, at 480 fps and takes the mean grey level per frame as the luminance signal. Quote: "the frequency remains in the range of 10-12 Hz ... The data fit an empirical formula between the frequency and the burner diameter: f ∝ D^-0.49". That exponent is the `-1/2` of `flicker_rate` (`f = 1.5/√D`). A bundle of three 6 mm candles is about 1.3 cm across, which the law puts at 13 Hz against the measured 10-12 Hz: inside 20 %, and the law stays the shipped default. Also from the paper: a single candle and a pair do not oscillate (steady or irregular), and oscillation starts at three; brightness and amplitude rise with the number of candles. That supports the existing guidance that a wick-sized fire is not a strobe: the rate law is for a bed wide enough to puff.
+
+The paper reports its luminance series only as dimensionless grey-level plots (its Fig. 2a, 3b) with no stated modulation depth, so it does **not** close the amplitude gap below. No default moves.
+
 ## Pending index
 
 - Mandin & Most (IAFSS 6) is a PDF fetched for this note, not imported into the home-still corpus; the
   scribe server timed out on conversion this pass. Gergely 2020 was downloaded (`paper_download`) but
   its markdown is not yet converted or indexed.
-- **The amplitude is still not *measured in luminance*.** The one paper known to do it (Maynard 2013,
+- **The amplitude is still not *measured in luminance*.** (Chen et al. 2019 is luminance-measured but gives plots, not a depth.) The one paper known to do it (Maynard 2013,
   *Fire interactions and pulsation*) is unobtainable, as `fire-light.md` records. The bound above is a
   temperature bound converted through `T⁴`.
 - Not indexed: `docs/research/flicker-depth.md` itself (distill was not asked to index).
