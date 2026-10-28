@@ -140,6 +140,9 @@ fn stub_source(name: &str) -> String {
         "bevy_pbr::render::view_transformations" => {
             "fn position_world_to_clip(world: vec3<f32>) -> vec4<f32> {\n\
              \x20   return vec4<f32>(world, 1.0);\n\
+             }\n\
+             fn depth_ndc_to_view_z(ndc_depth: f32) -> f32 {\n\
+             \x20   return -1.0 / ndc_depth;\n\
              }\n"
         }
         _ => "",

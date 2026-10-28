@@ -3168,3 +3168,30 @@ Open issues: #4 (criterion 3 done), #3 answered, #2 (ask 3 open), #1 publish (re
 3. The flame from above, round 6 (`flame-overhead.md`).
 4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 5. #3 origin-from-light.
+
+## Iteration 133 — 2026-10-28 — depth_fade under an orthographic camera (issue #6)
+
+Outcome: bug fix in `src/flame.wesl`. The fade's margin was `scene_depth > source_depth * 1.03` on reverse-Z NDC depth, 135 ft at an orthographic `far` of 6000, so Sanctuary's camera never faded a flame. Both depths now go through `depth_ndc_to_view_z` and a tap occludes when the scene is nearer by more than `FADE_MARGIN` = 0.15 of the flame's drawn height (new flat varying `fade_margin`; `fade.z` carries view z). `tools/wesl-check` stub gained `depth_ndc_to_view_z`; `examples/occlusion.rs` gained `LIGHTS_ORTHO=1` / `LIGHTS_FAR`. Rustdoc, CHANGELOG (Fixed), `flame-occlusion.md` amendment. Perspective results change slightly (margin is now a fraction of height, not of distance).
+
+### Ranking
+
+Open issues: #6 (bug, the only one reported wrong behaviour, reproduced by capture), #4 (criterion 3 done), #3 answered, #2 (ask 3 open; waits on #6 per its last comment), #1 publish (release, skipped). #6 first: a bug, and it blocks Sanctuary adopting `depth_fade`. Runner-up: #2 ask 3 `visible_from`.
+
+### Sources
+
+Craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technical `10.1017_jfm.2018.707` (quoted in the flame notes); the projection-aware conversion is Bevy 0.20's own `view_transformations.wesl`. Distill not queried; no new corpus scan.
+
+### Verification
+
+- `occlusion` example, 1280x720, 60 frames, `/tmp/l133/`: orthographic near 0.1 far 6000 — flame over the wall max luma 158.8 with `depth_fade` off, 13.7 (sky, below the wall's 23.3) on; same at far 1500; torch on the wall's face unchanged and the torch past the wall's end still drawn, in both projections. Perspective: behind-wall flame 171 → 24 max luma, face torch kept.
+- Gate: build release/debug, test, test --features serde, examples, clippy, doc, fmt, wasm lib, wesl-check passed.
+- Not done: no permanent test (the comparison lives in the shader; wesl-check only checks it compiles); no pan sequence or perspective before/after byte compare; Bench not run (shader-only, the CPU bench has no flame path); GIF not re-encoded (depth_fade is off in the courtyard and showcase).
+- Verdict: GREAT for the fix (flame gone behind the wall, flush torch kept); the fade's edge behaviour under ortho pan was not captured.
+
+### Top 5 remaining, ranked
+
+1. #2 ask 3, `visible_from`; a time envelope for the fade.
+2. An ortho pan sequence to judge the fade's edge smoothness (issue #6 criterion 4 was judged on stills).
+3. A bowl that shades its own rim.
+4. The flame from above, round 6 (`flame-overhead.md`).
+5. #3 origin-from-light.

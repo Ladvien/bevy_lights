@@ -11,6 +11,7 @@
 //!
 //! # Knobs
 //!
+//! `LIGHTS_ORTHO=1` swaps in an orthographic camera (`LIGHTS_FAR`, default 6000) to check issue #6.
 //! `LIGHTS_DEPTH_FADE=1` turns the fade on (and gives the camera the `DepthPrepass` it reads), so the
 //! same scene runs both ways; `LIGHTS_PAN=1` swings the camera along x from -24 to -9 over
 //! `LIGHTS_FRAMES` frames, aimed at the torch behind the wall, which carries the source past the wall's
@@ -67,6 +68,16 @@ fn spawn(
         AmbientLight { color: Color::srgb(0.45, 0.55, 1.0), brightness: 40.0, ..default() },
         Exposure { ev100: 6.0 },
     ));
+    if std::env::var("LIGHTS_ORTHO").is_ok_and(|v| v != "0") {
+        // Issue #6: an orthographic camera with a far plane in the thousands, which a perspective-shaped margin cannot see through.
+        let far = std::env::var("LIGHTS_FAR").ok().and_then(|v| v.parse().ok()).unwrap_or(6000.0);
+        view.insert(Projection::Orthographic(OrthographicProjection {
+            near: 0.1,
+            far,
+            scaling_mode: bevy::camera::ScalingMode::FixedVertical { viewport_height: 6.0 },
+            ..OrthographicProjection::default_3d()
+        }));
+    }
     if fade_on() {
         // The fade reads this: without it the flame has no depth to test and draws whole.
         view.insert(DepthPrepass);
