@@ -3284,3 +3284,36 @@ Craft `10.2478_bsmr-2022-0020` and `10.32657_10220_48312`; production `s2011-adv
 3. Re-encode `docs/media/courtyard.gif` (still the box).
 4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 5. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
+
+## Iteration 137 — 2026-10-28 — The coal bed reads as embers, not a pink plate
+
+Outcome: shipped. `char_field`'s `PLATEAU` 0.92 → 0.75 (a lump has a hot middle), `FIELD_MEAN` lower bound 0.42 → 0.38, the tests' hot-fraction lower bound 0.02 → 0.005, and the courtyard scales the bed's radiance by `BED_GAIN` 0.2. `coal_radiance` is unchanged (the soot lining uses it).
+
+### Ranking
+
+Open issues: #4 (criterion 3 delivered in 130), #3 answered, #2 (ask 3 not needed), #1 publish (release, seen, skipped). No bug issues. Picked iteration 136's backlog item 1: at the 2.2 m camera the bed was a pale pink-white plate with dark red blotches (mean RGB 223/145/113, 59 % of its pixels at R 255), the showcase's central prop. Runner-up: the flame from above, round 6; then re-encoding `courtyard.gif`.
+
+### Sources
+
+Craft `10.1525_fq.2004.57.3.24` (Prince, a clipped source reads as video); production `s2011-advances-pdf-slides`; technical `PBR3_12_Light_Sources`, all quoted in `docs/research/fuel-bed.md` round 2. Both numbers are design defaults. Distill and the corpus scan were not run this pass.
+
+### Finding
+
+Sweeps (`/tmp/l137/sweep*.png`): the pastel is not the emissive's temperature. Raising the fuel's kelvin at constant radiance only made the clipped patches paler; scaling the ramp down moved the bed to orange (R:G ≈ 15:1 in scene units is rolled toward white by TonyMcMapface, which is where the blue comes from). Gain alone left each lump a flat salmon chip, so `PLATEAU` was the second fix.
+
+### Verification and critique
+
+- Captures: six cameras A-F, 1280x720, 60 frames, before/after in `/tmp/l137/`; `cmpC.png`, `cmpD.png`, `cmpB.png` are crops at 200-300 %. Bed window at C (100x45 px): before 223/145/113, 59 % R=255; after 191/79/41, 14 %. Frame mean luma before/after: A 80.8/80.8, B 83.5/83.4, C 115.4/115.2, D 88.9/88.8, E 47.9/47.9, F 43.9/43.9: the pools are untouched.
+- Critique: C and D show a bed of orange coals with bright middles and dark crevices, the flame foot standing on it and the lip ring still the brightest line of the prop; B (0.9 m, grazing) shows the bed's far edge as a dark-and-orange band under the flame, no plate. Remaining flaws: the brightest lump peaks are still salmon, not yellow-orange, because the tonemapper adds blue above R ~ 3 (a hotter, hue-correct core would need the host's own tonemapping); lump edges are blobby at 4x; the stem's foot is a plain cone; E is blocked by a figure.
+- Verdict: GREAT for the bed at C, D and B.
+- Bench (CPU only, example and a constant): p50 446, min 271 (flicker p50 167, pool 329); the bench runs no code this change touches and the machine's load differs from iteration 136's run, so not comparable and not a regression.
+- `docs/media/showcase.gif` re-encoded (60 frames, 480x270, 30 fps, 2.4 MB, same caption). `courtyard.gif` (640x360) still shows the box braziers and the pink bed; not re-encoded.
+- Gate: build release/debug, test, test --features serde, examples, clippy, doc, fmt, wasm lib, wesl-check: all passed.
+
+### Top 5 remaining, ranked
+
+1. The flame from above, round 6 (`flame-overhead.md`).
+2. Re-encode `docs/media/courtyard.gif` (still the box and the pink bed).
+3. A hue-correct hot core for the bed (yellow-orange peaks), which wants the host's tonemapper in the loop.
+4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+5. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
