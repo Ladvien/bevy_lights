@@ -141,6 +141,33 @@ neither can a ramp whose middle stop is past the display's white point. Both are
   brazier's `Kindle` is a *re*-light, not a first burn, and a re-lit bed that re-charred would be the
   wrong story.
 
+## Round 2 (iteration 137): the bed is a tonemapper's problem, not a temperature's
+
+The example's bowl (`brazier-bowl.md`) put the bed 2.2 m from the hero camera inside a round rim, where
+it reads as what it is: a pale pink plate with dark red blotches, brighter than the fire standing in it.
+Measured on `/tmp/l137/before/C.png`, the bed's 100×45 window (the 0.34 m disc) is mean RGB **223/145/113**,
+**59 %** of its pixels at R 255, blue 113 on a source whose blackbody blue is zero. The blue is not in the
+emissive: `coal_radiance(0.5)` is `[268, 16, 0]` cd/m², and at `ev100` 6 the red channel is ~3.5 in scene
+units. It is the tonemapper: Bevy's default `TonyMcMapface` rolls a channel that far over toward white, so
+blue appears and the hue goes salmon. Scaling both stops down (ember and fuel together, 1.0 → 0.12) moved
+the bed to 193/80/42 and the pastel went with it, while raising the fuel's temperature at the same radiance
+(1300 → 1600 K) only made the clipped patches paler: the cure is exposure of the bed, not its temperature.
+
+**Craft.** Prince, on why a clipped source reads as video (quoted above, "the highlights were a dead giveaway
+that it was video"): a source's brightest surface has to keep its colour. **Production.** The 2011 *Advances*
+fire course note's point that rendering "is working quite hard to try to hide the particle nature of the
+system" applies to the tonemapper's roll-off as much as to the particles: the bed's own hue has to survive
+the display transform. **Technical.** `PBR3_12_Light_Sources`, "Blackbody emitters are perfectly diffuse":
+the emitted radiance is a *temperature's*, and a real bed is not a blackbody at its coals' core temperature
+over its whole area (ash coats every lump; emissivity is under 1), so a share of the ramp is the physical
+correction and not a fudge.
+
+**Adopted:** the example multiplies the texture by `BED_GAIN = 0.1`. The crate's `coal_radiance` is
+unchanged (the soot lining samples it at a dull ember and is right as it is). Measured at 0.1: mean
+**190/76/36**, 9 % of pixels at R ≥ 250, char blotches near-black rather than dark red. 0.04 and 0.07 were
+also rendered: 0.07 left the bed no brighter than the lining it sits in (the source must be the brightest
+thing on its own prop). **Design default**; there is no source for the number.
+
 ## Pending index
 
 Read live from the running library on 2026-10-26.
