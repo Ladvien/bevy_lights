@@ -3424,3 +3424,23 @@ No Rust or shader change; no bench or gate re-run (tree identical to iteration 1
 3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 142 — 2026-10-28 — The overhead tint is not a tonemapper roll-off: knee experiment falsified, reverted
+
+Open issues: #4 (criterion 3 delivered in 130), #3 answered, #1 publish (release, seen, skipped); no bug issues; `gh` reachable. GPU free. Picked iteration 141's backlog item 1 (cap the overhead core's peak). Corpus re-scan and home-still preflight not run (a shader constant; no new source). Tree was clean at start.
+
+**Experiment**: divide the fragment's emission by `1 + K * overhead.x * max(r,g,b)` (hue-preserving soft knee), K = 0.5, 2.0, 6.0; wesl-check passed. Captures `/tmp/l142/{after,k2.0.png,k6.0.png}`, courtyard, 63° camera, 4 m, frame 60, crop `560,250 200x160` and the patch pixel at (645,302):
+- baseline (224, 172, 106) G/R 0.77; K=2 (216, 168, 105) G/R 0.78; K=6 (195, 149, 92) G/R 0.77.
+- The sage/khaki patch on the coal's upper lumps is visually identical at every K, including when the whole flame is visibly dimmer. Hue is invariant under intensity compression, so iteration 141's hypothesis (a tonemapper roll-off at the core's peak) is **falsified**: the tan is not a function of the flame's intensity.
+
+Verdict NOT YET; reverted (`git checkout src/flame.wesl`), nothing shipped. No Rust change, no bench or gate re-run, no baseline worktree.
+
+**Next hypothesis** (untried): the patch is the sum of the flame's *ramp colour* (`CORE_YELLOW` mixed with `material.base`) and the coal bed's own dark-gap colour, so what is wrong is the flame's *hue at moderate heat* (G/R 0.77 at heat ~0.5), not its peak. Test by ramping the colour mix to stay orange until `heat` > 0.7 (move the `smoothstep(0.40, 0.80)` to (0.65, 0.95)) and measuring G/R at the patch; if it does not move, hide the coal bed under the flame (a build with the bed's emissive zeroed) to see whether the green is in the coal's lit material instead (the pool light's colour on a dark lump), since a flame-hidden capture in 141 removed the *whole* patch only because the lumps were flame-lit.
+
+### Top 5 remaining, ranked
+
+1. The overhead patch: test the ramp's hue at moderate heat, then the coal's lit colour (above).
+2. Layered volume in the overhead flame (an inner and an outer shell).
+3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
