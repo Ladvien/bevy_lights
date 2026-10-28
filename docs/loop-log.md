@@ -3344,3 +3344,37 @@ None new: no model, default or shader changed, so no research note. Recipe from 
 3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 4. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients (a better palette strategy than one global 256-colour palette).
+
+## Iteration 139 — 2026-10-28 — the flame from above (round 6)
+
+Outcome: shipped, `src/flame.wesl` only.
+
+### Ranking
+
+Open issues: #4 (criterion 3 delivered in 130), #3 answered, #1 publish (release, seen, skipped); no bug issues. Candidates: (1) the flame from above, round 6 — a fire is gone at 75° of camera elevation, the common view of a tactical or top-down game, with five failed rounds recorded and its first prerequisite (a non-clipped coal bed) met by iteration 137; (2) a hue-correct hot core for the bed, which needs the host's tonemapper. Picked 1: a visible artifact (a practical with no flame) outranks a colour refinement.
+
+### Sources
+
+Unchanged from `docs/research/flame-overhead.md`: *Real-Time Rendering* 4th ed. §13.6.3 (the failure of an axial billboard), Nguyen GPU Gems ch. 6 (the ancestor and its own account of the failure), SIGGRAPH 2011 *Advances* fire talk (production conceals the particle nature), Doğaner on visible sources (craft). No new source; the note's `Pending index` gap (view-dependent flame appearance) is still open.
+
+### What changed
+
+Rounds 1-5 stretched an *upright* quad by `1/cos(e)`. Debug capture (solid colour) showed why that cannot work: the stretched quad's upper vertices rise toward a camera 4 m up and perspective magnifies them into a trapezoid, and an upright plane through the brazier's origin is inside the bowl, so the depth test hides it. Sliding that quad along its view rays kept the corners but broke the perspective-correct `uv` (flame shifted up off the bed, three captures). Round 6 builds the quad facing the camera through the plume's centre past 50°, samples the upright tongue at `SOURCE_HEIGHT + sy/cos(e)`, fades in an elliptical cross-section by 76°, ripples it with its own fbm (the tongue's `n1` drew horizontal streaks at 80°/85°), and softens the tongue's foot and dims it.
+
+### Verification and critique
+
+- Captures `/tmp/l139/{before,r1..r9,sweep}/`: courtyard, brazier at (5,0,5), camera 4 m away at 0/30/45/60/70/75/80/85° and an 11-angle sweep 46°-86°. Before: bare coal bed at 75°/80°/85°. After (r9): hot yellow core with an orange halo centred on the bed at every angle; the tongue shortens into it with no step (sweep window means change by under 5 DN between neighbours, which is camera travel).
+- Ground level: 0°, 30°, 45° differ from the build before by 1 channel of 1 pixel (`magick compare -metric AE`).
+- Clipping: 0 px with min channel ≥ 245 in the bed window at 75° and 85°, before and after.
+- Flaws at zoom: the cross-section's edge is soft and its internal structure is only a brightness ripple, a pale-green tint where the yellow core saturates the bed's red at 58°-66°, and the torch at 85° was not re-measured (the only torch in frame is at the edge, ~70° ray elevation, and reads the same before and after).
+- Verdict: GREAT against `## What great looks like` (a fire at every angle, no pop, footprint on the fire, unchanged from the side, cheap); NOT a showcase of flame detail from above, which the note lists as a deviation.
+- Bench (CPU-only, no Rust changed): `mean_us=572 p50_us=552 min_us=293`, flicker p50 193 µs, pool p50 401 µs. No before/after A/B: nothing it measures changed. Gate: build, test (both feature sets), examples, clippy, doc, fmt, wasm, wesl-check all pass.
+- Media: `showcase.gif` and `courtyard.gif`/`.png` are from cameras below 50°; not re-encoded.
+
+### Top 5 remaining, ranked
+
+1. Crisper structure in the overhead cross-section (tongue-like licks rather than a brightness ripple), and the pale-green tint at 58°-66°.
+2. A hue-correct hot core for the bed (yellow-orange peaks), which wants the host's tonemapper in the loop.
+3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+4. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients (a better palette strategy than one global 256-colour palette).
