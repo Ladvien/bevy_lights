@@ -55,6 +55,7 @@ use bevy::asset::RenderAssetUsages;
 use bevy::camera::Exposure;
 use bevy::core_pipeline::prepass::DepthPrepass;
 use bevy::light::{NotShadowCaster, NotShadowReceiver};
+use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_lights::*;
@@ -104,6 +105,65 @@ const BRAZIER_BED: f32 = 0.34;
 const COAL_FIELD: u32 = 128;
 /// The char field's seed: the example's own, so a capture's coals are reproducible like its figures.
 const COAL_FIELD_SEED: u32 = 7;
+
+/// How far below the lip the coal bed's top face sits, in metres. See `docs/research/brazier-bowl.md`.
+const BED_BELOW_LIP: f32 = 0.05;
+/// Sides of the bowl's revolved profile.
+const BOWL_SEGMENTS: usize = 32;
+
+/// A brazier's bowl, as one of two meshes: the iron shell (`lining == false`: the outside from foot to
+/// lip, and the flat lip) or the soot lining (`lining == true`: the inside wall down to the bed). Both
+/// are one revolved profile centred vertically on `BRAZIER_TOP / 2`, so each can be the mesh of an
+/// entity placed at mid-height as the old box was. Separate strips keep the lip's corners sharp, and
+/// separate meshes let a fire basket's inside be black with soot while its lip stays bright iron.
+/// `docs/research/brazier-bowl.md`.
+fn bowl_mesh(lining: bool) -> Mesh {
+    let lift = -BRAZIER_TOP * 0.5;
+    // (radius, height above the ground)
+    let outside: [(f32, f32); 6] =
+        [(0.20, 0.0), (0.17, 0.04), (0.10, 0.20), (0.10, 0.30), (0.34, 0.52), (0.44, BRAZIER_TOP)];
+    let lip: [(f32, f32); 2] = [(0.44, BRAZIER_TOP), (0.38, BRAZIER_TOP)];
+    let inside: [(f32, f32); 3] =
+        [(0.38, BRAZIER_TOP), (0.33, BRAZIER_TOP - 0.05), (0.0, BRAZIER_TOP - 0.10)];
+    let mut positions: Vec<[f32; 3]> = Vec::new();
+    let mut normals: Vec<[f32; 3]> = Vec::new();
+    let mut uvs: Vec<[f32; 2]> = Vec::new();
+    let mut indices: Vec<u32> = Vec::new();
+    let strips: &[&[(f32, f32)]] = if lining { &[&inside] } else { &[&outside, &lip] };
+    for &strip in strips {
+        // The profile's normal at each point: the edge's perpendicular, averaged across the two edges
+        // that meet there. Each strip is traversed so that it points out of the solid.
+        let edge_normal = |a: (f32, f32), b: (f32, f32)| {
+            let (dr, dy) = (b.0 - a.0, b.1 - a.1);
+            Vec2::new(dy, -dr).normalize_or_zero()
+        };
+        let base = positions.len() as u32;
+        for (i, &(r, y)) in strip.iter().enumerate() {
+            let before = if i > 0 { edge_normal(strip[i - 1], strip[i]) } else { Vec2::ZERO };
+            let after = if i + 1 < strip.len() { edge_normal(strip[i], strip[i + 1]) } else { Vec2::ZERO };
+            let n = (before + after).normalize_or_zero();
+            for s in 0..=BOWL_SEGMENTS {
+                let a = s as f32 / BOWL_SEGMENTS as f32 * TAU;
+                let (sin, cos) = a.sin_cos();
+                positions.push([r * cos, y + lift, r * sin]);
+                normals.push([n.x * cos, n.y, n.x * sin]);
+                uvs.push([s as f32 / BOWL_SEGMENTS as f32, i as f32 / (strip.len() - 1) as f32]);
+            }
+        }
+        let ring = BOWL_SEGMENTS as u32 + 1;
+        for i in 0..strip.len() as u32 - 1 {
+            for s in 0..BOWL_SEGMENTS as u32 {
+                let (a, b) = (base + i * ring + s, base + (i + 1) * ring + s);
+                indices.extend_from_slice(&[a, b, a + 1, a + 1, b, b + 1]);
+            }
+        }
+    }
+    Mesh::new(PrimitiveTopology::TriangleList, RenderAssetUsages::RENDER_WORLD)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_POSITION, positions)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_NORMAL, normals)
+        .with_inserted_attribute(Mesh::ATTRIBUTE_UV_0, uvs)
+        .with_inserted_indices(Indices::U32(indices))
+}
 
 /// The char field as an image a `StandardMaterial` can sample as its **emissive**: [`char_field`] over
 /// the bed, mapped by [`coal_radiance`] to the bed's own radiance in candelas per square metre.
@@ -429,7 +489,20 @@ fn spawn_scene(
     mut images: ResMut<Assets<Image>>,
 ) {
     let stone_material = materials.add(stone(Srgba::rgb(0.32, 0.30, 0.28)));
-    let bowl_material = materials.add(stone(Srgba::rgb(0.10, 0.09, 0.09)));
+    // Cast iron: near-black, and glossier than the stone so the lip can carry the one highlight on the prop.
+    let bowl_material = materials.add(StandardMaterial {
+        base_color: Srgba::rgb(0.03, 0.028, 0.026).into(),
+        perceptual_roughness: 0.45,
+        ..default()
+    });
+    // The inside of a fire basket is soot: darker than iron and with no sheen, so the fire's own light,
+    // 0.5 m away, does not turn the lining into a bright plate.
+    let soot_material = materials.add(StandardMaterial {
+        base_color: Srgba::rgb(0.016, 0.0145, 0.013).into(),
+        perceptual_roughness: 0.95,
+        reflectance: 0.0,
+        ..default()
+    });
     // A bed of coals is a *surface with a temperature field on it*, not a uniform emitter: burnt-through
     // char is dark and glowing fuel is bright, interleaved at the scale of a coal. A constant emissive
     // was the brightest thing in the frame at every camera and clipped to a flat white slab from above,
@@ -513,7 +586,7 @@ fn spawn_scene(
             .spawn((
                 Name::new(format!("Brazier {index}")),
                 Brazier,
-                Mesh3d(meshes.add(Cuboid::new(0.8, BRAZIER_TOP, 0.8))),
+                Mesh3d(meshes.add(bowl_mesh(false))),
                 MeshMaterial3d(bowl_material.clone()),
                 // The coals sit in the bowl and the light is above them: the bowl does not shade its
                 // own fire. Cast, it throws a hard dark square across the ground around every brazier.
@@ -521,12 +594,19 @@ fn spawn_scene(
                 Transform::from_translation(*at + Vec3::Y * BRAZIER_TOP * 0.5),
             ))
             .with_children(|brazier| {
-                // The source the light is motivated by: a bed of glowing coals on the box's top.
+                // The bowl's inside, a separate mesh so it can be soot rather than iron.
+                brazier.spawn((
+                    Name::new("Soot lining"),
+                    Mesh3d(meshes.add(bowl_mesh(true))),
+                    MeshMaterial3d(soot_material.clone()),
+                    NotShadowCaster,
+                ));
+                // The source the light is motivated by: a bed of glowing coals sunk below the bowl's lip.
                 brazier.spawn((
                     Name::new("Coal bed"),
                     Mesh3d(coal_bed.clone()),
                     MeshMaterial3d(coal_material.clone()),
-                    Transform::from_xyz(0.0, BRAZIER_TOP * 0.5, 0.0),
+                    Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 - BED_BELOW_LIP - 0.025, 0.0),
                     NotShadowCaster,
                 ));
                 // The fire's size, from its pool: POOL_LUX at BRAZIER_POOL metres out, from a light
@@ -561,8 +641,8 @@ fn spawn_scene(
                         depth_fade: depth_fade_on(),
                         fire: Some(coals),
                     },
-                    // The flame's foot is on the coals, at the top of the box.
-                    Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04, 0.0),
+                    // The flame's foot is on the coals, below the lip with them.
+                    Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04 - BED_BELOW_LIP, 0.0),
                 ));
             });
     }
