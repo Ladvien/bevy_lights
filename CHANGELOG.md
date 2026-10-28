@@ -20,6 +20,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Changed
 
+- **The `courtyard` example's braziers link their flame to their coals (`fire: Some(coals)`), and `LIGHTS_RELIGHT=<seconds>` re-lights them once.** `K` re-lit a brazier's light but its flame burned on at full height, because the site had `fire: None`; with the link the flame catches with its light again (captured at 1280x720: flame absent at 0.1 s after the re-light, growing over the kindle, full by ~1.4 s). Example only; the default scene is unchanged.
+
 - **The `courtyard` example's carried flames now have something carrying them.** Each bearer's flame hung 0.42 m out from the capsule with no hand, stick or lantern under it: seen from the elevated camera it was a light with no source. A torch now has a stick ending at the flame's foot, a lantern has an iron body, and a fist and an arm join it to the figure. Example geometry only: the crate's API and its lighting are unchanged (frame mean 54.74 → 54.72 at the elevated camera, pool 4). `docs/research/carried-fire.md` has the amendment.
 
 ### Fixed
