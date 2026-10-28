@@ -8,6 +8,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 - `examples/courtyard` gains `LIGHTS_EV100=x`, the camera's exposure (default 6). At 9 the ground is no longer saturated salmon around a brazier, so a flame's own contrast can be judged. Example only; the crate is unchanged.
 
+### Changed
+
+- `docs/media/showcase.gif` re-encoded at 400 × 225 (was 480 × 270): 1.8 MB, under the README's 2 MB budget (was 2.4 MB). Same scene, same frames, caption shortened to fit.
+
 ### Fixed
 
 - **No edge-on slab poking past the flame seen from straight above (`docs/research/flame-overhead.md`, round 10).** At 85°+ the upright tongue, edge-on, collapsed to a one-pixel horizontal line of its widest row that stuck out past the cross-section's ellipse beside the core. Its brightness now goes to zero between sin(elevation) 0.970 and 0.996; below 76° every term is unchanged (identical frames). Shader only.

@@ -3712,3 +3712,21 @@ No crate code, shader or default changed; no bench.
 3. A cited, luminance-measured flicker amplitude (blocked on distill / Maynard 2013).
 4. Bearers are placeholder capsules.
 5. A time envelope for the overhead fade, only if a host reports it.
+
+## Iteration 159 — 2026-10-28 — showcase.gif under the 2 MB budget
+
+Outcome: shipped, media and docs only; no `src/` change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (3710e6f), 19 GiB RAM, /tmp 60 %. `hs status` (live): distill/qdrant embedded 0, scribe .110 unavailable; no research needed, nothing modelled.
+
+Candidates: (1) overhead flame, no new construction idea; (2) `showcase.gif` 2.40 MB against "under ~2 MB", cheap and certain, a stated README rule; (3) flicker amplitude, blocked on distill. Picked 2.
+
+Recipe: `docs/DEMOS.md` (`LIGHTS_FRAMES=260 EVERY=2 FROM=9 FOCUS_WALK=18`, xvfb `-n 159`, frames 1-60, `tools/gif.sh`). Sizes by width: 480 px 2.48 MB, 432 px 2.09 MB, 400 px 1.82 MB; 400 shipped. The first caption was clipped by the narrower frame; shortened to "4 braziers, 48 torch-bearers, 8-light pool" and re-checked at 300 %. Read the coalesced frame 30 at 250 %: bowl braziers, flames, warm pools, blue shadows, banding rings as before (256 colours, `dither=none` by design). Verdict: GREAT as README hero media for what it claims. A windowed flicker re-measurement was tried and is inconclusive (the camera walk and moving bearers dominate the windows), so no new Hz figure is claimed; the frames and rate (30 fps content) are unchanged by the re-encode. README caption size and `docs/DEMOS.md` updated; `cargo test --release --test readme` passes. No bench or gate re-run: no code changed.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude (blocked on distill / Maynard 2013).
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports it.
+5. Banding in the GIF's pool gradients.
