@@ -100,6 +100,14 @@ const BRAZIER_BED: f32 = 0.34;
 // ---- The fuel bed's char field: a bed of coals is a surface with a temperature field on it, not a
 // ---- uniform emitter. `docs/research/fuel-bed.md` has the defect, the sources and the measurements.
 
+/// The share of [`coal_radiance`] the bed's texture carries. At 1.0 the bed's red channel is ~35 times the
+/// display's white at `NIGHT_EV100`, and the tonemapper (TonyMcMapface) rolls a value that far over towards
+/// white: measured over the bed at 2.2 m, mean RGB 223/145/113 with 59 % of its pixels at R 255, a pale
+/// pink plate whose coals read as terrazzo. At 0.2, with the lumps given a bright middle (`PLATEAU`), the same bed measures 191/79/41
+/// with 14 % clipped: orange coals with dark char between them. A design default (`docs/research/fuel-bed.md`, round 2); the lining
+/// keeps the full ramp, because its glow is a fraction of an ember and is not in the tonemapper's roll-off.
+const BED_GAIN: f32 = 0.2;
+
 /// The side of the generated char field, in texels: the bed is 0.34 m and the nearest camera in the
 /// showcase is 4 m away, so a texel is about 2.7 mm — far under a pixel at every captured angle.
 const COAL_FIELD: u32 = 128;
@@ -210,7 +218,7 @@ fn coal_radiance_image(seed: u32) -> Image {
         for x in 0..COAL_FIELD {
             let u = x as f32 / (COAL_FIELD - 1) as f32;
             let v = y as f32 / (COAL_FIELD - 1) as f32;
-            let rgb = coal_radiance(char_field(u, v, seed));
+            let rgb = coal_radiance(char_field(u, v, seed)).map(|c| c * BED_GAIN);
             data.extend_from_slice(&rgb);
             data.push(1.0);
         }
