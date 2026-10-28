@@ -3444,3 +3444,24 @@ Verdict NOT YET; reverted (`git checkout src/flame.wesl`), nothing shipped. No R
 3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 143 — 2026-10-28 — The overhead patch is not the flame's ramp hue: experiment falsified, reverted
+
+Open issues: #4, #3 answered, #1 publish (release, seen, skipped); no bug issues; `gh` reachable. GPU free. Picked iteration 142's backlog item 1 (test the ramp's hue at moderate heat). Corpus re-scan and home-still preflight not run (a shader constant; no new source). Tree was clean at start.
+
+**Experiment** (captures `/tmp/l143/{before,after,after2}/`, courtyard, 4 m, frame 60, 56/63/66/80°, 1280x720):
+- Variant A: `smoothstep(0.40, 0.80, heat)` → `(0.65, 0.95)` for the `CORE_YELLOW` mix. The whole flame's core goes orange: sampled G/R at the flame fell (e.g. (255,198,125) → (255,156,84)), and the torches' yellow-white heart is visibly lost in a side capture (`side.png`). Cost too high.
+- Variant B: the same shift scaled by `in.overhead.x` (overhead views only; side views identical by construction). Flame at 56°/66° is orange as intended (`cmp2.png`: (246,154,89) → (246,129,61)), **but the sage/khaki patch on the coal lump just under the flame is visually unchanged** at 56° and 66°.
+- Conclusion: with 141 (hue-compressed intensity, no change) and 142 (core colour, no change), the patch is independent of the flame's colour *and* intensity. By elimination it is in the coal bed's own lit material (the pool light's colour on the dark lump, with a green-ish channel from the light/ambient sum), not in `flame.wesl`.
+
+Verdict NOT YET; reverted (`git checkout src/flame.wesl`), nothing shipped. No Rust change, no bench or gate re-run, no baseline worktree.
+
+**Next hypothesis** (untried, and not a shader item): build the courtyard's coal bed with its emissive zeroed and the flame hidden, to see whether the green is the bowl material's lit result (example scene, `examples/courtyard.rs`), i.e. a scene-material issue, not a crate defect. If it is, drop it from the crate's backlog.
+
+### Top 5 remaining, ranked
+
+1. Check the coal bed's lit material in `examples/courtyard.rs` for the green (above); if it is the scene's, close the item.
+2. Layered volume in the overhead flame (an inner and an outer shell).
+3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
