@@ -99,7 +99,7 @@ fn setup(mut commands: Commands) {
         // `kindle` grows the flame with its light, on the same 0.6 s envelope, and `diameter` matches
         // the `Flicker`'s so the drawn flame breathes at the same rate the light does. `depth` is how
         // far it dips: give the flame the same one as its light, or the two disagree.
-        FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS, diameter: Some(0.34), depth: FLICKER_DEPTH, depth_fade: false },
+        FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS, diameter: Some(0.34), depth: FLICKER_DEPTH, depth_fade: false, fire: None },
     ));
 
     // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
@@ -119,7 +119,7 @@ fn setup(mut commands: Commands) {
             ..default()
         },
         // The pool's lights flicker at the un-sized rate, so this flame does too.
-        FlameSite { height: torch_height, phase: 1.9, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false },
+        FlameSite { height: torch_height, phase: 1.9, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false, fire: None },
         Transform::from_xyz(4.0, 0.0, 2.0),
     ));
 
@@ -208,6 +208,9 @@ flame **breathe at the light's own rate and phase**, so the fire and the ground 
 rather than a still flame over a moving pool; `FlameSite::depth` is the same choice for the flame's
 brightness, and giving it the light's `Flicker::depth` is what keeps the two dipping together.
 `PoolCandidate::phase` does the same for a light the pool hands over.
+`FlameSite::fire: Some(light)` removes the choice: the flame then reads the `diameter`, `depth` and `phase` of that
+entity's `Flicker` (or `PoolCandidate`) every frame, so the two cannot be set apart and a `Flicker::set_depth` moves
+the flame with it. The light need not be the site's parent; `None` keeps the site's own values.
 
 A flame is taller than its torch, so a torch behind a wall edge can leave a tongue of fire hanging over the
 wall with nothing under it. `FlameSite::depth_fade` fades the flame by how much of its source the camera

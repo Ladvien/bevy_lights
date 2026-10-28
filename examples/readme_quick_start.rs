@@ -35,6 +35,7 @@ fn setup(mut commands: Commands) {
             diameter: Some(0.34),
             depth: FLICKER_DEPTH,
             depth_fade: false,
+            fire: None,
         },
     ));
 
@@ -62,6 +63,7 @@ fn setup(mut commands: Commands) {
             diameter: None,
             depth: FLICKER_DEPTH,
             depth_fade: false,
+            fire: None,
         },
         Transform::from_xyz(4.0, 0.0, 2.0),
     ));
