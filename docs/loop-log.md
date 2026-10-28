@@ -3780,3 +3780,19 @@ Candidates: the same five as iteration 161; none has a new idea or an unblocked 
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
 5. A time envelope for the overhead fade, only if a host reports it.
+
+## Iteration 163 — 2026-10-28 — no change shipped (backlog unchanged, distill still down after `hs restart`)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (a8316aa), 19 GiB RAM, VRAM 4/24 GB used, /tmp 60 %. `hs status` (live): distill and qdrant refuse connections (embedded 0), scribe .110 backend unavailable, bmb scribe idle. `hs restart` run once as the skill directs ("Restarted 4 service(s)", distill containers restarted); distill was still unreachable 60 s later. No `distill_search`.
+
+Candidates: the same five as iteration 162; none has a new idea or an unblocked path, so nothing was started on speculation.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude (blocked on distill; convert the candle-flame oscillation paper first).
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
+5. A time envelope for the overhead fade, only if a host reports it.
