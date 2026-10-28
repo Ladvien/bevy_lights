@@ -3850,3 +3850,9 @@ Candidates: the same five as iteration 165; none has a new idea or an unblocked 
 Outcome: log only; no `src/`, shader, default or media change.
 
 Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (768985d). `hs status` (live): distill and qdrant refuse connections (embedded 0), scribe .110 backend unavailable, bmb scribe idle; the candle-flame oscillation paper is downloaded but not converted. No `distill_search`. Candidates and top 5 unchanged from iteration 166; none has a new idea or an unblocked path, so nothing was started on speculation.
+
+## Iteration 168 — 2026-10-28 — no change shipped (backlog unchanged, distill still down)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (4f44a97). `hs status` (live): distill and qdrant refuse connections (embedded 0), scribe .110 backend unavailable, bmb scribe idle; the candle-flame oscillation paper is downloaded (4 h ago) but not converted. No `distill_search`. Candidates and top 5 unchanged from iteration 167; none has a new idea or an unblocked path, so nothing was started on speculation.
