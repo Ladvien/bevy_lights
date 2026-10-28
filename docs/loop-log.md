@@ -3532,3 +3532,21 @@ Critique: after, the flame body gains defined lick edges and a pale core instead
 3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 4. Banding in the GIF's pool gradients.
 5. A hue-correct hot core (needs the host's tonemapper; design only).
+
+## Iteration 148 — 2026-10-28 — Overhead flame: two shells plus gain, brighter core but NOT YET; reverted, nothing shipped
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. GPU free, 16 GiB RAM, /tmp 56 %. Tree clean at start. Corpus re-scan and home-still preflight not run (no new source).
+
+Took iteration 147's item 1. Experiment (`/tmp/l148/{before,after}/c66.png`, `cmp.png` 3x crop 400x300+440+270; courtyard, eye 6.63,4.85,5 look 5,1.2,5, frame 90): the overhead branch of `src/flame.wesl` got the 147 gain (mask x1.6 clamped 1.4, heat x1.3) plus an inner shell (0.55 of the radius, rippled by `streak`, +0.35 heat). `wesl-check` ok.
+
+Critique: the plume gains a pale, defined core inside an orange skirt, clearly better than the dim fan. But the plume still sits behind and above the bed instead of standing on it, the core reads as a flat pale blob (no vertical volume), the ground stays a near-uniform saturated orange so contrast is low, and the bed disc is still the sharpest feature. Verdict NOT YET. Reverted (`git checkout src/flame.wesl`); no gate or bench run (nothing shipped); no baseline worktree.
+
+**Pattern across 143-148:** the remaining gap is not intensity or hue but missing vertical volume at ~66°, which a disc cannot supply; it needs a different construction (a second, camera-facing tongue quad offset up the plume axis, or a short stack of discs at rising heights) and a darker courtyard exposure to judge it. That is a research round, not another tweak.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame volume via a stack of 3 discs at rising heights (not a single disc); new research round in `docs/research/flame-overhead.md`; judge under darker exposure. Carry the 147/148 gain and inner shell as components.
+2. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+4. Banding in the GIF's pool gradients.
+5. A hue-correct hot core (needs the host's tonemapper; design only).
