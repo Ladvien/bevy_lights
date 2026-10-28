@@ -50,8 +50,12 @@ const SPARSE: f32 = 0.30;
 
 /// How deep into a lump its fall-off from the hot core runs: a coal is not a flat chip, it is a lump
 /// whose middle is the temperature that glows and whose faces cool towards its edges. At `0.92` the
-/// lump is nearly flat and the fall is quick at its rim; a soft cone would read as a lit bump.
-const PLATEAU: f32 = 0.92;
+/// lump was nearly flat, and rendered as a flat salmon plate per lump with no hot core: measured on the
+/// courtyard's bed at 2.2 m, a lump's pixels spanned a few DN. At `0.75` each lump has a bright middle and
+/// a dim rim, which is what an ember looks like (`docs/research/fuel-bed.md`, round 2). Only about 1 % of
+/// the bed now reaches the top of the field (it was 2-18 %), so the hot fraction the tests bound starts at
+/// 0.005.
+const PLATEAU: f32 = 0.75;
 
 /// The two fracture depths, as a share of a lump's radius: a shard's edge is jagged, and one term of
 /// value noise gives it one scale of jaggedness. Without them every lump is a rotated box.
@@ -81,11 +85,11 @@ pub const EMBER_AT: f32 = 0.30;
 /// The field's mean over a bed, measured: what a caller can expect from any seed, and what the tests
 /// assert. Overlapping shards put rather more of the bed in coal than a nearest-lump partition did,
 /// because a shard's area is not bounded by its neighbours' — measured across seeds 0, 7 and 1234 the
-/// mean is 0.45–0.50, and the ash is a fifth to a quarter of the bed.
+/// mean is 0.40–0.50, and the ash is a fifth to a quarter of the bed.
 ///
 /// The *brightness* is not the field's job: [`coal_radiance`] maps the field onto a temperature ramp,
 /// and the lump that sits at the top of the ramp is tens of times brighter than the ash beneath it.
-pub const FIELD_MEAN: (f32, f32) = (0.42, 0.52);
+pub const FIELD_MEAN: (f32, f32) = (0.38, 0.52);
 
 /// One lattice point's value in `0..=1`: an integer hash of the point, the same construction the flame
 /// shader uses (`src/flame.wesl`), so a bed and the fire standing on it are the same kind of noise.
@@ -404,7 +408,7 @@ mod tests {
             // numbers the other way round, which is how the honeycomb render got past a test that only
             // checked the mean.
             assert!((0.15..=0.35).contains(&charred), "seed {seed}: {charred:.3} of the bed is ash");
-            assert!((0.02..=0.22).contains(&hot), "seed {seed}: {hot:.3} of the bed is glowing fuel");
+            assert!((0.005..=0.22).contains(&hot), "seed {seed}: {hot:.3} of the bed is glowing fuel");
             // Both ends are reached, so the bed's brightest lumps can sit at the top of the curve. The
             // top is not guaranteed *exactly*: the rim cools, so a seed whose hottest lump settles in a
             // corner peaks near 0.85 instead of 0.99. Measured across seeds 0, 7, 21, 99 and 1234 the
@@ -459,7 +463,7 @@ mod tests {
             let ash = values.iter().filter(|v| **v < EMBER_AT).count() as f32 / count;
             let glow = values.iter().filter(|v| **v > 0.75).count() as f32 / count;
             assert!((0.15..=0.35).contains(&ash), "seed {seed}: {ash:.3} of the bed is ash");
-            assert!((0.02..=0.22).contains(&glow), "seed {seed}: {glow:.3} of the bed is at full glow");
+            assert!((0.005..=0.22).contains(&glow), "seed {seed}: {glow:.3} of the bed is at full glow");
             // Every coal is a lump with its own peak and every channel between two of them a dark
             // trough, so several rows across the bed each cross the field several times. A single row
             // can graze a boundary and miss the structure, so this counts over eight.
