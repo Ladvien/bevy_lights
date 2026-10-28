@@ -3058,3 +3058,33 @@ Acceptance 1–4 pinned: 300 s at 50 Hz time-average of `base · flicker_swing` 
 ## Operator note, 2026-10-27: iteration 115's occlusion work is parked, not lost
 
 Issue #2's occlusion work was left uncommitted on a loop branch, and iterations 116 to 126 each stopped on the dirty tree. It is parked as two substantive commits on `loop/iter-115` (pushed): `ee759b3`, the research note, and `1260f0e`, which holds `src/flame.rs`, `src/flame.wesl`, `examples/occlusion.rs`, `tools/wesl-check`, and the README, CHANGELOG and `docs/research/flame-occlusion.md` edits. The branch sits directly on `main` at `3f0581e` and merges without conflict, but nothing in it has been built, tested or captured. Taking #2 can start from `git cherry-pick ee759b3 1260f0e` (not the eleven log commits between them, which only record the stop), then the usual gate and a look at the captures.
+
+## Iteration 129 — 2026-10-27 — FlameSite::depth_fade (issue #2, ask 1)
+
+Outcome: the parked iteration-115 occlusion work (`loop/iter-115`, `ee759b3` research, `1260f0e` code) cherry-picked, gated, captured and landed. Iterations 116 to 127's stop-logs live only on that branch and are not merged; this iteration is numbered 129 because branches `loop/iter-127` and `loop/iter-128` exist.
+
+### Ranking
+
+Open issues: #5 (done in 114), #4 partly done, #3 answered, #2 occlusion, #1 publish (release, seen, skipped). No bug issues. #2 first: it is the only open item with a consumer-reported player-visible fault, and its code already existed. Runner-up: a bowl that shades its own rim.
+
+### Sources
+
+Craft `10.7456_tojdac.1674124` (Doğaner, visible source of light); production `GPU Gems` ch. 29 (Sekulic, one-point depth test at the source); technical `bevy_pbr-0.20.0` prepass depth. Note: `docs/research/flame-occlusion.md`. Distill was not used (the note records it).
+
+### Verification
+
+- Gate: build release/debug, test, test --features serde, examples, clippy, doc, fmt, wasm lib, wesl-check (both `DEPTH_PREPASS` variants) passed after one fix: the two `src/lib.rs` doctest `FlameSite` literals lacked `depth_fade`.
+- Default unchanged: `courtyard` seeds 1 and 2, 300 frames, baseline `ec86303` vs this build: `compare -metric AE` 0 (identical).
+- Occlusion example, fade off vs on: tongue over the wall gone, flush and past-the-end torches unchanged (`/tmp/l129/off|on/x.png`).
+- Pan (44 frames, every 3rd): unoccluded frames within 0.8 % of fade off; fade 222, 202, 180, 153, 121, 88, 31 over the occluding frames; worst step 0.28 per 3 frames (about 0.09 per frame, under the note's 1/9 target).
+- Bench (CPU only, flame has no path in it): min_us 263 base, 262 after; p50_us 470 vs 509 (run-to-run noise, `pool_p50` 346 vs 324).
+- Verdicts: static occlusion GREAT; pan GREAT per frame, steppy in sixteenths (documented in the note's Deviations); default unchanged GREAT. `/tmp/l129/critique.md`.
+- Not done: `showcase.gif` not re-encoded (default draw is byte-identical); `FlameSite::visible_from` (ask 3) not built; #2 stays open for it.
+
+### Top 5 remaining, ranked
+
+1. #2 ask 3, `visible_from`; a time envelope for the fade.
+2. A bowl that shades its own rim.
+3. The flame from above, round 6 (`flame-overhead.md`).
+4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+5. #4 ask 3 (site takes its light's depth).
