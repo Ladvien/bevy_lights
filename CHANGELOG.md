@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- `examples/courtyard` gains `LIGHTS_EV100=x`, the camera's exposure (default 6). At 9 the ground is no longer saturated salmon around a brazier, so a flame's own contrast can be judged. Example only; the crate is unchanged.
+
 ### Fixed
 
 - **A fire is still a fire from above (`docs/research/flame-overhead.md`).** An upright billboard presents `cos(elevation)` of its area, so a brazier's flame was gone by 75° of camera elevation and a tactical or top-down camera saw a bare coal bed. Past 50° the flame's quad now faces the camera through the plume's centre, the upright flame is drawn on it as the image it has on screen, and a rippled cross-section of the plume (an ellipse `R` wide and `R·sin(elevation)` tall) fades in by 76°, so the tongue turns into a round, hot-cored glow with no step. At or below 50° the frame is unchanged. Shader only: `src/flame.wesl`; no API, default or CPU cost changed.

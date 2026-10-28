@@ -27,7 +27,7 @@
 //! # Knobs
 //!
 //! `LIGHTS_RELIGHT=<seconds>` re-lights the braziers once at that time (what `K` does). `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
-//! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`. `LIGHTS_DEPTH_FADE=1`
+//! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`. `LIGHTS_EV100=x` sets the camera's exposure (default 6; 9 is a dark frame whose ground is not saturated by the fires). `LIGHTS_DEPTH_FADE=1`
 //! sets `FlameSite::depth_fade` on every flame and gives the camera a `DepthPrepass`; the occlusion
 //! case it is for has its own scene in `examples/occlusion.rs`.
 //! `LIGHTS_RANK=distance` (rank by distance alone, the old rule), `LIGHTS_REACH`, `LIGHTS_FOCUS_WALK` (the focus's orbit radius; past the pool's reach the torches
@@ -405,6 +405,12 @@ fn depth_fade_on() -> bool {
     std::env::var("LIGHTS_DEPTH_FADE").is_ok_and(|v| v != "0")
 }
 
+/// `LIGHTS_EV100=x` overrides the camera's exposure (default [`NIGHT_EV100`]). A higher value is a darker
+/// frame: with the ground not saturated, a flame's own contrast can be judged against it.
+fn exposure_ev100() -> f32 {
+    std::env::var("LIGHTS_EV100").ok().and_then(|v| v.parse().ok()).unwrap_or(NIGHT_EV100)
+}
+
 fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: Res<NightFill>) {
     let CameraPlacement(eye, look) = *placement;
     let mut camera = commands.spawn((
@@ -413,7 +419,7 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
         // black silhouettes and the fire has nothing to read against. Its colour is the sky's
         // temperature, not a hand-picked blue.
         AmbientLight { color: sky_colour(), brightness: 2.0, ..default() },
-        Exposure { ev100: NIGHT_EV100 },
+        Exposure { ev100: exposure_ev100() },
     ));
     // The depth fade reads the depth prepass, so a camera that asks for it carries one.
     if depth_fade_on() {
