@@ -3566,3 +3566,21 @@ Both remaining backlog items need a research round first (item 1: `docs/research
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 150 — 2026-10-28 — No citable amplitude, no research round possible; nothing shipped
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (fe8b804), 17 GiB RAM, /tmp 56 %. `hs status`: distill (`192.168.1.110:7434`) and qdrant still down, scribe on .110 unreachable (VLM backend), bmb scribe idle. `paper_search` works again (openalex and crossref answer; core needs a key; semantic_scholar rate-limited).
+
+Tried item 2 (a cited, luminance-measured flicker amplitude). `paper_search` "candle flame flicker frequency luminance fluctuation" returned Chen et al. 2019, *Frequency and Phase Characteristics of Candle Flame Oscillation* (10.1038/s41598-018-36754-w). `paper_download` ok; `scribe_convert` timed out at 30 s (outcome unknown), so the PDF was fetched from nature.com to `/tmp/l150/chen.pdf` and read with `pdftotext`. Its brightness is the mean gray value per frame at fixed camera parameters, "Thus, the brightness is dimensionless", plotted only as figures; a single candle "does not exhibit visible oscillation and remains stable", and flicker appears only for three or more bound candles. It gives a frequency trend but no relative depth for a single fire, so it cannot replace the ±0.15 design default and was not committed to the corpus or a note. The other hit that touched luminance (Stratton 2005 thesis, pulsation frequency of furniture and pool fires) reports frequency, not depth. `docs/research/flicker-depth.md` already bounds the amplitude against Mandin & Most's measured 25 % temperature ceiling; nothing here tightens it.
+
+Item 1 (overhead disc stack) needs the corpus and distill for its research note, and the 143-148 passes show it also needs a visual-judgement round under a darker exposure; with distill down no craft/production/technical triple can be assembled. No code, capture, baseline worktree or bench was run.
+
+**Next:** when `hs status` shows distill healthy, run item 1. Item 2 stays blocked on a source that reports relative luminance depth for a single flame; try `paper_search` for "fluctuation of flame radiation intensity" in the fire-safety literature, not the candle-synchronisation one.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame volume via a stack of 3 discs at rising heights; new research round; judge under darker exposure. Carry the 147/148 gain and inner shell as components.
+2. A cited, luminance-measured flicker amplitude (the ±15 % depth is a design default from Sanctuary; bounded, not validated, by `flicker-depth.md`).
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
