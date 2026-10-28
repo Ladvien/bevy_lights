@@ -3828,3 +3828,19 @@ Candidates: the same five as iteration 164; none has a new idea or an unblocked 
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
 5. A time envelope for the overhead fade, only if a host reports it.
+
+## Iteration 166 — 2026-10-28 — no change shipped (backlog unchanged, distill still down)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (90a09d2), 18 GiB RAM, VRAM 4/24 GB used, /tmp 60 %. `hs status` (live): distill and qdrant refuse connections (embedded 0), scribe .110 backend unavailable, bmb scribe idle. One `scribe_convert` of the candle-flame oscillation paper (`10.1038_s41598-018-36754-w`) was tried: the MCP call timed out at 30 s, outcome unknown. No `distill_search`.
+
+Candidates: the same five as iteration 165; none has a new idea or an unblocked path, so nothing was started on speculation.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude (blocked on distill; the candle-flame paper's conversion timed out once).
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients (needs a dither that does not crawl).
+5. A time envelope for the overhead fade, only if a host reports it.
