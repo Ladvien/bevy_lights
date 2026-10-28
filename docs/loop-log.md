@@ -3195,3 +3195,31 @@ Craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technica
 3. A bowl that shades its own rim.
 4. The flame from above, round 6 (`flame-overhead.md`).
 5. #3 origin-from-light.
+
+## Iteration 134 — 2026-10-28 — Judging depth_fade's edge on an orthographic pan (iteration 133 backlog item 2)
+
+Outcome: measurement only, no `src/` or example change, no verdict change. Iteration 133 judged issue #6's fix on stills; this pass runs the pan. Result appended to `docs/research/flame-occlusion.md` ("Orthographic pan, per frame").
+
+### Ranking
+
+Open issues: #4 (criterion 3 done in 130), #3 answered, #2 (ask 1 delivered and now unblocked by #6; ask 3 declared not needed by Sanctuary), #1 publish (release, seen, skipped). No bug issues open (#6 closed). Picked backlog item 2: the one shipped fix whose smoothness had no per-frame evidence, and Sanctuary adopts `depth_fade` on that camera. Runner-up: a bowl that shades its own rim (art, larger). Not picked: `visible_from` (not needed).
+
+### Sources
+
+No new research; the note's own sources (craft `10.7456_tojdac.1674124`, production `s2011-advances-pdf-slides`, technical `10.1017_jfm.2018.707`). Distill not queried, corpus not re-scanned.
+
+### Verification
+
+- `occlusion`, `LIGHTS_PAN=1`, 240 frames, 1280x720, all four of {fade off, on} x {perspective, ortho}; plus every frame 130-240 for ortho on and off (`/home/ladvien/tmp/l134/`).
+- Fade on / off ratio of the flame's orange excess, per frame: 0.77, 0.70 x5, 0.54 x2, 0.45 x3, 0.34, 0.33, 0.33, 0.32, 0.32, 0.21, 0.08 x3, 0.00 from then on. Largest single-frame step 0.16; about 20 frames (0.33 s) from visible to gone; never returns. The contact sheet of frames 35-43 (ortho) shows the tongue ducking behind the wall's end with the wall's edge cutting it, no stray flame over the wall.
+- Critique: the fade is steppy in sixteenths (plateaus of 2-5 frames are sub-pixel pan motion, the fade-off series has them too); it is spatial, not a time envelope, so a camera that stops mid-fade stays mid-fade. Neither is a defect against the note's validation targets (no pop, step <= 0.26). Verdict: GREAT for the edge on a pan; the time envelope stays unbuilt.
+- Gate: not run in full, no library code changed (docs only). Bench not run.
+- Issue #2 is Sanctuary's to close; its last comment asked to keep it open until #6 landed, which it has.
+
+### Top 5 remaining, ranked
+
+1. A bowl that shades its own rim.
+2. The flame from above, round 6 (`flame-overhead.md`).
+3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+4. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
+5. #3 origin-from-light (answered; closeable by Sanctuary).
