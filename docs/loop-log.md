@@ -3255,3 +3255,32 @@ Not run: bench (example-only), full gate (only `cargo fmt` and `cargo clippy --e
 3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 4. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
 5. #3 origin-from-light (answered; closeable by Sanctuary).
+
+## Iteration 136 — 2026-10-28 — A brazier is a bowl (finished from iteration 135)
+
+Outcome: shipped, example-only (no `src/` change). Iteration 135's bowl (cherry-picked from `loop/iter-135`, `83b569a`) plus two fixes for its two remaining flaws: the coal bed is a disc (was a square stamp in a round bowl) and the soot lining carries an emissive glow gradient from the bed up to the rim (was one flat tone).
+
+### Ranking
+
+Open issues: #4 (criterion 3 delivered in 130, and the pool-path instance its last comment names is covered by `fire` reading `PoolCandidate`), #3 answered, #2 (ask 3 not needed), #1 publish (release, seen, skipped). No bug issues. Picked iteration 135's backlog item 1: the showcase's central prop. Runner-up: the flame from above, round 6; then bearers are capsules, a luminance-measured flicker amplitude, a time envelope for the fade.
+
+### Sources
+
+Craft `10.2478_bsmr-2022-0020` and `10.32657_10220_48312`; production `s2011-advances-pdf-slides`; technical `PBR3_12_Light_Sources` (all quoted in `docs/research/brazier-bowl.md`). The glow's strength (0.8 of a dull ember) and fall (0.15 of the profile) are design defaults. Distill and the corpus scan were not run this pass.
+
+### Verification and critique
+
+- Captures: six cameras, 1280x720, 60 frames (`/tmp/l136/{before,after}/A-F.png`, before = main's box at `3890ece`); `critique.md` there. D (elevated) and C (2.2 m) show a lit lip ring, a rim-dark to bed-warm lining, a round bed inside the rim, the outside under the lip near black. Mean luma before/after A 80.1/80.8, C 113.6/115.4, D 88.0/88.9, F 43.2/43.9: pools unchanged; B 77.4 → 83.5 (the box face is gone).
+- Remaining flaws: the bed is still pale pink-white (the fuel-bed ramp, not this item); the stem's foot is a plain cone; camera E was blocked by a figure and carries no signal.
+- Verdict: GREAT for the bowl at C, D, B.
+- Bench (CPU only, no example path): before p50 689 / min 339, after p50 706 / min 336 (flicker p50 267/266, pool 500/516): noise.
+- `docs/media/showcase.gif` re-encoded (60 frames, 480x270, 30 fps, 2.4 MB, same caption); frame 0 is black as the courtyard is still lighting, as in the recipe; frame 45 shows the four bowls. `courtyard.gif` (640x360, older) still shows the box braziers; not re-encoded this pass.
+- Gate: build release/debug, test, test --features serde, examples, clippy, doc, fmt, wasm lib, wesl-check.
+
+### Top 5 remaining, ranked
+
+1. The coal bed's brightness: pale pink-white at 1.6-2.2 m, a hot-core falloff toward its edge.
+2. The flame from above, round 6 (`flame-overhead.md`).
+3. Re-encode `docs/media/courtyard.gif` (still the box).
+4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+5. A time envelope for the fade, only if a host reports a camera stopping mid-fade.

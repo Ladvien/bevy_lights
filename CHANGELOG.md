@@ -8,6 +8,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 - **`FlameSite::depth_fade` works under an orthographic camera (issue #6).** The occlusion margin was 3 % of reverse-Z depth, which is 3 % of the distance for a perspective camera but 135 ft for an orthographic one with `far` 6000, so a flame behind a wall never faded. The shader now converts the source's and the scene's depth to linear view z (`depth_ndc_to_view_z`) and hides the source when the scene is nearer by more than 15 % of the flame's drawn height, so any projection at any far plane agrees. Perspective results change slightly (the margin is now a fraction of the flame's height rather than of the distance); a torch flush on a wall still does not fade. `examples/occlusion.rs` gains `LIGHTS_ORTHO=1` / `LIGHTS_FAR`.
 
+### Changed
+
+- **`examples/courtyard`'s braziers are iron bowls, not boxes.** A revolved bowl on a stem with a bright lip, a soot lining that glows from the coals up to the rim, and a round coal bed sunk 0.05 m below the lip, so the showcase's central prop reads as a fire basket. Example only: no library code or default changed; `docs/media/showcase.gif` is re-encoded. `docs/research/brazier-bowl.md`.
+
 ### Added
 
 - **A flame linked with `FlameSite::fire` catches with its light's `Kindle`.** Re-lighting a fire (inserting `Kindle::default()` over the light) flared the light from nothing while its flame, which had caught once at spawn, burned on at full height: a source that precedes its own light. While the named entity's `Kindle` runs (`elapsed < KINDLE_SECONDS`) the flame's drawn scale is `kindle_gain(elapsed)`, the light's own curve, floored at 0.001, and it is exactly 1 afterwards, even if the `Kindle` is removed mid-way. The site's own `kindle` seconds are not used while a link's kindle runs. A site with `fire: None`, a link to an entity with no `Kindle` or a settled one draws as before. `docs/research/flame-relight.md`.

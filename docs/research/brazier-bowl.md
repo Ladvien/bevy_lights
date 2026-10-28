@@ -94,3 +94,13 @@ not found.
 A dark iron-grey bowl on a stem whose lip is the brightest line on the prop, whose inside is a warm
 gradient from the bed's glow up to the rim, and whose outside under the lip is almost black. The coals
 glow *in* it, partly hidden by the near lip, and the flame comes out of the opening.
+
+## Iteration 136: what shipped
+
+Round 1-5 of iteration 135 reached a bowl that read but a lining that was one tone and a bed that was a hard-edged square. Two changes finished it, both example-only:
+
+- **The bed is a disc.** `Circle(bed/2)` laid flat at the bed's top (no side wall, so no striped crescent on its rim) instead of a 0.34 m square, which sat in a round bowl as a stamp. Same texture, same size, same flicker/flame diameter.
+- **The lining glows from the bed up.** The soot material has an emissive texture over the lining's profile (`v` 0 at the lip, 0.5 at the bed): radiance of a dull ember (`coal_radiance(0.35)`) times 0.8 at the bed's edge, dying with an e-fold of 0.15 of the profile toward the rim. Craft reason: a heated wall next to coals is the one gradient that tells which way the heat goes (see `## Craft principle`). **Design default**, not from a source; the 0.8 and 0.15 were chosen by eye at the 2.2 m camera and the lining reads rim-dark to bed-warm.
+
+Deviation: `## Model adopted` said the coal bed was a box dropped 0.05 m; it is a disc at the same height. No crate default changed.
+Measured (1280x720, `LIGHTS_FRAMES=60`, 6 cameras): mean luma before/after A 80.1/80.8, C 113.6/115.4, D 88.0/88.9, F 43.2/43.9 — the pools are unchanged; B rises 77.4 → 83.5 because the box face is gone.
