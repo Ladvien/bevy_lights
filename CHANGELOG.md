@@ -11,6 +11,7 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Changed
 
+- **The flame seen from above has licks, not a soft halo (`docs/research/flame-overhead.md`, round 7).** Past 50° of camera elevation the plume's cross-section's radius is a scrolling noise of the direction from the fire's axis and its brightness is streaked along the radius, with a crisper edge (`smoothstep(0, 0.26)` for `0.35`), so the outline has tongues that lean and part. Frames below 50° are unchanged (1 channel of 1 pixel). Design defaults, judged in captures.
 - **`examples/courtyard`'s braziers are iron bowls, not boxes.** A revolved bowl on a stem with a bright lip, a soot lining that glows from the coals up to the rim, and a round coal bed sunk 0.05 m below the lip, so the showcase's central prop reads as a fire basket. Example only: no library code or default changed; `docs/media/showcase.gif` is re-encoded. `docs/research/brazier-bowl.md`.
 
 ### Added
