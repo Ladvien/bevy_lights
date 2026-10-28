@@ -42,7 +42,7 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `tools/wesl-check/` — compiles `src/flame.wesl` to WGSL and parses it with naga, without a GPU.
 - `docs/research/*.md` — one note per system, plus `corpus.md`.
 - `docs/loop-log.md` — what each improvement-loop iteration did.
-- `.omp/commands/lights-loop.md`, `.omp/skills/bevy-lights-build-loop/SKILL.md` — the loop.
+- `.omp/commands/build-loop.md` — the loop (`/build-loop`): one command file, no separate skill.
 - `scripts/bevy-build-loop.sh` — the loop's headless driver.
 - `.github/workflows/ci.yml` — `lint`, `build`, `wasm`, on big's self-hosted runners.
 

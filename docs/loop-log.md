@@ -1,6 +1,6 @@
 # bevy_lights loop log
 
-Iterations of the improvement loop (`skill://bevy-lights-build-loop`). Each entry: what changed and
+Iterations of the improvement loop (`/build-loop`, `.omp/commands/build-loop.md`). Each entry: what changed and
 why it ranked first, the sources, the critique and verdict, the numbers, and the ranked backlog that
 the next iteration picks from.
 
