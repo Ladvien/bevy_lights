@@ -162,11 +162,16 @@ the emitted radiance is a *temperature's*, and a real bed is not a blackbody at 
 over its whole area (ash coats every lump; emissivity is under 1), so a share of the ramp is the physical
 correction and not a fudge.
 
-**Adopted:** the example multiplies the texture by `BED_GAIN = 0.1`. The crate's `coal_radiance` is
-unchanged (the soot lining samples it at a dull ember and is right as it is). Measured at 0.1: mean
-**190/76/36**, 9 % of pixels at R ≥ 250, char blotches near-black rather than dark red. 0.04 and 0.07 were
-also rendered: 0.07 left the bed no brighter than the lining it sits in (the source must be the brightest
-thing on its own prop). **Design default**; there is no source for the number.
+**Adopted:** the example multiplies the texture by `BED_GAIN = 0.2`, and `char_field`'s `PLATEAU` goes
+0.92 → 0.75. The crate's `coal_radiance` is unchanged (the soot lining samples it at a dull ember and is
+right as it is). Gain alone (0.1, then 0.14) removed the pink but left each lump a flat salmon chip with no
+hot core (a lump's pixels spanned a few DN): the plateau's near-flat top was the second defect. At
+`PLATEAU` 0.75 each lump is brighter in the middle than at its rim, an ember's look, and only ~1 % of the
+bed reaches the top of the field (was 2-18 %), so the tests' hot-fraction lower bound is 0.005 and
+`FIELD_MEAN` starts at 0.38. Measured on `/tmp/l137/after/C.png`: bed mean **191/79/41**, 14 % of pixels at
+R ≥ 250 (was 223/145/113, 59 %), char blotches dark rather than pink. 0.07 left the bed no brighter than the
+lining it sits in (the source must be the brightest thing on its own prop). **Design defaults**; there is no
+source for either number.
 
 ## Pending index
 
