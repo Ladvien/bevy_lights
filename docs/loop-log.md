@@ -3616,3 +3616,17 @@ Item 2: fetched `https://escholarship.org/uc/item/851832j6` (Maynard thesis) as 
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 153 — 2026-10-28 — Distill still down; nothing shipped
+
+Open issues: #1 publish (release, seen, skipped); no bug issues read this pass (carried from 152). Tree clean at start (2b223fa), 19 GiB RAM available, /tmp 56 %. `hs status` (live): distill (`192.168.1.110:7434`) refuses connections, qdrant down, scribe on .110 reports the VLM backend unreachable, bmb scribe idle; `hs restart` not repeated. `catalog_recent` not re-scanned beyond the status feed, which shows only the Chen candle download. The local corpus (`~/.cache/bevy_lights_corpus/markdown`, 362 files) is present, so item 1's research could be started with `grep` over it instead of `distill_search`; the next pass should try that rather than wait for distill. No code, capture, baseline worktree or bench was run.
+
+**Next:** run item 1, doing the research round from the local corpus if distill is still down (record the unindexed note under `Pending index`).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame volume via a stack of 3 discs at rising heights; new research round (local corpus grep if distill is down); judge under darker exposure. Carry the 147/148 gain and inner shell as components.
+2. A cited, luminance-measured flicker amplitude (±15 % is a design default); get Maynard's thesis by `paper_download` by DOI or a browser session.
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
