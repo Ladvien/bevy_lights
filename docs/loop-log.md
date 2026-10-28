@@ -3600,3 +3600,19 @@ Item 2 (cited flicker amplitude): one `paper_search`, "fluctuation of flame radi
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 152 — 2026-10-28 — Distill still down, Maynard thesis unreachable; nothing shipped
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (8183584), 19 GiB RAM, /tmp 56 %, GPU 4 GB used of 24 (free). `hs status`: distill (`192.168.1.110:7434`) and qdrant refuse connections, scribe on .110 reports the VLM backend unreachable, bmb scribe idle; `hs restart` not repeated.
+
+Item 2: fetched `https://escholarship.org/uc/item/851832j6` (Maynard thesis) as iteration 151 advised; the host answers with an AWS WAF JavaScript challenge, no document text, so no amplitude could be read. Item 1 still needs the craft/production/technical triple from distill. No code, capture, baseline worktree or bench was run.
+
+**Next:** when `hs status` shows distill healthy, run item 1. For item 2, get Maynard's thesis by another route (`paper_download` by DOI, or a browser session) before spending another search.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame volume via a stack of 3 discs at rising heights; new research round; judge under darker exposure. Carry the 147/148 gain and inner shell as components.
+2. A cited, luminance-measured flicker amplitude (the ±15 % depth is a design default from Sanctuary; bounded, not validated, by `flicker-depth.md`).
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
