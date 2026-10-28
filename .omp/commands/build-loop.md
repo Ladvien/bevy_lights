@@ -68,9 +68,11 @@ Recover a killed pass's tree with `git -C <repo> log --all --oneline --grep='WIP
 
 Preflight home-still now, so research is not blocked later:
 
-- `system_status` (MCP) or `hs status`. If distill is down, run `hs restart` once; if it stays down,
-  skip `distill_search` and `distill_index` and list each unindexed note under `Pending index`. Record
-  the live state in the log; do not copy an earlier iteration's outage note.
+- `system_status` (MCP) or `hs status`. If distill is down, run `systemd-run --user --scope --collect hs
+  restart` once, never a bare `hs restart`: that starts Qdrant's podman monitors inside this loop's own
+  systemd unit, so restarting the loop restarts Qdrant (it did, on 2026-10-28). If it stays down, skip
+  `distill_search` and `distill_index` and list each unindexed note under `Pending index`. Record the
+  live state in the log; do not copy an earlier iteration's outage note.
 - Scribe: check `scribe_health`. `scribe_convert` may queue or fail; then rely on the corpus.
 - Corpus: `~/.cache/bevy_lights_corpus/markdown`. If it is missing, sync it per
   `docs/research/corpus.md`.
