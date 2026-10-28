@@ -104,6 +104,7 @@ fn spawn(
         diameter: None,
         depth: FLICKER_DEPTH,
         depth_fade: fade_on(),
+        fire: None,
     };
     // Behind the wall, and past its end: a post 0.8 m tall with a metre or more of flame on top.
     for (name, at, phase, height) in [

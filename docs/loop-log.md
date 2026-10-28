@@ -3088,3 +3088,31 @@ Craft `10.7456_tojdac.1674124` (Doğaner, visible source of light); production `
 3. The flame from above, round 6 (`flame-overhead.md`).
 4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 5. #4 ask 3 (site takes its light's depth).
+
+## Iteration 130 — 2026-10-27 — FlameSite::fire (issue #4 criterion 3, issue #3)
+
+Outcome: API addition, no rendering change. Scope: `FlameSite::fire: Option<Entity>` (`src/flame.rs`): the flame's brightness reads `diameter`/`depth`/`phase` from the named entity's `Flicker`, or from its `PoolCandidate` (depth `FLICKER_DEPTH`, phase the site's when absent); `None`, a despawned entity or an entity with neither keeps the site's own. Three tests (`a_flame_breathes_by_the_light_its_site_names` incl. `set_depth` following, `a_flame_reads_a_pool_candidate_the_way_the_pool_does`, `a_dangling_fire_link_falls_back_to_the_sites_own_values`), README, CHANGELOG, note `docs/research/flame-fire-link.md`. Breaking for `FlameSite` literals (`fire: None`).
+
+### Ranking
+
+Open issues: #5 done, #4 (criterion 3 open), #3 answered, #2 (ask 3 open), #1 publish (release, seen, skipped). No bug issues. Captures (courtyard default, ground, grazing at 1280x720; per-frame occlusion pan) showed no new visible defect: the near brazier's flame at ground level is a soft small teardrop with a ~4 px dim foot gap (measured on the column through its axis), not worth a change. The occlusion pan is the iteration-129 result. #4 criterion 3 first: a consumer-reported disagreement with two measured instances; `visible_from` needs a CPU visibility answer the note rejected. Runner-up: #2 ask 3.
+
+### Sources
+
+Craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technical `10.1017_jfm.2018.707` (all already quoted in `flame-flicker.md`). Distill not queried.
+
+### Verification
+
+- Gate: build release/debug, test, test --features serde, examples, clippy (one fix: `update_flames` hit 8 arguments, bundled into a `Sites` SystemParam), doc, fmt, wasm lib, wesl-check passed.
+- Default unchanged: `courtyard` 300 frames vs the pre-change capture, `compare -metric AE` 0.
+- No shader, look or default changed, so no GIF re-encode; verdict: not a visual change (default pixel-identical).
+- Bench (CPU only, flame has no path in it): min_us 317, p50_us 504 against 263/470–509 in iteration 129, on a machine running another bench (`bench_elements`); not attributable to this change.
+- Not done: the courtyard does not use `fire` (its sites' values already match by construction); `Kindle` does not follow the link.
+
+### Top 5 remaining, ranked
+
+1. #2 ask 3, `visible_from`; a time envelope for the fade.
+2. A bowl that shades its own rim.
+3. The flame from above, round 6 (`flame-overhead.md`).
+4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+5. #3 origin-from-light and `Kindle` through the `fire` link.
