@@ -3662,3 +3662,17 @@ Fifth pass at the same gap with disc constants; stop tuning discs. The ground ar
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 156 — 2026-10-28 — courtyard exposure switch (`LIGHTS_EV100`)
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (0efa54a), 18 GiB RAM, /tmp 60 %, GPU 4 GB used. `hs status` (live): distill and qdrant down, scribe .110 down, bmb scribe idle; no research or corpus re-scan possible, and none was needed (no crate code or default changed).
+
+Took item 1's prerequisite from iteration 155: a darker exposure switch, so the overhead flame can be judged apart from the saturated ground. `examples/courtyard` reads `LIGHTS_EV100` (default 6 = unchanged). Captures `/tmp/l156/ev{6,9,11}_y{6.5,9}.png`, sheet `/tmp/l156/cmp.png`: at EV 6 the ground is salmon at 76° and 85°; at EV 9 it is dark stone and the flame reads as a ragged orange burst with a pale core on the dark bed; at EV 11 the stone is lost. EV 9 is the judging exposure. The overhead flame itself is unchanged and still NOT YET (a cauliflower, not tongues). Example-only change: release build of examples ok; no crate code, so no bench.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame: a tongue-quad construction judged at `LIGHTS_EV100=9`.
+2. A cited, luminance-measured flicker amplitude (±15 % is a design default).
+3. Bearers are placeholder capsules.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
