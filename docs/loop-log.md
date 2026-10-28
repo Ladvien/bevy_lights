@@ -3223,3 +3223,35 @@ No new research; the note's own sources (craft `10.7456_tojdac.1674124`, product
 3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 4. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
 5. #3 origin-from-light (answered; closeable by Sanctuary).
+
+## Iteration 135 — 2026-10-28 — A brazier is a bowl (not shipped: NOT YET)
+
+Outcome: no change on `main` except the research note `docs/research/brazier-bowl.md`. The example change is on branch `loop/iter-135` (commit `83b569a`, pushed, not merged), because I could not reach GREAT in five rounds.
+
+### Ranking
+
+Open issues: #4 (criterion 3 done in 130), #3 answered, #2 (ask 3 not needed), #1 publish (release, seen, skipped). No bug issues. Picked iteration 134's backlog item 1, a bowl that shades its own rim: the baseline (`/tmp/l135/before/C.png`) showed the showcase's central prop as a flat-topped crate with a coal sticker. Runner-up: the flame from above, round 6.
+
+### Sources
+
+Craft `10.2478_bsmr-2022-0020` (Huttunen, underlighting) and `10.32657_10220_48312` (Doyle); production `s2011-advances-pdf-slides`; technical `PBR3_12_Light_Sources`. A fire-basket-specific craft source was not found in the corpus. Distill and the corpus scan were not run this pass.
+
+### What was built (branch only)
+
+`bowl_mesh(lining)` in `examples/courtyard.rs`: a revolved profile (foot, stem, belly, flat lip) as an iron shell, plus a separate soot-lined inside; the coal bed sunk 0.05 m below the lip and the flame foot with it. Normals/winding are by profile traversal; the lathe's first winding was inverted and the stem showed as a hole until fixed.
+
+### Verification and critique
+
+Captures at four cameras (1.6 m, 0.9 m, 2.2 m, 4 m elevated), 60 frames, 1280x720, `/tmp/l135/after/`. Rounds: (1) one shared 0.10-albedo material: the inside was a flat peach plate, as bright as the floor; (2-3) a darker/rougher iron: the interior stayed a flat plate because the fire's specular/diffuse at 0.5 m (the 58 000 lx of `fuel-bed.md`) dominates albedo; (4-5) a separate soot lining (albedo 0.006→0.016, roughness 0.95, reflectance 0): the bowl now reads, the iron lip is the brightest line on the prop, the belly under it falls to shade, the stem reads at 0.9 m.
+
+Remaining flaws against `## What great looks like`: the lining is one flat tone at 2.2 m (sampled DN 59 and 60 at two points 200 px apart, no wall-to-floor gradient); the coal bed is still a hard-edged square on a round bowl (pre-existing, but it is now more obvious inside a round rim); the stem's foot reads as a tin cup at the courtyard's ground level (`A.png`). Verdict: NOT YET. Five rounds used, no GREAT state reached, so nothing is merged.
+
+Not run: bench (example-only), full gate (only `cargo fmt` and `cargo clippy --examples --all-features -D warnings` passed on the branch), README/GIF (no merge).
+
+### Top 5 remaining, ranked
+
+1. Finish the bowl from `loop/iter-135`: a round or hex-shaped coal bed (a disc mask on the emissive field) so the bed fits its bowl, and a lining gradient (an emissive term from the bed, or a deeper wall); then gate and merge.
+2. The flame from above, round 6 (`flame-overhead.md`).
+3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+4. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
+5. #3 origin-from-light (answered; closeable by Sanctuary).
