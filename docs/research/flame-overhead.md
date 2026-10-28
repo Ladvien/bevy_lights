@@ -262,3 +262,7 @@ Judged at full frame and at 4× on the fire, at every camera the crate's own sho
 - **The same fire from the side.** At the showcase camera the flame is pixel-identical to before this change.
 - **Cheap.** One `asin` and a few vector operations per vertex, and one extra fbm per fragment only where the cross-section is
   drawn (camera past 50°); no second draw, no second material, no new instance data.
+
+### Round 10 — judging exposure (iteration 156)
+
+No shader change. `courtyard` gains `LIGHTS_EV100` (default 6). Captured the unmodified shader at 76° and 85° at EV 6, 9 and 11 (`/tmp/l156/cmp.png`): at EV 9 the ground reads as dark stone with a warm pool, and the overhead flame is a small ragged orange burst with a pale core on the dark coal bed, so its shape (a cauliflower, not tongues) can finally be judged against its surroundings; at EV 11 the stone is lost. Use `LIGHTS_EV100=9` for the next overhead attempt, which should be a tongue-quad construction, not disc constants.
