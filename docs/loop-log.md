@@ -3692,3 +3692,23 @@ Verdict: artifact removed; the overhead flame as a whole remains NOT YET (burst,
 3. Bearers are placeholder capsules.
 4. A time envelope for the overhead fade, only if a host reports it.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 158 — 2026-10-28 — no change shipped (item 2 and the GIF size checked, both blocked)
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (8629f86), 18 GiB RAM, /tmp 60 %, GPU 4 GB used. `hs status` (live): distill and qdrant down, scribe .110 down, bmb scribe idle; no corpus re-scan or new search possible.
+
+Candidates checked, none shipped:
+
+1. **A cited flicker amplitude (backlog 2).** Searched the local corpus (`~/.cache/bevy_lights_corpus/markdown`, 362 top-level entries) for a luminance-variation figure for a candle or open flame; the only hits are unrelated medical and sexology papers that mention "candle", and the one flame-physics paper held (Xia & Zhang 2018, `10.1017_jfm.2018.707`) gives the rate law, not a luminance depth. `FLICKER_DEPTH = 0.15` therefore stays a design default. Needs the distill index back, or Maynard 2013 by other means.
+2. **`showcase.gif` is 2.40 MB against the README rule's "under ~2 MB".** Tried re-encoding the committed file with `palettegen stats_mode=diff` and `paletteuse diff_mode=rectangle`: 2.16 MB at 256 colours, 2.16 MB at 192. No `gifsicle` on big. A real cut needs fewer frames or a narrower clip, which changes what the hero shows; not done without a capture review. Not committed.
+3. **Overhead flame (backlog 1).** Re-viewed `/tmp/l157/after/y65.png` at 1280 x 720: at full frame the bowl reads as a lit fire from above, ~50 px wide; two earlier tongue-stack attempts (`docs/attempts/`) are already NOT YET and no new construction idea was in hand, so no round was spent.
+
+No crate code, shader or default changed; no bench.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack (upright leaning ribbons seen end-on).
+2. `showcase.gif` under 2 MB: re-capture a shorter or narrower clip (needs a GPU capture review).
+3. A cited, luminance-measured flicker amplitude (blocked on distill / Maynard 2013).
+4. Bearers are placeholder capsules.
+5. A time envelope for the overhead fade, only if a host reports it.
