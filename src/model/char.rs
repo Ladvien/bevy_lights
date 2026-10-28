@@ -51,7 +51,7 @@ const SPARSE: f32 = 0.30;
 /// How deep into a lump its fall-off from the hot core runs: a coal is not a flat chip, it is a lump
 /// whose middle is the temperature that glows and whose faces cool towards its edges. At `0.92` the
 /// lump is nearly flat and the fall is quick at its rim; a soft cone would read as a lit bump.
-const PLATEAU: f32 = 0.92;
+const PLATEAU: f32 = 0.7;
 
 /// The two fracture depths, as a share of a lump's radius: a shard's edge is jagged, and one term of
 /// value noise gives it one scale of jaggedness. Without them every lump is a rotated box.
