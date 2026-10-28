@@ -26,7 +26,7 @@
 //!
 //! # Knobs
 //!
-//! `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
+//! `LIGHTS_RELIGHT=<seconds>` re-lights the braziers once at that time (what `K` does). `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
 //! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`. `LIGHTS_DEPTH_FADE=1`
 //! sets `FlameSite::depth_fade` on every flame and gives the camera a `DepthPrepass`; the occlusion
 //! case it is for has its own scene in `examples/occlusion.rs`.
@@ -532,23 +532,26 @@ fn spawn_scene(
                 // The fire's size, from its pool: POOL_LUX at BRAZIER_POOL metres out, from a light
                 // BRAZIER_LIGHT over the ground. 60 000 lm was 20x this and blew the pool it lit.
                 let lumens = lumens_for(BRAZIER_POOL, BRAZIER_LIGHT);
-                brazier.spawn((
-                    Name::new("Coals"),
-                    PointLight {
-                        color: fire_colour(),
-                        intensity: lumens,
-                        range: BRAZIER_POOL * POOL_RANGE_MARGIN,
-                        shadow_maps_enabled: true,
-                        ..default()
-                    },
-                    Flicker { base: lumens, phase, diameter: brazier_bed(), ..default() },
-                    Kindle::default(),
-                    Transform::from_xyz(0.0, BRAZIER_LIGHT - BRAZIER_TOP * 0.5, 0.0),
-                ));
+                let coals = brazier
+                    .spawn((
+                        Name::new("Coals"),
+                        PointLight {
+                            color: fire_colour(),
+                            intensity: lumens,
+                            range: BRAZIER_POOL * POOL_RANGE_MARGIN,
+                            shadow_maps_enabled: true,
+                            ..default()
+                        },
+                        Flicker { base: lumens, phase, diameter: brazier_bed(), ..default() },
+                        Kindle::default(),
+                        Transform::from_xyz(0.0, BRAZIER_LIGHT - BRAZIER_TOP * 0.5, 0.0),
+                    ))
+                    .id();
                 brazier.spawn((
                     Name::new("Flame site"),
-                    // The brazier's light is spawned with `Kindle::default()`, so its flame catches with it
-                    // over the same envelope: the fire grows rather than appearing whole.
+                    // The flame names the coals as its fire, so it catches with them: at the start, and again
+                    // whenever the coals are re-lit (`K`, or `LIGHTS_RELIGHT`), the fire grows rather than
+                    // appearing whole.
                     FlameSite {
                         height: BRAZIER_FLAME_HEIGHT,
                         phase,
@@ -556,7 +559,7 @@ fn spawn_scene(
                         diameter: brazier_bed(),
                         depth: FLICKER_DEPTH,
                         depth_fade: depth_fade_on(),
-                        fire: None,
+                        fire: Some(coals),
                     },
                     // The flame's foot is on the coals, at the top of the box.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04, 0.0),
@@ -720,14 +723,20 @@ fn orbit_focus(time: Res<Time>, mut focus: Query<&mut Transform, With<Focus>>) {
 }
 
 /// `K` re-lights every brazier: re-inserting [`Kindle::default()`] restarts the flare, and the
-/// message is written again.
+/// message is written again. `LIGHTS_RELIGHT=<seconds>` does it once at that elapsed time, so an
+/// unattended capture can show the flame catching with its light again.
 fn relight_braziers(
     mut commands: Commands,
     keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
     braziers: Query<&Children, With<Brazier>>,
     lights: Query<(), With<Kindle>>,
+    mut timed: Local<Option<Option<f32>>>,
 ) {
-    if !keys.just_pressed(KeyCode::KeyK) {
+    let at = *timed.get_or_insert_with(|| std::env::var("LIGHTS_RELIGHT").ok().and_then(|v| v.parse().ok()));
+    let elapsed = time.elapsed_secs();
+    let due = at.is_some_and(|at| elapsed - time.delta_secs() < at && elapsed >= at);
+    if !keys.just_pressed(KeyCode::KeyK) && !due {
         return;
     }
     for children in &braziers {
