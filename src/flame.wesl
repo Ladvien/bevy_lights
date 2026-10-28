@@ -313,15 +313,18 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     // turbulence, drawn as the ellipse it projects to (`R` wide, `R * sin(elevation)` tall) and faded in with the camera's rise.
     if in.overhead.x > 0.0 {
         let q = vec2<f32>(x, sy / max(in.overhead.z, OVERHEAD_SQUASH));
-        // Rippled by its own turbulence in the ellipse's undistorted coordinates: `n1` runs along the flame's height, which overhead
-        // is a few pixels long, so its features would be horizontal streaks.
-        let ripple = fbm(vec2<f32>(q.x * 2.5, q.y * 2.5 - t * 1.7));
-        let radius = FLAME_HALF_WIDTH * (1.0 + 0.5 * (ripple - 0.5));
-        let disc = 1.0 - length(q) / radius;
-        // Tongues of the turbulence lift and drop its brightness, so it is a body of fire rather than a soft lamp.
-        let licks = clamp(0.5 + 1.2 * (ripple - 0.5) + 0.5, 0.0, 1.3);
-        mask = max(mask, smoothstep(0.0, 0.35, disc) * licks * in.overhead.x);
-        heat = max(heat, clamp(disc, 0.0, 1.0) * (1.0 - 0.45 * length(q) / radius) * in.overhead.x);
+        // Lobed: the radius is a noise of the direction from the axis (periodic in angle, no seam), scrolling in time, and a second
+        // noise of the direction streaks the brightness along the radius, so the outline has tongues that lean and part
+        // (`docs/research/flame-overhead.md`, round 7).
+        let rq = length(q);
+        let dir = q / max(rq, 1e-4);
+        let lobes = fbm(dir * 0.9 + vec2<f32>(t * 0.6, 3.7));
+        let radius = FLAME_HALF_WIDTH * (0.85 + 0.8 * (lobes - 0.5));
+        let disc = 1.0 - rq / radius;
+        let streak = fbm(dir * 1.6 + vec2<f32>(5.1, -t * 1.5 + rq * 4.0));
+        let licks = mix(1.0, clamp(0.5 + 1.1 * streak, 0.0, 1.3), smoothstep(0.1, 0.6, rq / radius));
+        mask = max(mask, smoothstep(0.0, 0.26, disc) * licks * in.overhead.x);
+        heat = max(heat, clamp(disc, 0.0, 1.0) * (1.0 - 0.45 * rq / radius) * in.overhead.x);
     }
     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));

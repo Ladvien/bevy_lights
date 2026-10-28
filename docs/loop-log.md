@@ -3378,3 +3378,27 @@ Rounds 1-5 stretched an *upright* quad by `1/cos(e)`. Debug capture (solid colou
 3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 4. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients (a better palette strategy than one global 256-colour palette).
+
+## Iteration 140 — 2026-10-28 — Licks in the flame from above
+
+Open issues: #4 (criterion 3 delivered in 130), #3 answered, #1 publish (release, seen, skipped); no bug issues; `gh` reachable. Picked iteration 139's backlog item 1 (crisper structure in the overhead cross-section) over its item 2 (a hue-correct core, which needs the host's tonemapper): at 75°-85° the fire was a soft orange halo with no outline, the most visible gap of a top-down camera. Corpus re-scan and home-still preflight were not run this pass (the change is a shader constant set; sources are the note's existing stems).
+
+**Changed:** the cross-section's radius is a scrolling noise of the direction from the axis, its brightness is streaked along the radius, edge `smoothstep(0, 0.26)` (`src/flame.wesl`). Sources (by stem, already quoted in `docs/research/flame-overhead.md`): craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides` and Gregory §11.4.3; technical `10.1017_jfm.2018.707` and RTR §6.3.
+
+### Verification and critique
+
+- Captures `/tmp/l140/{before,after,after2}/` (courtyard, brazier 4 m away, 1280x720, frame 60, 0/30/45/60/70/75/80/85°), zooms `z*.png`, montage `after2/m.png`.
+- Round 1 (`dir*1.5`, amplitude 1.0, edge 0.18): lobed but a starburst at 75° and 85°: NOT YET. Round 2 (shipped): soft rounded licks, a ragged outline at 60°, 70°, 75°, 85°, a hot core inside.
+- Flaws at zoom: interior radial streaks are subtle; the flame is small against the bowl (≈ a third of its diameter); the pale-green tint where the yellow core saturates the red at ~60° remains (backlog item); at 75° the plume sits on the bed's far half so the near half still reads as bare coals.
+- Unchanged below 50°: `magick compare -metric AE` 0.0039, 0.0013, 0.0013 at 0°, 30°, 45° (1 channel of 1 pixel). Clipping: 0 px with min channel ≥ 245 in the bed window at 75° and 85°, before and after.
+- Verdict: GREAT for the stated validation target (visible lobes at every angle 60°-85°, crisper edge, no starburst, no clipping); not a showcase of flame volume.
+- Bench (CPU-only, no Rust changed): `mean_us=498 p50_us=489 min_us=254`, flicker p50 161 µs, pool p50 337 µs. Gate: build, dev build, test (both feature sets), examples, clippy, doc, fmt, wasm, wesl-check all pass.
+- Media: `showcase.gif`, `courtyard.gif` and `.png` are from cameras below 50° and do not show this change; not re-encoded.
+
+### Top 5 remaining, ranked
+
+1. The pale-green tint where the core saturates at 56°-66°, and a hue-correct hot core (wants the host's tonemapper).
+2. Layered volume in the overhead flame (an inner and an outer shell, so it reads as depth, not a lobed disc).
+3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients (a better palette strategy than one global 256-colour palette).
