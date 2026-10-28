@@ -164,7 +164,7 @@ not ripple across it. Akenine-Möller et al. §6.3's turbulence sum (already the
 **Model adopted.** The cross-section's radius is modulated by a function of the *direction* from the axis (a noise of the unit vector, so it is
 periodic in angle and has no seam), scrolling in time, with a larger amplitude than the round-6 ripple; its edge is `smoothstep(0, 0.18)` instead of
 `0.35`; and its brightness is streaked radially by a second noise of the direction, scrolled outward. Each constant is a design default,
-judged in captures. The tongue, the quad and the 50°/76° blend are unchanged, so frames below 50° are bit-identical.
+judged in captures. **Shipped values:** lobes `fbm(dir*0.9 + (0.6 t, 3.7))`, radius `R*(0.85 + 0.8*(lobes-0.5))`, streaks `fbm(dir*1.6 + (5.1, -1.5 t + 4 r))` mixed in from 0.1 to 0.6 of the radius, edge `smoothstep(0, 0.26)`. A first try (`dir*1.5`, amplitude 1.0, edge 0.18) read as a starburst/explosion and was softened. The tongue, the quad and the 50°/76° blend are unchanged, so frames below 50° are bit-identical.
 
 **Validation.** At 60°-85° the outline has at least three visible lobes and the edge is crisper than round 6's; no pixel with min channel
 >= 245 in the bed window; ground-level frames (0°, 30°, 45°) unchanged to 1 channel of 1 pixel.
@@ -212,9 +212,7 @@ Round 6's values, all in `src/flame.wesl`; each is a design default calibrated i
 - **The cross-section is drawn inside the upright quad rather than as a second quad.** A second horizontal quad
   would cost a second draw and a second material, and would need its own depth and blend ordering against the coal
   bed it sits in — for a shape that is one `length()` away in the shader.
-- **The flame is still not a volume.** From above it is a rippled ellipse with a hot core and a foreshortened tongue, not a
-  body of fire with internal structure; its edge is soft (`smoothstep(0, 0.35)`), which is how a translucent flame ends
-  but is the main thing a sharper art director would ask to be crisper.
+- **The flame is still not a volume.** Round 7 gave its outline lobes and its body radial streaks (edge `smoothstep(0, 0.26)`), but from above it is still one lobed disc with a hot core and a foreshortened tongue, not layered fire; the interior streaks are subtle.
 - **The camera's elevation is taken from the ray to the plume's centre** (`view.world_from_view[3]`), which is exact for a
   perspective camera. For an orthographic camera that translation is the near/far midpoint, so a flame well off the view axis
   reads an elevation a little off its true one; the error is the flame's offset over the camera's distance, small at any
