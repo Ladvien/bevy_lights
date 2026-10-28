@@ -161,7 +161,9 @@ pub struct FlameSite {
     /// The shader reads the depth prepass at the flame's source, a third of the way up it, and over a ring of
     /// taps around it, and multiplies the flame's emission by the share of them the camera can see, so a wall
     /// edge crossing the source takes the flame down over a few pixels rather than popping it
-    /// (`docs/research/flame-occlusion.md`). **It needs a [`DepthPrepass`](bevy::core_pipeline::prepass::DepthPrepass) on the
+    /// (`docs/research/flame-occlusion.md`). A tap hides the source when the scene there is nearer than the source by more than
+    /// 15 % of the flame's height, compared in linear view distance, so **a perspective and an orthographic camera both work, at
+    /// any far plane** (issue #6). **It needs a [`DepthPrepass`](bevy::core_pipeline::prepass::DepthPrepass) on the
     /// camera**: without one there is no depth to read and the flame draws whole. `false` (the default a host that
     /// does not care writes) is the flame exactly as it always was, with no depth read at all. May be changed at
     /// any time; [`FlamePlugin`] moves the flame to the right material.
