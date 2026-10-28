@@ -3495,3 +3495,22 @@ Captured the courtyard at 66° (eye 6.63,4.85,5) and 85° (eye 5.3,9,5) and a si
 3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 4. Banding in the GIF's pool gradients.
 5. A hue-correct hot core (needs the host's tonemapper; design only).
+
+## Iteration 146 — 2026-10-28 — Overhead flame: the disc is not hidden by the bed; nothing shipped
+
+Open issues: #4, #3 answered, #1 publish (release, seen, skipped); no bug issues. GPU free (4 GB used), 16 GiB RAM, /tmp 56 %. Tree clean at start. Corpus re-scan and home-still preflight not run (no crate change).
+
+Took iteration 145's item 1. Captures `/tmp/l146/` (courtyard, eye 6.63,4.85,5 look 5,1.2,5, frame 90, 3x crop). Two experiments, both reverted:
+
+1. `BED_GAIN` 0.0 (`before/nobed_c.png`): the lower ~60 % of the bed's ellipse is black; only its upper part carries the flame's pale core. So the overhead disc (`src/flame.wesl`, `if in.overhead.x > 0.0`) contributes little over the lower bed at 66°; the bright, cratered look in `before/c66.png` is the coal bed's own emission, not the flame.
+2. Pulling the facing quad toward the eye (`centre + normalize(to_eye) * size * k`, k 0.3 and 3.0) to rule out the bed's near side burying it in the depth test: k 0.3 is pixel-identical to before (`a1c.png`); k 3.0 only enlarges the flame into a wash (`a2c.png`). Depth occlusion by the bed is **not** the cause.
+
+So the disc is simply weak at this angle: its mask (`smoothstep(0, .26, disc) * licks * overhead.x`) and heat feed an additive orange onto an already orange-saturated ground. Candidate fix, not tried: weight the disc by radius toward a hotter centre and measure against a darker exposure; needs its own research round. Nothing shipped; no gate or bench run (no change); no baseline worktree.
+
+### Top 5 remaining, ranked
+
+1. Overhead disc is weak at ~66° (above): raise its contribution and give it a radial heat gradient; needs a research round and exposure check.
+2. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+4. Banding in the GIF's pool gradients.
+5. A hue-correct hot core (needs the host's tonemapper; design only).
