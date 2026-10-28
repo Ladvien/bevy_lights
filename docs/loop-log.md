@@ -3856,3 +3856,11 @@ Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at s
 Outcome: log only; no `src/`, shader, default or media change.
 
 Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (4f44a97). `hs status` (live): distill and qdrant refuse connections (embedded 0), scribe .110 backend unavailable, bmb scribe idle; the candle-flame oscillation paper is downloaded (4 h ago) but not converted. No `distill_search`. Candidates and top 5 unchanged from iteration 167; none has a new idea or an unblocked path, so nothing was started on speculation.
+
+## Iteration 169 — 2026-10-28 — no change shipped (backlog unchanged, candle paper still unconverted)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (75fb1be). `hs status` (live): distill (Cuda) and qdrant are UP (18028 docs embedded), scribe .110 backend unavailable, bmb scribe idle. The candle-flame oscillation paper (`10.1038_s41598-018-36754-w`) is still downloaded but not converted: `scribe_convert` timed out at 30 s again and no Convert event appeared two minutes later; `hs scribe convert` takes a path, not a stem. Backlog item 2 (a cited, luminance-measured flicker amplitude) therefore still lacks its technical source. Candidates and top 5 unchanged from iteration 166; nothing was started on speculation.
+
+Next pass: if the paper's markdown exists, take item 2 now that distill is up.
