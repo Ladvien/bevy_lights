@@ -236,6 +236,11 @@ FPS=30 WIDTH=640 \
   "Four braziers, 48 torches, an 8-light pool"
 ```
 
+`docs/media/courtyard.gif` is the showcase's capture at 640 px: the showcase recipe's step 1, then frames 1 to 48 of the
+sequence (frame 0 is black: the pipelines are still compiling), renumbered from 0 and encoded with `WIDTH=640`. 48 frames,
+3.1 MB. `docs/media/courtyard.png` is the still above. Both were re-taken on 2026-10-28 with the bowl braziers and the
+ember bed; the earlier files showed box braziers and a pink bed.
+
 **No default font path, deliberately.** `/System/Library/Fonts/...` exists on exactly one of the
 machines this repo is built on and fails on the others — and it fails in `magick`, after ffmpeg has
 already spent the whole two-pass encode. Name both files at the call site. The paths above are

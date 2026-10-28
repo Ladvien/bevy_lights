@@ -3317,3 +3317,30 @@ Sweeps (`/tmp/l137/sweep*.png`): the pastel is not the emissive's temperature. R
 3. A hue-correct hot core for the bed (yellow-orange peaks), which wants the host's tonemapper in the loop.
 4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 5. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
+
+## Iteration 138 — 2026-10-28 — courtyard.gif and courtyard.png re-taken (the README's linked media was stale)
+
+Outcome: shipped, media and docs only; no `src/` change.
+
+### Ranking
+
+Open issues: #4 (criterion 3 delivered in 130), #3 answered, #1 publish (release, seen, skipped). No bug issues; `gh` was reachable. Candidates: (1) the flame from above, round 6, which needs a research round and a shader rewrite the five earlier rounds did not land; (2) `courtyard.gif`, which the README links as "the same courtyard" and which still showed the box braziers and the pink bed from before iterations 136 and 137 — a false README line, cheap and certain. Picked 2: a stale caption costs a reader more than a missing improvement, and 1 keeps its place at the top of the backlog.
+
+### Sources
+
+None new: no model, default or shader changed, so no research note. Recipe from `docs/DEMOS.md` (showcase recipe, step 1; `tools/gif.sh`).
+
+### Verification and critique
+
+- Capture: `LIGHTS_FRAMES=260 LIGHTS_SHOT_EVERY=2 LIGHTS_SHOT_FROM=9 LIGHTS_FOCUS_WALK=18`, 1280x720, xvfb `-n 138`, release examples rebuilt first (0.5 s: nothing stale). Frame 0 is 15 KB and black (pipelines compiling); frames 1-48 used, so the clip opens on the still-dim courtyard and fires then breathe. Single-window luma beside a brazier over the 48 frames: 106 → 136 → 125 → 134 → 123 → 134 → 123 → 69, a visible swing and a camera walk at the end; not a calibrated flicker measurement (the showcase's 2.50 Hz measurement is unchanged).
+- Read the coalesced GIF frame 30 at full size and 300 % on a brazier: bowl brazier on a stem, ember bed, flame, warm pool on the stone, blue shadow side. Remaining flaws: banding rings in the pool gradients (256 colours, `dither=none` by design), the caption is low contrast over the floor, and a figure stands in front of one brazier. The 3.1 MB file is larger than the hero's 2 MB budget; that budget is the hero's, and the old file was 2.9 MB.
+- Verdict: GREAT as README-linked media for what it claims (bowl braziers, ember bed, 48 torch-bearers, 8-light pool). `courtyard.png` (1280x720, frame 600) read at full size, same scene, bowl braziers, no pink plate.
+- Bench: not run; no code changed. Gate: no code changed, not re-run.
+
+### Top 5 remaining, ranked
+
+1. The flame from above, round 6 (`flame-overhead.md`).
+2. A hue-correct hot core for the bed (yellow-orange peaks), which wants the host's tonemapper in the loop.
+3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+4. A time envelope for the fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients (a better palette strategy than one global 256-colour palette).
