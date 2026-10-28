@@ -556,6 +556,7 @@ fn spawn_scene(
                         diameter: brazier_bed(),
                         depth: FLICKER_DEPTH,
                         depth_fade: depth_fade_on(),
+                        fire: None,
                     },
                     // The flame's foot is on the coals, at the top of the box.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04, 0.0),
@@ -676,6 +677,7 @@ fn spawn_scene(
                         diameter: None,
                         depth: FLICKER_DEPTH,
                         depth_fade: depth_fade_on(),
+                        fire: None,
                     },
                     Transform::from_translation(at),
                 ));
