@@ -3144,3 +3144,27 @@ Craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technica
 3. A bowl that shades its own rim.
 4. The flame from above, round 6 (`flame-overhead.md`).
 5. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+
+## Iteration 132 — 2026-10-27 — The courtyard re-lights a brazier and its flame catches (judges iteration 131 by eye)
+
+Outcome: example change only, no `src/` change. The courtyard's braziers now set `FlameSite::fire: Some(coals)`, and `LIGHTS_RELIGHT=<seconds>` re-lights them once at that time (what `K` does), so an unattended capture can show iteration 131's linked relight, which had no visual judgement. CHANGELOG entry; no research note (no default, look or API changed).
+
+### Ranking
+
+Open issues: #4 (criterion 3 done), #3 answered, #2 (ask 3 open), #1 publish (release, seen, skipped). No bug issues. Picked the iteration-131 backlog's item 2: the one shipped behaviour never seen on a GPU, and `K` in the example visibly left the flame at full height (`fire: None`), so the demo contradicted the feature. Runner-up: #2 ask 3 `visible_from` (needs a CPU visibility design the occlusion note rejected).
+
+### Verification
+
+- Relight capture (1280x720, eye 7.5,1.6,7.5, look 5,1.0,5, `LIGHTS_RELIGHT=10`, every 10th frame from 596; `/tmp/l132/after/sheet.png`): frame 596 full flame; frame 606 (0.17 s after) coals dim and no flame; 616-646 the flame grows with the light; by ~1.4 s full. Each brazier logged `kindled` twice (start and relight). Critique: the flame is absent for the first ~0.1 s (kindle_gain floor), as at spawn; the grow is a smooth cone, no pop. Verdict GREAT.
+- Default unchanged: `courtyard` 300 frames vs the pre-change build (`compare -metric AE`) 0.
+- Gate: build release/debug, test, test --features serde, examples, clippy, doc, fmt, wasm lib, wesl-check passed.
+- Bench not run: no library code changed.
+- GIF not re-encoded: default look is pixel-identical.
+
+### Top 5 remaining, ranked
+
+1. #2 ask 3, `visible_from`; a time envelope for the fade.
+2. A bowl that shades its own rim.
+3. The flame from above, round 6 (`flame-overhead.md`).
+4. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+5. #3 origin-from-light.
