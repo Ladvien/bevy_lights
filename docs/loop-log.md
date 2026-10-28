@@ -3902,3 +3902,9 @@ Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at s
 Outcome: log only; no `src/`, shader, default or media change.
 
 Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (3a11f75). The top 5 from iteration 170 stand unchanged; none has a new idea or an unblocked path, so nothing was started on speculation.
+
+## Iteration 175 — 2026-10-28 — no change shipped (backlog unchanged)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: #1 publish (release, seen, skipped); no bug issues. Tree clean at start (d4bb184). Parked work: only the iteration-115 flame-occlusion WIP for issue #2, which is no longer open, so stale and ignored. The top 5 from iteration 170 stand unchanged; none has a new idea or an unblocked path, so nothing was started on speculation.
