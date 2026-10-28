@@ -62,6 +62,16 @@ const EMBER_RED: vec3<f32> = vec3<f32>(0.95, 0.20, 0.02);
 const SOURCE_HEIGHT: f32 = 0.35;
 const FADE_RADIUS: f32 = 0.10;
 const FADE_MARGIN: f32 = 0.15;
+// The flame from above (`docs/research/flame-overhead.md`): an upright quad presents `cos(elevation)` of its area, so the flame's
+// own edges vanish before 75 degrees. From OVERHEAD_START (50 degrees) to OVERHEAD_FULL (76) the quad is stretched by `1/cos` (at
+// most OVERHEAD_STRETCH) so it still covers a flame's footprint on screen, a cross-section of the plume is drawn in it, and each
+// vertex slides along its view ray onto the camera-facing plane through the plume's centre (the same pixels, but not inside the bowl).
+// Below OVERHEAD_START every term is exactly its old value.
+const OVERHEAD_START: f32 = 0.873;
+const OVERHEAD_FULL: f32 = 1.326;
+const OVERHEAD_STRETCH: f32 = 6.0;
+// The squash floor of the cross-section's ellipse: sin(10 degrees), so a camera nearly level does not flatten it to a line.
+const OVERHEAD_SQUASH: f32 = 0.18;
 
 // The flame's own stage IO: only the quad's uv and the fire's phase cross to the fragment.
 struct FlameVertexOutput {
@@ -82,6 +92,12 @@ struct FlameVertexOutput {
     @location(4) @interpolate(flat) fade: vec4<f32>,
     // The depth fade's margin in view-space units: the share of the flame's drawn height a nearer surface must clear to hide the source.
     @location(5) @interpolate(flat) fade_margin: f32,
+    // The flame from above: `.x` how far the camera is over the fire (0 at 50 degrees and below, 1 at 76 and above), `.y` the quad's
+    // stretch in world height, `.z` the sine of the elevation (the cross-section's squash). Flat: one camera, one flame.
+    @location(6) @interpolate(flat) overhead: vec3<f32>,
+    // The quad's uv again, interpolated in screen space. Overhead the quad is slid along each vertex's view ray onto a tilted plane, so
+    // the perspective-correct `uv` is no longer the upright flame's image on screen; this one is, and the cross-section is drawn in it.
+    @location(7) @interpolate(linear) screen_uv: vec2<f32>,
 }
 
 // ---- 2D simplex noise and the classic fbm over it (provenance UNVERIFIED, see header) ---------------------------------
@@ -233,9 +249,22 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     // read above; multiplying it in here is the whole difference between a documented catch and a
     // flame that appears whole. `docs/research/flame-kindle.md` measures it.
     let size = tag.y * material.params.y * took;
-    let billboard = origin + right * (vertex.position.x * size * FLAME_ASPECT) + up * (vertex.position.y * size + size * 0.5);
+    // The camera's elevation over the flame's source: 0 level, 1.57 straight down.
+    let to_eye = view.world_from_view[3].xyz - (origin + up * (size * SOURCE_HEIGHT));
+    let sin_e = clamp(to_eye.y / max(length(to_eye), 1e-4), 0.0, 1.0);
+    let elevation = asin(sin_e);
+    let topdown = smoothstep(OVERHEAD_START, OVERHEAD_FULL, elevation);
+    let stretch = mix(1.0, min(1.0 / max(cos(elevation), 1e-3), OVERHEAD_STRETCH), topdown);
+    let lift = mix(0.5, SOURCE_HEIGHT, topdown);
+    var billboard = origin + right * (vertex.position.x * size * FLAME_ASPECT) + up * (vertex.position.y * size * stretch + size * lift);
+    // Slide each vertex along its own view ray onto the plane through the plume's centre that faces the camera: the same pixels, but
+    // no part of the quad is left inside the brazier's bowl or below its floor, where the depth test would hide it.
+    let ray = normalize(view.world_from_view[3].xyz - billboard);
+    billboard += ray * (topdown * dot(origin + up * (size * SOURCE_HEIGHT) - billboard, normalize(to_eye)) / max(dot(ray, normalize(to_eye)), 0.05));
+    out.overhead = vec3<f32>(topdown, stretch, sin_e);
     out.position = position_world_to_clip(billboard);
     out.uv = vec2<f32>(vertex.position.x, vertex.position.y) + vec2<f32>(0.5, 0.5);
+    out.screen_uv = out.uv;
     out.phase = f32((raw >> 8u) & 0xffu) / 255.0 * TAU;
     out.took = took;
     out.brightness = f32(raw & 0xffu) / 255.0;
@@ -247,9 +276,15 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
 @fragment
 fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     let t = material.params.x + in.phase;
+    // Level the quad is the upright plane and its perspective-correct uv is the flame's own; overhead it is the screen-space one.
+    let uv = mix(in.uv, in.screen_uv, in.overhead.x);
     // Height up the flame from its foot (a 4% margin under it) and the distance across in flame heights, so the noise is round.
-    let y = (in.uv.y - 0.04) / 0.96;
-    let x = (in.uv.x - 0.5) * FLAME_ASPECT;
+    // Overhead the quad is `stretch` times taller and its middle is the plume's centre, so the flame's own height is read back
+    // from the quad's.
+    let lift = mix(0.5, SOURCE_HEIGHT, in.overhead.x);
+    let rise = lift + (uv.y - 0.5) * in.overhead.y;
+    let y = (rise - 0.04) / 0.96;
+    let x = (uv.x - 0.5) * FLAME_ASPECT;
     let s = clamp(y, 0.0, 1.0);
     // Rising turbulence: fbm fields scrolled down the flame, so their features climb it.
     let n1 = fbm(vec2<f32>(x * 2.5, y * 1.8 - t * 1.7));
@@ -268,9 +303,20 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     // Noise eats into the upper flame, so its top licks instead of ending in a smooth point.
     body -= (1.0 - n3) * 0.9 * pow(u, 1.8);
     body = select(body, -1.0, dy < 0.0);
-    let mask = smoothstep(0.0, 0.30, body) * smoothstep(0.0, 0.06, y);
+    var mask = smoothstep(0.0, 0.30, body) * smoothstep(0.0, 0.06, y);
     // Hottest along the axis and low down: red rim and tip, the host's fire, a yellow core.
-    let heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);
+    var heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);
+    // From above the plume's cross-section is what is seen: a horizontal disc of the plume's widest radius, rippled by the same
+    // turbulence, drawn as the ellipse it projects to (`R` wide, `R * sin(elevation)` tall) and faded in with the camera's rise.
+    if in.overhead.x > 0.0 {
+        // One quad unit of height is `stretch * cos(elevation)` flame heights on screen (1 until the stretch is capped).
+        let screen = in.overhead.y * sqrt(max(1.0 - in.overhead.z * in.overhead.z, 0.0));
+        let q = vec2<f32>(x, (uv.y - 0.5) * screen / max(in.overhead.z, OVERHEAD_SQUASH));
+        let radius = FLAME_HALF_WIDTH * (1.0 + 0.5 * (n1 - 0.5));
+        let disc = 1.0 - length(q) / radius;
+        mask = max(mask, smoothstep(0.0, 0.45, disc) * in.overhead.x);
+        heat = max(heat, clamp(disc, 0.0, 1.0) * (1.0 - 0.45 * length(q) / radius) * in.overhead.x);
+    }
     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));
     // A fire that is still catching is redder, and each flame knows its own progress (`in.took`): the steady ramp
