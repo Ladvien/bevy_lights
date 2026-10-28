@@ -3402,3 +3402,25 @@ Open issues: #4 (criterion 3 delivered in 130), #3 answered, #1 publish (release
 3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients (a better palette strategy than one global 256-colour palette).
+
+## Iteration 141 — 2026-10-28 — The pale-green tint at 56°-66°: diagnosed, not fixed (shader change reverted)
+
+Open issues: #4 (criterion 3 delivered in 130), #3 answered, #1 publish (release, seen, skipped); no bug issues; `gh` reachable. Picked iteration 140's backlog item 1 (the khaki/sage patch on the coal bed under the overhead flame). Corpus re-scan and home-still preflight not run (a colour constant; no new source). GPU free (4 GB of 24 used by a bystander).
+
+**Diagnosis** (captures `/tmp/l141/{before,after,after2}/`, courtyard, brazier 4 m away, 1280x720, frame 60, 0/45/56/60/63/66/70/80°; debug builds `noflame63.png`, `red63.png`, `dim63.png`):
+- With the flame hidden (`noflame63.png`) there is no patch: it is the flame's own output.
+- The patch is a *dark gap between coal lumps* with the flame added over it: bed (91,27,6) there, tonemapped result (222,189,122) at 63°, against neighbouring lumps already at R 255 (255,137,62). It is the flame's colour alone, a pale tan, seen beside saturated orange, and it reads as sage by simultaneous contrast.
+- A pure-red flame gives (222,27,6) at the same pixel, so the flame's red contribution there is about 222 sRGB; at 0.4x flame strength the patch is (162,102,58), a plain brown: the tint appears only at the full core intensity, i.e. it is the tonemapper rolling a very saturated high-intensity orange towards white along a yellow-green path, not the ramp's hue.
+- Tried: an orange core past 50° (`CORE_ABOVE` (1.0, 0.60, 0.24), then (1.0, 0.48, 0.16)). Max G/R in the bed window fell (63°: 0.848 → 0.773 → 0.727; 66°: 0.836 → 0.743 → 0.715; 60°: 0.883 → 0.871 → 0.809) but the patch is visually unchanged in the montages `after/m.png` and `after2/m.png`, and a more orange core costs the yellow-white read of the fire's heart. Verdict: NOT YET; reverted (`git checkout src/flame.wesl`), nothing shipped. wesl-check passed on the experiment.
+
+**Next hypothesis** (not tried): compress the core's intensity, not its hue, where `heat` saturates (a soft clamp of the additive's peak so the tonemapper's input stays out of its yellow-green roll-off), judged against the *host's* tonemapper, which is why the item has been marked as wanting it. Or desaturate the core towards white as `heat → 1` so the LUT's input is not a saturated orange.
+
+No Rust or shader change; no bench or gate re-run (tree identical to iteration 140's merge). No baseline worktree was made.
+
+### Top 5 remaining, ranked
+
+1. The overhead core's tonemapper roll-off (above): cap or whiten the core's peak; judge in captures with the host's tonemapper.
+2. Layered volume in the overhead flame (an inner and an outer shell).
+3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+5. Banding in the GIF's pool gradients.
