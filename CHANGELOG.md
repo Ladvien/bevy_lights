@@ -6,6 +6,7 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Fixed
 
+- **A fire is still a fire from above (`docs/research/flame-overhead.md`).** An upright billboard presents `cos(elevation)` of its area, so a brazier's flame was gone by 75° of camera elevation and a tactical or top-down camera saw a bare coal bed. Past 50° the flame's quad now faces the camera through the plume's centre, the upright flame is drawn on it as the image it has on screen, and a rippled cross-section of the plume (an ellipse `R` wide and `R·sin(elevation)` tall) fades in by 76°, so the tongue turns into a round, hot-cored glow with no step. At or below 50° the frame is unchanged. Shader only: `src/flame.wesl`; no API, default or CPU cost changed.
 - **`FlameSite::depth_fade` works under an orthographic camera (issue #6).** The occlusion margin was 3 % of reverse-Z depth, which is 3 % of the distance for a perspective camera but 135 ft for an orthographic one with `far` 6000, so a flame behind a wall never faded. The shader now converts the source's and the scene's depth to linear view z (`depth_ndc_to_view_z`) and hides the source when the scene is nearer by more than 15 % of the flame's drawn height, so any projection at any far plane agrees. Perspective results change slightly (the margin is now a fraction of the flame's height rather than of the distance); a torch flush on a wall still does not fade. `examples/occlusion.rs` gains `LIGHTS_ORTHO=1` / `LIGHTS_FAR`.
 
 ### Changed
