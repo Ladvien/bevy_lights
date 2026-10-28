@@ -3465,3 +3465,19 @@ Verdict NOT YET; reverted (`git checkout src/flame.wesl`), nothing shipped. No R
 3. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
 4. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
 5. Banding in the GIF's pool gradients.
+
+## Iteration 144 — 2026-10-28 — The overhead "green patch" is the flame's yellow core, not a defect: item closed
+
+Open issues: #4, #3 answered, #1 publish (release, seen, skipped); no bug issues; `gh` reachable. GPU free (4 GB used, 16.9 GiB RAM). Picked iteration 143's backlog item 1 (is the green in the courtyard's coal bed?). Corpus re-scan and home-still preflight not run (no new source; no crate change). Tree was clean at start.
+
+**Experiment** (`/tmp/l144/`, courtyard, eye 6.63,4.85,5 look 5,1.2,5 (~66° elevation, 4 m), frame 60, 1280x720): `BED_GAIN` 0.2 → 0.0 in `examples/courtyard.rs`, so the bed emits nothing and is a dark lump under the flame (`cmp2.png`). The pale patch **stays**, at the flame's base over the dark bed: pixels (640,380) srgb(203,172,109), (645,385) (214,174,109), (635,390) (195,168,107). G/R 0.85, B/R 0.54: a desaturated pale yellow, which is `CORE_YELLOW` (1.0, 0.78, 0.30) after the tonemapper, not a green (G never exceeds R). It reads sage only by simultaneous contrast against the saturated orange (254,108,26) around it.
+
+Conclusion, with 141 (intensity), 142 (knee), 143 (ramp hue): the patch is the flame's hot core, correctly yellow-white where the flame is brightest and seen end-on; the coal bed is not involved. Not a defect; the item is closed and dropped from the backlog. Reverted the experiment (`git checkout examples/courtyard.rs`); nothing shipped, no gate or bench run (no change), no baseline worktree.
+
+### Top 5 remaining, ranked
+
+1. Layered volume in the overhead flame (an inner and an outer shell).
+2. Bearers are placeholder capsules; a luminance-measured flicker amplitude.
+3. A time envelope for the overhead fade, only if a host reports a camera stopping mid-fade.
+4. Banding in the GIF's pool gradients.
+5. A hue-correct hot core (needs the host's tonemapper; design only).
