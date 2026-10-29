@@ -64,7 +64,7 @@ A row of braziers in a crosswind, each leaning the same way, the large ones less
 ## Validation targets
 
 - `flame_tilt(0, d) == 0` for every `d`; monotonic in `U`; a larger `d` tilts less at the same `U` (the Froude number falls faster than the Reynolds number rises); never reaches 90°.
-- Anchor values by hand from the formula: brazier `D = 0.34 m`, `U = 3 m/s` → `k ≈ 3.3`, `θ ≈ 53°`; a 0.2 m torch at 1 m/s → 44°.
+- Anchor values by hand from the formula: brazier `D = 0.34 m`, `U = 3 m/s` → `k ≈ 3.4`, `θ ≈ 59.8°`; a 0.2 m torch at 1 m/s → 47.5°; a 0.1 m/s draught on the brazier → 13°.
 - Zero wind leaves every flame's transform scale at exactly `(took, 1, 1)`: the existing flame tests hold unchanged.
 - Capture: courtyard at `LIGHTS_WIND` 0 vs 2 m/s, ground and eye level, two seeds; flame foot pixels identical to the no-wind frame, tip displaced downwind, the flame not clipped by its quad.
 
