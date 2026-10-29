@@ -4064,3 +4064,19 @@ Test: `tests/settings.rs::saved_settings`. Gate: fmt, build, test --features ser
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients.
 5. Editor: a flame preview (a `FlameLook` at a chosen time) if bevy_emerge asks.
+
+## Iteration 194 — 2026-10-29 — log only: no workable item
+
+Outcome: nothing shipped; no code, shader, default or media change, so no captures, bench or release (tree unchanged since v0.2.5).
+
+Preflight (live): `hs status` shows distill up (192.168.1.110:7434, Cuda) and scribe up on two hosts. Open issues on this repo: none. No `wiggum/parked-*` branch; only old `WIP(iteration 115, parked)` commits (flame occlusion, long since shipped). bevy_emerge #103 (F7) wants: placed fires with `Flicker`/`Kindle`/`Flame`, pool budget view, light-map overlay (light-grid, not this crate). Placements are serde-able, `PoolBudget` shows which lights are real, `problems()`, `Flicker::intensity_at`, partial files all exist; the only unmet item, a CPU flame preview, would duplicate the shader and has no consumer ask.
+
+Ranked candidates: (1) overhead flame at EV 9 needs a new construction, not the disc stack; (2) luminance-measured flicker amplitude: `distill_search` this pass returned only Chen 2019 and Gergely 2022 (frequency, intensity normalised to mean, no modulation depth in percent), and `flicker-depth.md` already rests on them, so no new citable number; Maynard 2013 not in the corpus; (3) placeholder bearers need a real asset; (4) GIF banding; (5) editor flame preview if bevy_emerge asks. Blocker for all three fallbacks of section 4: (1) is open-ended art work with no researched construction, (2) has no source to cite, (3) needs an asset; none is a ready item and inventing one would be speculation.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude (`paper_search` Maynard 2013 or similar, then download/convert).
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients.
+5. Editor: a flame preview if bevy_emerge asks.
