@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **`LightPool` is `Serialize`/`Deserialize`** under the `serde` feature, so an editor saves the pool's budget with a project. The slot template `LightPool::light` is written as `color`, `range`, `radius` and `shadow_maps_enabled` (the fields the pool copies; `intensity` is ignored and reads back as 0), and any missing field takes its default. No visual or default change.
+
 ## [0.2.1] - 2026-10-29
 
 ### Added
