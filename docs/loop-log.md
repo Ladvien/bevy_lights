@@ -4080,3 +4080,15 @@ Ranked candidates: (1) overhead flame at EV 9 needs a new construction, not the 
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients.
 5. Editor: a flame preview if bevy_emerge asks.
+
+## Iteration 195 — 2026-10-29 — log only: no workable item
+
+Outcome: nothing shipped; tree unchanged since v0.2.5, so no captures, bench or release. Open issues on this repo: none; no `wiggum/parked-*` branch; bevy_emerge #103 is open with no new comments asking for anything this crate lacks. Backlog unchanged from iteration 194 (overhead flame at EV 9 needs a new construction; cited flicker amplitude has no citable source in the corpus; placeholder bearers need an asset; GIF banding; editor flame preview with no consumer ask). Blocker for all three section-4 fallbacks is the same as iteration 194: none is a ready, researched item.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients.
+5. Editor: a flame preview if bevy_emerge asks.
