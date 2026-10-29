@@ -4003,3 +4003,20 @@ Cleaned: worktree ~/l189_base and ~/l189_base-target removed.
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients.
 5. Editor: serialisable `LightPool` settings (needs a serde mirror of `PointLight`'s four shared fields).
+
+## Iteration 190 — 2026-10-29 — `LightPool` serialises (editor project files)
+
+Outcome: `LightPool` gains serde under the `serde` feature; `light` is saved as the four fields the pool copies, intensity reads back 0, every field defaults when absent. No visual, shader or default change, so no captures.
+
+Open issues: none. Ranked candidates: (1) serialisable pool settings for bevy_emerge #103, (2) overhead flame at EV 9, (3) cited flicker amplitude. Picked 1 under "a pass never ends idle": the editor's stated need, small, testable.
+Assumed decision (owner may override): a `serde(with)` template mirror over changing `LightPool::light`'s type, which would break every host literal.
+Sources: `docs/research/light-pool.md` ("Iteration 190"); no new reading.
+Tests: `saved_pool::*` (tests/pool.rs, serde feature): round trip and partial file. Gate green: build, release build, test, test --features serde, examples, clippy -D, doc -D, fmt, wasm (wesl-check not run: no shader change). Bench not run: no frame-path code changed.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients.
+5. Editor: validation helper for settings (range checks with a useful error).
