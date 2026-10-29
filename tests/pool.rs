@@ -816,3 +816,32 @@ fn a_candidate_with_no_fire_phase_leaves_the_slots_own_alone() {
         );
     }
 }
+
+#[test]
+fn the_budget_names_who_holds_a_light_and_who_went_without() {
+    let mut app = app(LightPool { size: 3, reach: 10.0, reserve: 0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let near: Vec<Entity> =
+        (1..=5).map(|x| candidate(&mut app, Vec3::new(x as f32, 0.0, 0.0), 100.0)).collect();
+    let far = candidate(&mut app, Vec3::new(50.0, 0.0, 0.0), 100.0);
+    let hidden = candidate(&mut app, Vec3::new(0.5, 0.0, 0.0), 100.0);
+    app.world_mut().entity_mut(hidden).insert(Visibility::Hidden);
+    settle(&mut app);
+
+    let budget = app.world().resource::<PoolBudget>().clone();
+    assert_eq!(budget.granted(), 3, "{budget:?}");
+    assert_eq!(budget.wanting, 5, "the far and the hidden candidate do not want one: {budget:?}");
+    assert_eq!(budget.starved(), 2);
+    for (i, entity) in near.iter().enumerate() {
+        assert_eq!(budget.holds(*entity), i < 3, "candidate at x = {}", i + 1);
+    }
+    assert!(!budget.holds(far) && !budget.holds(hidden));
+    assert_eq!(budget.holder_of(0), Some(near[0]));
+    assert_eq!(budget.holder_of(9), None);
+
+    // A dark pool wants and holds nothing.
+    app.world_mut().resource_mut::<LightPool>().gain = 0.0;
+    settle(&mut app);
+    let budget = app.world().resource::<PoolBudget>();
+    assert_eq!((budget.granted(), budget.wanting, budget.starved()), (0, 0, 0), "{budget:?}");
+}
