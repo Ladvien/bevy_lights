@@ -354,3 +354,13 @@ fn set_depth_and_set_mean_hold_at_the_edges() {
     fire.set_mean(1200.0);
     assert!((averaged(&fire) / 1200.0 - 1.0).abs() < 0.01);
 }
+
+/// A host writes `Flicker { base, phase, ..default() }` and nothing more: the spelling the crate
+/// documents as stable. If `Flicker` ever became `#[non_exhaustive]` this stops compiling, and the
+/// fields a host did not name keep their defaults.
+#[test]
+fn a_host_literal_naming_only_base_and_phase_takes_the_defaults() {
+    let f = Flicker { base: 1000.0, phase: 1.3, ..default() };
+    assert_eq!(f.diameter, None);
+    assert_eq!(f.depth, FLICKER_DEPTH);
+}

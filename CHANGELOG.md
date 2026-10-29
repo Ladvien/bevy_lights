@@ -4,6 +4,12 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Migration from 0.1
+
+- **`Flicker { base, phase }` becomes `Flicker { base, phase, ..default() }`.** `Flicker` gained `diameter` and `depth`; spelled with `..default()` a literal absorbs this and any later field. `diameter: None` keeps 0.1's rate exactly. `Flame { kindled }` gained `source`, which a host never constructs.
+- **`LightPool::rank` defaults to `Rank::Illuminance`.** A host whose candidates all burn the same lumens gets the same order as `Rank::Distance`; a host that mixes fires (a brazier and torches) will see the pool's choice change. Set `rank: Rank::Distance` for 0.1's order.
+- New in 0.2: `Flicker::diameter`, `FlameSite::kindle`, `LightPool::{rank, reserve, hysteresis, fade_seconds}` and `model::cinematography`.
+
 ### Added
 
 - `examples/courtyard` gains `LIGHTS_EV100=x`, the camera's exposure (default 6). At 9 the ground is no longer saturated salmon around a brazier, so a flame's own contrast can be judged. Example only; the crate is unchanged.
