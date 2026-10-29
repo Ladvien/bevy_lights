@@ -60,7 +60,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_lights::*;
 
-use common::{Draw, ExampleHarness, camera, camera_placement, seed};
+use common::{Draw, ExampleHarness, camera, camera_placement, seed, wind_env};
 
 /// How many torch-bearers walk the courtyard.
 const BEARERS: usize = 48;
@@ -371,6 +371,7 @@ fn main() {
         // The flames' colour comes from the same temperature as their light, and `max_height` is set
         // once here, before any site spawns (the height is packed as a fraction of it).
         .insert_resource(FlameLook { color: fire_temperature(), strength: 0.82, max_height: 4.0 })
+        .insert_resource(FlameWind { velocity: wind_env().unwrap_or_default() })
         .insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 0.0, ..default() })
         .add_systems(Startup, (spawn_scene, spawn_camera).chain())
         .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers).chain())
