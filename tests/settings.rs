@@ -54,3 +54,17 @@ fn a_pool_reports_reach_hysteresis_and_the_template_light() {
     assert_eq!(fields(pool.problems()), ["reach", "hysteresis", "fade_seconds", "light.range"]);
     assert!(LightPool { size: 0, ..Default::default() }.problems().is_empty());
 }
+
+/// The preview curve is the same function the system writes: a fire flares up while kindling and
+/// matches an already-burning one once the kindle has run its course.
+#[test]
+fn intensity_at_follows_the_kindle_and_then_the_flicker() {
+    let fire = Flicker::at_mean(1000.0, 0.5);
+    for t in [0.0, 0.37, 2.9] {
+        let burning = fire.intensity_at(t, None);
+        assert!(burning > 0.0);
+        assert_eq!(fire.intensity_at(t, Some(KINDLE_SECONDS)), burning);
+        assert_ne!(fire.intensity_at(t, Some(0.0)), burning);
+    }
+    assert_eq!(Flicker { base: 0.0, ..fire }.intensity_at(1.0, None), 0.0);
+}
