@@ -112,6 +112,26 @@ impl Flicker {
     }
 }
 
+impl Flicker {
+    /// What is unusable in these settings, field by field; empty when they are fine.
+    ///
+    /// The crate never refuses a value, so a `NaN` phase or a negative `base` still runs (and writes a
+    /// bad intensity). This is for a host that reads a `Flicker` from a file or a panel. A `depth`
+    /// outside `0..=`[`MAX_FLICKER_DEPTH`](crate::MAX_FLICKER_DEPTH) is reported although it is
+    /// clamped, because the flame drawn on the fire reads the same number.
+    pub fn problems(&self) -> Vec<crate::Problem> {
+        use crate::model::problem::{finite, non_negative, positive, within};
+        let mut out = Vec::new();
+        non_negative(&mut out, "base", self.base);
+        finite(&mut out, "phase", self.phase);
+        if let Some(d) = self.diameter {
+            positive(&mut out, "diameter", d);
+        }
+        within(&mut out, "depth", self.depth, 0.0, crate::MAX_FLICKER_DEPTH);
+        out
+    }
+}
+
 /// A light that is taking hold: its intensity flares up over [`KINDLE_SECONDS`] instead of switching
 /// on.
 ///
