@@ -92,7 +92,7 @@ pub use model::{
     flicker_depth, flicker_factor, flicker_mean, flicker_swing, hand_off, key_to_fill, kindle_gain,
     pack_flame_tag, preferred, raised_light, stops, unpack_flame_tag, white_balanced,
 };
-pub use pool::{LightPool, LightPoolPlugin, PoolCandidate, PoolLight, Rank};
+pub use pool::{LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
 
 use bevy::prelude::*;
 

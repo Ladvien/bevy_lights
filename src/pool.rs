@@ -52,6 +52,8 @@ impl<F: Component> Plugin for LightPoolPlugin<F> {
             .register_type::<LightPool>()
             .register_type::<PoolCandidate>()
             .register_type::<PoolLight>()
+            .init_resource::<PoolBudget>()
+            .register_type::<PoolBudget>()
             .add_systems(Update, assign_pool::<F>.in_set(LightsSystems::Pool));
     }
 
@@ -235,6 +237,47 @@ pub struct PoolLight {
     pub slot: usize,
 }
 
+/// Which candidates hold a real light right now, and how many wanted one: the pool's lamp schedule.
+///
+/// [`LightPoolPlugin`] `init_resource`s it and rewrites it every frame, after the assignment; it is
+/// read-only for a host (a write is overwritten next frame). A level editor shows it to say which
+/// torches are real lights at the viewer's position, and a game reads [`PoolBudget::starved`] to see
+/// that its [`LightPool::size`] is too small for the scene.
+///
+/// A candidate **wants** a light when it is visible, within [`LightPool::reach`] of the focus, and the
+/// pool is lit (a focus exists and [`LightPool::gain`] is above 0); a dark pool wants and holds nothing.
+/// Reserve lights, which only fade a departed owner out, are not part of it.
+#[derive(Resource, Clone, Debug, Default, PartialEq, Eq, Reflect)]
+#[reflect(Resource, Default)]
+pub struct PoolBudget {
+    /// The candidate each slot holds, indexed by [`PoolLight::slot`], `0..`[`LightPool::size`].
+    pub holders: Vec<Option<Entity>>,
+    /// How many candidates asked for a light this frame, held or not.
+    pub wanting: usize,
+}
+
+impl PoolBudget {
+    /// How many real lights are in use.
+    pub fn granted(&self) -> usize {
+        self.holders.iter().flatten().count()
+    }
+
+    /// How many candidates wanted a light and got none: virtual this frame.
+    pub fn starved(&self) -> usize {
+        self.wanting.saturating_sub(self.granted())
+    }
+
+    /// The candidate slot `slot` holds, if any.
+    pub fn holder_of(&self, slot: usize) -> Option<Entity> {
+        self.holders.get(slot).copied().flatten()
+    }
+
+    /// Whether `candidate` holds a real light this frame.
+    pub fn holds(&self, candidate: Entity) -> bool {
+        self.holders.contains(&Some(candidate))
+    }
+}
+
 /// The four fields of [`LightPool::light`] that every pool light shares, as they were last written
 /// onto the slots.
 #[derive(Clone, Copy, PartialEq)]
@@ -350,9 +393,11 @@ struct HandOffState {
 ///    then takes its candidate's position plus its [`PoolCandidate::offset`], with
 ///    `Flicker::base = intensity · gain · fade`. Every slot with no candidate is hidden, and the whole pool
 ///    is hidden when there is no focus or the gain is zero.
+#[allow(clippy::too_many_arguments)]
 fn assign_pool<F: Component>(
     mut commands: Commands,
     pool: Res<LightPool>,
+    mut schedule: ResMut<PoolBudget>,
     focus: Query<&GlobalTransform, With<F>>,
     candidates: CandidateRead,
     mut slots: Query<(Entity, &PoolLight, &mut Transform, &mut Visibility, &mut Flicker, &mut PointLight)>,
@@ -700,6 +745,11 @@ fn assign_pool<F: Component>(
             old_look.insert(chosen.unwrap_or(Entity::PLACEHOLDER), (at, intensity, flicker.phase));
         }
     }
+    // Publish the frame's answer: who holds each real slot, and how many candidates asked. Rewritten in
+    // place, so a steady pool allocates nothing here.
+    schedule.holders.clear();
+    schedule.holders.extend((0..pool.size).map(|slot| held.get(&slot).copied()));
+    schedule.wanting = lit.len();
     // Prune the remembered positions to what the pool can still need: the candidates in this frame's
     // list and the ones a slot holds. Keyed by `Entity`, this map would otherwise grow by one entry for
     // every candidate ever pooled, which is a leak in a library that runs for hours.

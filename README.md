@@ -178,6 +178,8 @@ best-ranked `PoolCandidate`s around the one entity carrying your focus marker, e
 candidate's position plus its own world-space offset. Everything else is a flame and nothing else. The
 assignment is deterministic: rank, then `Entity`.
 
+`PoolBudget` is the pool's lamp schedule, rewritten every frame: `holds(entity)` and `holder_of(slot)` say which candidates are real lights right now, and `starved()` counts the candidates that wanted one and are only flames, so an editor can show the budget and a game can see `size` is too small.
+
 A candidate is ranked by the **light it puts on the subject** (`intensity / distance²`), not by its
 distance alone, so a bright brazier at 3 m outranks a dim torch at 2 m; `LightPool::rank` switches to
 `Rank::Distance` for the old rule. A slot keeps the candidate it holds until a challenger is
