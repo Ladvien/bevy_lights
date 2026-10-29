@@ -68,3 +68,22 @@ fn intensity_at_follows_the_kindle_and_then_the_flicker() {
     }
     assert_eq!(Flicker { base: 0.0, ..fire }.intensity_at(1.0, None), 0.0);
 }
+
+#[cfg(feature = "serde")]
+#[allow(clippy::unwrap_used)]
+mod saved_settings {
+    use bevy_lights::{FlameLook, Flicker, Kindle};
+
+    #[test]
+    fn a_file_naming_only_some_fields_takes_the_defaults_for_the_rest() {
+        let f: Flicker = serde_json::from_str(r#"{"base": 1234.0}"#).unwrap();
+        assert_eq!(f.base, 1234.0);
+        assert_eq!(Flicker { base: 0.0, ..f }, Flicker { base: 0.0, ..Flicker::default() });
+
+        let look: FlameLook = serde_json::from_str("{}").unwrap();
+        assert_eq!(look, FlameLook::default());
+
+        let k: Kindle = serde_json::from_str("{}").unwrap();
+        assert_eq!(k, Kindle::default());
+    }
+}

@@ -240,7 +240,7 @@ pub struct Flame {
 /// defaults are a campfire: a warm orange at full strength, four world units of headroom for the
 /// tallest flame a scene has.
 #[derive(Resource, Clone, Copy, Debug, PartialEq, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 #[reflect(Resource)]
 pub struct FlameLook {
     /// The fire's colour: the middle of the flame's ramp, between its cool red rim and its yellow
