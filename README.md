@@ -60,9 +60,9 @@ bevy_lights = { git = "https://github.com/Ladvien/bevy_lights", branch = "main" 
 
 The crate is pinned to Bevy 0.20; its MSRV is Rust 1.97.1. `serde` is an optional feature: it derives
 `serde` on the components and resources a host saves — `Flicker`, `Kindle`, `PoolCandidate`, `PoolLight`,
-`FlameSite`, `FlameLook`, `Rank` — and turns on Bevy's own `serialize` for the colours they carry.
-`LightPool` is deliberately not one of them: `PointLight` has no serde derive, and a light's intensity is
-a runtime number the crate rewrites every frame.
+`FlameSite`, `FlameLook`, `Rank`, `LightPool` — and turns on Bevy's own `serialize` for the colours they carry.
+`PointLight` has no serde derive, so `LightPool` saves its slot template as the four fields the pool copies
+(`color`, `range`, `radius`, `shadow_maps_enabled`); every field is optional on the way in.
 
 ## Quick start
 
