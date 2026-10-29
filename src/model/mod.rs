@@ -9,6 +9,7 @@ pub mod char;
 pub mod cinematography;
 pub mod fire;
 pub mod pool;
+pub mod problem;
 pub mod reach;
 pub mod tag;
 
@@ -23,5 +24,6 @@ pub use fire::{
     flicker_swing, kindle_gain,
 };
 pub use pool::{FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, hand_off, preferred};
+pub use problem::{Problem, ProblemKind};
 pub use reach::{RANGE_MARGIN, flame_light_offset, raised_light};
 pub use tag::{pack_flame_tag, set_flame_brightness, unpack_flame_tag};
