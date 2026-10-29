@@ -4049,3 +4049,18 @@ Open issues: none. Ranked candidates: (1) preview hook for bevy_emerge #103 (pre
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients.
 5. Editor: a flame preview (a `FlameLook` at a chosen time) if bevy_emerge asks.
+
+## Iteration 193 — 2026-10-29 — partial saved files load for `Flicker`, `Kindle`, `FlameLook`
+
+Outcome: the three authored types that have a `Default` gain `serde(default)` (as `LightPool` has), so a project file written before a field was added, or by hand, still loads. `FlameSite` has no `Default` (its height and tag are required), so it is unchanged. No visual, shader or default change, so no captures; bench not run (no frame-path code).
+
+Open issues: none on this repo; bevy_emerge #103's wants (preview, pool budget, serialisable settings, validation) are all met. Ranked candidates: (1) forward-compatible saved settings for the editor, (2) overhead flame at EV 9, (3) cited flicker amplitude. Picked 1: the others stay blocked. Assumed decision (owner may override): `serde(default)` over `deny_unknown_fields`, so an older crate reading a newer file still loads.
+Test: `tests/settings.rs::saved_settings`. Gate: fmt, build, test --features serde, clippy -D, doc -D, wasm green.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients.
+5. Editor: a flame preview (a `FlameLook` at a chosen time) if bevy_emerge asks.

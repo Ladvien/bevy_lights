@@ -36,7 +36,7 @@ impl Plugin for FlickerPlugin {
 /// `diameter` here is the same number the flame drawn on the fire should be given, so the two breathe
 /// together.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 #[reflect(Component)]
 pub struct Flicker {
     /// The light's mean intensity, in the same units as the light's own `intensity` (lumens).
@@ -147,7 +147,7 @@ impl Flicker {
 /// out. The crate advances [`Kindle::elapsed`] and writes [`Kindled`] on the first frame it is
 /// present; a host never advances it itself.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 #[reflect(Component)]
 pub struct Kindle {
     /// Seconds since the fire was lit. The crate stops advancing it at [`KINDLE_SECONDS`]; it keeps

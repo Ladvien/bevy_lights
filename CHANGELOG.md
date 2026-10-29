@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Changed
+
+- **`Flicker`, `Kindle` and `FlameLook` load from a partial file**: a saved field that is absent takes its default, as `LightPool` already did, so a project written before a field was added still loads. No visual or default change.
+
 ## [0.2.4] - 2026-10-29
 
 ### Added
