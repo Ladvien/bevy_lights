@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-29
+
 ### Migration from 0.1
 
 - **`Flicker { base, phase }` becomes `Flicker { base, phase, ..default() }`.** `Flicker` gained `diameter` and `depth`; spelled with `..default()` a literal absorbs this and any later field. `diameter: None` keeps 0.1's rate exactly. `Flame { kindled }` gained `source`, which a host never constructs.
