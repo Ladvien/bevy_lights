@@ -4020,3 +4020,18 @@ Tests: `saved_pool::*` (tests/pool.rs, serde feature): round trip and partial fi
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients.
 5. Editor: validation helper for settings (range checks with a useful error).
+
+## Iteration 191 — 2026-10-29 — `problems()`: settings validation for the editor
+
+Outcome: `Flicker`, `FlameSite`, `FlameLook` and `LightPool` gain `problems() -> Vec<Problem>` (`Problem { field, kind: ProblemKind }`, `Display` + `Error`; engine-free type in `src/model/problem.rs`). The crate still never refuses a value. No visual, shader or default change, so no captures.
+
+Open issues: none (gh list empty). Ranked candidates: (1) validation helper for bevy_emerge #103 (previous backlog item 5), (2) overhead flame at EV 9, (3) cited flicker amplitude. Picked 1 under "a pass never ends idle"; the others remain blocked/speculative. Assumed decision (owner may override): report a `depth` above `MAX_FLICKER_DEPTH` though it is clamped, because the flame reads the same number; a `Vec` of problems over a first-error `Result`, so a panel shows every bad field at once.
+Sources: none new (validation is not a lighting default). Tests: `tests/settings.rs` (4) + `model::problem` unit test. Gate: test --features serde, clippy -D, doc -D, fmt, wasm green (full-feature examples/wesl-check not rerun: no example or shader change). Bench not run: no frame-path code.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients.
+5. Editor: a preview hook (drive a single fire at a chosen time) if bevy_emerge asks.
