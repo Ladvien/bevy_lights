@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-29
+
 ### Added
 
 - **`PoolBudget`**: a resource the pool rewrites every frame with the candidate each real slot holds (`holders`, `holder_of`, `holds`) and how many candidates asked for a light (`wanting`, `granted`, `starved`). An editor shows which torches are real lights right now; a game sees its pool is too small when `starved()` is above 0. No visual or default change.
