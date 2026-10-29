@@ -1,6 +1,6 @@
 [package]
 name = "bevy_lights"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 rust-version = "1.97.1"
 description = "Practical lights for Bevy: fires that flicker and flare as they kindle, a budgeted pool of real lights placed over thousands of virtual ones, and billboard shader flames."
