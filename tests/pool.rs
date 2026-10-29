@@ -845,3 +845,51 @@ fn the_budget_names_who_holds_a_light_and_who_went_without() {
     let budget = app.world().resource::<PoolBudget>();
     assert_eq!((budget.granted(), budget.wanting, budget.starved()), (0, 0, 0), "{budget:?}");
 }
+
+#[cfg(feature = "serde")]
+mod saved_pool {
+    use bevy::light::PointLight;
+    use bevy::prelude::*;
+    use bevy_lights::{LightPool, Rank};
+
+    #[test]
+    fn a_pool_round_trips_with_its_slot_template() {
+        let pool = LightPool {
+            size: 6,
+            reach: 31.5,
+            gain: 0.4,
+            light: PointLight {
+                color: Color::srgb(1.0, 0.5, 0.2),
+                range: 7.0,
+                radius: 0.25,
+                shadow_maps_enabled: true,
+                intensity: 9999.0,
+                ..default()
+            },
+            rank: Rank::Distance,
+            hysteresis: 1.3,
+            fade_seconds: 0.0,
+            reserve: 3,
+        };
+        let json = serde_json::to_string(&pool).unwrap();
+        let back: LightPool = serde_json::from_str(&json).unwrap();
+        assert_eq!((back.size, back.reach, back.gain, back.rank), (6, 31.5, 0.4, Rank::Distance));
+        assert_eq!((back.hysteresis, back.fade_seconds, back.reserve), (1.3, 0.0, 3));
+        assert_eq!(back.light.color, pool.light.color);
+        assert_eq!((back.light.range, back.light.radius, back.light.shadow_maps_enabled), (7.0, 0.25, true));
+        assert_eq!(
+            back.light.intensity, 0.0,
+            "the template's intensity is ignored by the pool and not saved"
+        );
+    }
+
+    #[test]
+    fn a_project_file_naming_only_some_fields_takes_the_defaults_for_the_rest() {
+        let pool: LightPool = serde_json::from_str(r#"{"size": 4, "light": {"range": 12.0}}"#).unwrap();
+        let defaults = LightPool::default();
+        assert_eq!(pool.size, 4);
+        assert_eq!(pool.light.range, 12.0);
+        assert_eq!(pool.light.color, defaults.light.color);
+        assert_eq!((pool.reach, pool.reserve, pool.rank), (defaults.reach, defaults.reserve, defaults.rank));
+    }
+}
