@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-29
+
 ### Added
 
 - **`problems()` on `Flicker`, `FlameSite`, `FlameLook` and `LightPool`**, returning a `Vec<Problem>` (`field`, `kind: ProblemKind`; `Display` reads "`reach` must be greater than zero"). An editor that loads settings from a project file shows the bad field before it reaches a light. The crate still never refuses a value. No visual or default change.
