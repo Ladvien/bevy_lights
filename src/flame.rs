@@ -189,6 +189,24 @@ pub struct FlameSite {
     pub fire: Option<Entity>,
 }
 
+impl FlameSite {
+    /// What is unusable in these settings, field by field; empty when they are fine. See
+    /// [`Flicker::problems`](crate::Flicker::problems). `fire` is not checked: whether the entity still
+    /// exists is the host's.
+    pub fn problems(&self) -> Vec<crate::Problem> {
+        use crate::model::problem::{finite, non_negative, positive, within};
+        let mut out = Vec::new();
+        positive(&mut out, "height", self.height);
+        finite(&mut out, "phase", self.phase);
+        non_negative(&mut out, "kindle", self.kindle);
+        if let Some(d) = self.diameter {
+            positive(&mut out, "diameter", d);
+        }
+        within(&mut out, "depth", self.depth, 0.0, crate::MAX_FLICKER_DEPTH);
+        out
+    }
+}
+
 /// The drawn flame: the child mesh [`FlamePlugin`] spawns under each [`FlameSite`].
 ///
 /// Its `Transform`'s scale is the fire's catch (a `FlameSite` with a [`kindle`](FlameSite::kindle)
@@ -240,6 +258,21 @@ pub struct FlameLook {
 impl Default for FlameLook {
     fn default() -> Self {
         Self { color: LinearRgba::rgb(1.0, 0.55, 0.18), strength: 1.0, max_height: 4.0 }
+    }
+}
+
+impl FlameLook {
+    /// What is unusable in these settings, field by field; empty when they are fine. See
+    /// [`Flicker::problems`](crate::Flicker::problems).
+    pub fn problems(&self) -> Vec<crate::Problem> {
+        use crate::model::problem::{non_negative, positive};
+        let mut out = Vec::new();
+        non_negative(&mut out, "color.red", self.color.red);
+        non_negative(&mut out, "color.green", self.color.green);
+        non_negative(&mut out, "color.blue", self.color.blue);
+        non_negative(&mut out, "strength", self.strength);
+        positive(&mut out, "max_height", self.max_height);
+        out
     }
 }
 
