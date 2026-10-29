@@ -292,6 +292,23 @@ pub struct PoolLight {
     pub slot: usize,
 }
 
+impl LightPool {
+    /// What is unusable in these settings, field by field; empty when they are fine. See
+    /// [`Flicker::problems`](crate::Flicker::problems). A `size` of 0 is a dark pool, not a problem; the
+    /// template light's `intensity` is ignored by the pool and not checked.
+    pub fn problems(&self) -> Vec<crate::Problem> {
+        use crate::model::problem::{non_negative, positive, within};
+        let mut out = Vec::new();
+        positive(&mut out, "reach", self.reach);
+        non_negative(&mut out, "gain", self.gain);
+        within(&mut out, "hysteresis", self.hysteresis, 1.0, f32::MAX);
+        non_negative(&mut out, "fade_seconds", self.fade_seconds);
+        positive(&mut out, "light.range", self.light.range);
+        non_negative(&mut out, "light.radius", self.light.radius);
+        out
+    }
+}
+
 /// Which candidates hold a real light right now, and how many wanted one: the pool's lamp schedule.
 ///
 /// [`LightPoolPlugin`] `init_resource`s it and rewrites it every frame, after the assignment; it is
