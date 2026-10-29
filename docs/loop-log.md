@@ -3948,3 +3948,4 @@ Open issues: #1 publish (release, seen, skipped; latest Sanctuary comment report
 ## Iteration 182 — 2026-10-29 — release 0.2.0 (issue #1)
 
 Outcome: `Flicker { base, phase, ..default() }` documented as the stable spelling and pinned by `a_host_literal_naming_only_base_and_phase_takes_the_defaults` (tests/flicker.rs); CHANGELOG gains a 0.1 → 0.2 migration section (Flicker literals, `Rank::Illuminance` default). Assumed decision (owner may override): `#[non_exhaustive]` + constructor rejected because it forbids even `..default()` literals outside the crate, the spelling the issue's acceptance requires; documented the spelling instead. `cargo semver-checks` reports 4 major failures, so 0.2.0. Full gate green (build, test, serde, examples, clippy, doc, fmt, wasm, wesl-check). No visual or shader change; no captures. Open issues: #1 only, worked. Backlog from iteration 170 unchanged.
+Release: https://crates.io/crates/bevy_lights/0.2.0 (commit tagged v0.2.0).
