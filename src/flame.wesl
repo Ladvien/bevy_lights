@@ -100,6 +100,9 @@ struct FlameVertexOutput {
     // The flame from above: `.x` how far the camera is over the fire (0 at 50 degrees and below, where the quad is upright, 1 at 76 and
     // above), `.y` the cosine and `.z` the sine of the elevation. Flat: one camera, one flame.
     @location(6) @interpolate(flat) overhead: vec3<f32>,
+    // The wind's lean: `.x` the tip's sideways offset in drawn heights (signed, along the camera's right), `.y` the quad's width in
+    // drawn heights (`FLAME_ASPECT` widened by the lean). Flat: one number for the whole flame.
+    @location(7) @interpolate(flat) wind: vec2<f32>,
 }
 
 // ---- 2D simplex noise and the classic fbm over it (provenance UNVERIFIED, see header) ---------------------------------
@@ -257,12 +260,24 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     let sin_e = clamp(to_eye.y / max(length(to_eye), 1e-4), 0.0, 1.0);
     let elevation = asin(sin_e);
     let topdown = smoothstep(OVERHEAD_START, OVERHEAD_FULL, elevation);
-    var billboard = origin + right * (vertex.position.x * size * FLAME_ASPECT) + up * (vertex.position.y * size + size * 0.5);
+    // The wind's lean rides on the instance scale's other two lengths (`1 + sin θ · direction`, world X and Z), which a parent's
+    // rotation cannot change. Projected on the camera's right it is how far the tip sits to the side, in drawn heights; the flame is
+    // `cos θ` as tall. From straight overhead the plume's cross-section is what is seen and it is not translated, so the lean fades
+    // out with the overhead blend.
+    let wind_world = (vec2<f32>(length(world_from_local[1].xyz), length(world_from_local[2].xyz)) - vec2<f32>(1.0)) * (1.0 - topdown);
+    let sin_tilt = min(length(wind_world), 0.995);
+    let cos_tilt = sqrt(1.0 - sin_tilt * sin_tilt);
+    let lean = dot(wind_world, vec2<f32>(right.x, right.z)) / cos_tilt;
+    let width = FLAME_ASPECT + abs(lean);
+    let across = vertex.position.x * width + 0.5 * lean;
+    let drawn = size * cos_tilt;
+    var billboard = origin + right * (across * drawn) + up * (vertex.position.y * drawn + drawn * 0.5);
     if sin_e > sin(OVERHEAD_START) {
         // Facing the camera: screen up is what the view direction and the horizontal right leave.
         let screen_up = normalize(cross(normalize(to_eye), right));
-        billboard = centre + right * (vertex.position.x * size * FLAME_ASPECT) + screen_up * (vertex.position.y * size * OVERHEAD_HEIGHT);
+        billboard = centre + right * (across * drawn) + screen_up * (vertex.position.y * drawn * OVERHEAD_HEIGHT);
     }
+    out.wind = vec2<f32>(lean, width);
     out.overhead = vec3<f32>(topdown, sqrt(max(1.0 - sin_e * sin_e, 0.0)), sin_e);
     out.position = position_world_to_clip(billboard);
     out.uv = vec2<f32>(vertex.position.x, vertex.position.y) + vec2<f32>(0.5, 0.5);
@@ -284,7 +299,10 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     let sy = (in.uv.y - 0.5) * OVERHEAD_HEIGHT;
     let rise = select(in.uv.y, SOURCE_HEIGHT + sy / max(in.overhead.y, OVERHEAD_COS_FLOOR), facing);
     let y = (rise - 0.04) / 0.96;
-    let x = (in.uv.x - 0.5) * FLAME_ASPECT;
+    // The wind's lean (`docs/research/flame-wind.md`): the quad was widened and shifted downwind in the vertex stage, so the screen
+    // offset is undone here and the flame is drawn bent back into it, rooted at its foot and taking the lean as it rises. With no
+    // wind `in.wind` is `(0, FLAME_ASPECT)` and this is the plain `(uv.x - 0.5) * FLAME_ASPECT`.
+    let x = (in.uv.x - 0.5) * in.wind.y + 0.5 * in.wind.x - in.wind.x * pow(clamp(rise, 0.0, 1.2), 1.6);
     let s = clamp(y, 0.0, 1.0);
     // Rising turbulence: fbm fields scrolled down the flame, so their features climb it.
     let n1 = fbm(vec2<f32>(x * 2.5, y * 1.8 - t * 1.7));
