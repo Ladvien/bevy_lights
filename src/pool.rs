@@ -74,10 +74,13 @@ impl<F: Component> Plugin for LightPoolPlugin<F> {
 /// number. The defaults are a metre world's: 16 lights, a 60 m reach and the intensity of a small
 /// fire.
 ///
-/// Not `Serialize`: `PointLight` itself has no serde derive (Bevy ships `serialize` for `Color`, and
-/// a light's intensity is a runtime number this crate writes every frame anyway). The template's
-/// fields are what a save would need, and a host that wants them saved saves its own budget.
+/// With the `serde` feature it is `Serialize` and `Deserialize`, so an editor can save it with a
+/// project and edit it live. `PointLight` itself has no serde derive, so [`LightPool::light`] is
+/// written as the four fields the pool copies onto its slots (`color`, `range`, `radius`,
+/// `shadow_maps_enabled`); its `intensity` is not saved (the pool ignores it) and reads back as 0.
+/// Every field is optional on the way in: a missing one takes its [`Default`].
 #[derive(Resource, Clone, Debug, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 #[reflect(Resource)]
 pub struct LightPool {
     /// How many real lights exist. Shrinking it despawns the extra lights on the next frame; growing
@@ -95,6 +98,7 @@ pub struct LightPool {
     /// Changing `gain`, `size` or `reach` does not touch the slots' looks, so a host that tints its own
     /// fire lights (a palette recolouring every light that carries its fire marker) keeps its tint
     /// through the night's glide, which writes `gain` every frame.
+    #[cfg_attr(feature = "serde", serde(with = "template_serde"))]
     pub light: PointLight,
     /// How much better a challenger must be than the light a slot already holds before it takes it:
     /// `1.0` is "any improvement wins", the default [`HYSTERESIS`] 1.15 needs a challenger about 13 %
@@ -135,6 +139,57 @@ impl Default for LightPool {
             fade_seconds: FADE_SECONDS,
             reserve: 1,
         }
+    }
+}
+
+/// Serde for [`LightPool::light`]: only the fields the pool copies onto its slots.
+#[cfg(feature = "serde")]
+mod template_serde {
+    use bevy::light::PointLight;
+    use bevy::prelude::Color;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    #[derive(Serialize, Deserialize)]
+    #[serde(default)]
+    struct Template {
+        color: Color,
+        range: f32,
+        radius: f32,
+        shadow_maps_enabled: bool,
+    }
+
+    impl Default for Template {
+        fn default() -> Self {
+            let light = super::LightPool::default().light;
+            Self {
+                color: light.color,
+                range: light.range,
+                radius: light.radius,
+                shadow_maps_enabled: light.shadow_maps_enabled,
+            }
+        }
+    }
+
+    pub fn serialize<S: Serializer>(light: &PointLight, serializer: S) -> Result<S::Ok, S::Error> {
+        Template {
+            color: light.color,
+            range: light.range,
+            radius: light.radius,
+            shadow_maps_enabled: light.shadow_maps_enabled,
+        }
+        .serialize(serializer)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PointLight, D::Error> {
+        let t = Template::deserialize(deserializer)?;
+        Ok(PointLight {
+            color: t.color,
+            intensity: 0.0,
+            range: t.range,
+            radius: t.radius,
+            shadow_maps_enabled: t.shadow_maps_enabled,
+            ..Default::default()
+        })
     }
 }
 
