@@ -110,6 +110,14 @@ impl Flicker {
         self.depth = flicker_depth(depth);
         self.set_mean(mean);
     }
+
+    /// The lumens this fire gives at virtual time `t` seconds, `kindle` seconds after it was lit
+    /// (`None`: already burning). This is exactly what `flicker_lights` writes each frame, so an
+    /// editor's timeline scrubber or a settings preview can draw a fire's curve with no app running.
+    pub fn intensity_at(&self, t: f32, kindle: Option<f32>) -> f32 {
+        let gain = kindle.map_or(1.0, kindle_gain);
+        self.base * flicker_swing(self.diameter, self.depth, t, self.phase) * gain
+    }
 }
 
 impl Flicker {
@@ -266,19 +274,15 @@ fn modulate<L: Emits>(
     dt: f32,
 ) -> bool {
     let mut lit = false;
-    let gain = match kindle {
-        Some(mut kindle) => {
-            lit = kindle.elapsed == 0.0;
-            if kindle.elapsed < KINDLE_SECONDS {
-                kindle.elapsed = (kindle.elapsed + dt).max(f32::MIN_POSITIVE);
-            }
-            kindle_gain(kindle.elapsed)
+    let elapsed = kindle.map(|mut kindle| {
+        lit = kindle.elapsed == 0.0;
+        if kindle.elapsed < KINDLE_SECONDS {
+            kindle.elapsed = (kindle.elapsed + dt).max(f32::MIN_POSITIVE);
         }
-        None => 1.0,
-    };
+        kindle.elapsed
+    });
     if !hidden {
-        let swing = flicker_swing(flicker.diameter, flicker.depth, t, flicker.phase);
-        *light.intensity() = flicker.base * swing * gain;
+        *light.intensity() = flicker.intensity_at(t, elapsed);
     }
     lit
 }

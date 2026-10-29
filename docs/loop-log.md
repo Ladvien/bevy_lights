@@ -4035,3 +4035,17 @@ Sources: none new (validation is not a lighting default). Tests: `tests/settings
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients.
 5. Editor: a preview hook (drive a single fire at a chosen time) if bevy_emerge asks.
+
+## Iteration 192 — 2026-10-29 — `Flicker::intensity_at`: a preview curve for the editor
+
+Outcome: `Flicker::intensity_at(t, kindle: Option<f32>)` returns the lumens a fire gives at a virtual time and kindle age; `flicker_lights`' `modulate` now calls it (one path). An editor scrubs a timeline or draws a fire's curve with no app. No visual, shader or default change, so no captures; bench not run (same arithmetic, no new work per frame).
+
+Open issues: none. Ranked candidates: (1) preview hook for bevy_emerge #103 (previous backlog item 5), (2) overhead flame at EV 9, (3) cited flicker amplitude. Picked 1: the others stay blocked. Assumed decision (owner may override): a plain `Option<f32>` kindle age rather than a `Kindle` argument, so a preview needs no component. Sources: none (no lighting default touched). Test: `tests/settings.rs::intensity_at_follows_the_kindle_and_then_the_flicker`. Gate: test, test --features serde, clippy -D, doc -D, fmt, wasm green; machine load ~40 so builds were slow.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients.
+5. Editor: a flame preview (a `FlameLook` at a chosen time) if bevy_emerge asks.
