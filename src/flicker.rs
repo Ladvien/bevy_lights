@@ -26,6 +26,10 @@ impl Plugin for FlickerPlugin {
 
 /// A light's mean intensity and the clock phase its flicker runs at.
 ///
+/// **Spell it `Flicker { base, phase, ..default() }`.** A field added later (as `diameter` and `depth`
+/// were) is then absorbed by the default instead of breaking the host. The struct is deliberately not
+/// `#[non_exhaustive]`: that would forbid a literal outside this crate even with `..default()`.
+///
 /// The light's intensity is written every frame (while it is visible) as
 /// `base · flicker_swing(diameter, depth, t, phase) · kindle_gain(…)`: see [`flicker_swing`]. Put it on a
 /// [`PointLight`] or a [`SpotLight`]. Two fires given different phases never fall into step, and the
