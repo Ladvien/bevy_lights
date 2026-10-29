@@ -3985,3 +3985,21 @@ Open issues: none. Tree clean at start (df66826). No `wiggum/parked-*` branches.
 Outcome: log only; no `src/`, shader, default or media change.
 
 Open issues: none. Tree clean at start (0f8c4d2). No `wiggum/parked-*` branches. The top 5 from iteration 170 stand unchanged; none has a new idea or an unblocked path, so nothing was started on speculation.
+
+## Iteration 189 — 2026-10-29 — `PoolBudget`: the pool's lamp schedule
+
+Outcome: new public resource `PoolBudget { holders, wanting }` with `granted`, `starved`, `holder_of`, `holds`, rewritten each frame by `assign_pool`; no visual or default change, so no captures.
+
+Open issues: none. Ranked candidates: (1) what bevy_emerge issue #103 asks of this crate ("show the light pool's budget (which lights are real right now)", previously unreadable outside `assign_pool`'s `Local`), (2) a serialisable pool budget (blocked: `PointLight` has no serde), (3) overhead flame at EV 9. Picked 1 under "a pass never ends idle": it is the editor's stated need, small, and testable. Assumed decision (owner may override): a `Resource` rather than a marker component on candidates, to avoid archetype moves on every hand-off.
+Sources: research note `docs/research/light-pool.md` ("Iteration 189"); craft: lamp-schedule practice (corpus: cinematography entries); production: `s2020-advances-pdf-slides`, `s2025-advances-materials-9`; technical: RTR4 pp. 918-935. No new index.
+Test: `the_budget_names_who_holds_a_light_and_who_went_without` (tests/pool.rs). Gate: fmt, build, test, test --features serde, clippy -D, doc -D, wasm all green (wesl-check not run: no shader change).
+Bench (`bench_lights`, pool=16, 5000 candidates): after min_us=340 p50_us=545 pool_p50_us=415; baseline main min_us=334 p50_us=816 pool_p50_us=526 (baseline run overlapped a build, so noisy; min equal, no regression).
+Cleaned: worktree ~/l189_base and ~/l189_base-target removed.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Bearers are placeholder capsules.
+4. Banding in the GIF's pool gradients.
+5. Editor: serialisable `LightPool` settings (needs a serde mirror of `PointLight`'s four shared fields).

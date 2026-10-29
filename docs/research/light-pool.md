@@ -172,3 +172,21 @@ added until someone asks.
 Olsson, Billeter & Assarsson 2012 is cited by DOI from Sanctuary's own comment, not read from the
 corpus: `10.1145/2343045.2343095` returns nothing from `paper_get`. Everything else in *Sources* is
 in the corpus and searchable by stem.
+
+## Iteration 189: the pool's budget, readable (`PoolBudget`)
+
+A level editor that places torches has to show the author **which of them are real lights right now**: the pool's whole point is that most are not, and an author who cannot see that cannot size a scene. The assignment lived in a `Local` inside `assign_pool`, so the only way to find a holder was to read every `PoolLight`'s transform and match it back to a candidate by position. This section records the query that replaces that; it adds no tuned number, so nothing here is a default and nothing changes visually.
+
+**Craft.** A gaffer works from a lamp schedule: every unit on the show, whether it is hot, and how many circuits are spare. The schedule is the working tool; the lamps are the result. Light-board practice (the *Cinematography Beyond Technique* and low-key lighting entries in `corpus.md`) treats "which units are on" as information the operator must always have in front of them; the crate's pool is the same board, with an automatic operator.
+
+**Production.** Many-light budgets in shipping engines are always exposed as counters (lights requested, lights granted, lights culled): the clustered-shading and tiled-culling talks listed above (`s2020-advances-pdf-slides`, `s2025-advances-materials-9`) report per-tile and per-frame light counts as the number a content author tunes against, and RTR4 pp. 918-935 frames the budget as the first thing a lighting artist checks.
+
+**Technical.** The pool already computes the full list: the visible, in-reach candidates ranked by `LightPool::rank`, and the slot each winner holds. `PoolBudget` publishes exactly those, at the end of `assign_pool`, as a `Resource` (`Reflect`, so `bevy_fairy` reads it). It is rewritten every frame in place, reusing its buffers, so it allocates nothing in steady state.
+
+**Model adopted.** `PoolBudget { holders: Vec<Option<Entity>>, wanting: usize }`. `holders[slot]` is the candidate that slot holds (indexed `0..LightPool::size`, reserves excluded: a reserve only fades a departure out). `wanting` is how many candidates asked for a light this frame: visible, within reach, and the pool not dark (a pool with no focus, or gain 0, wants nothing and holds nothing). Derived: `granted()`, `starved()` (`wanting - granted`, the candidates that are virtual right now), `holder_of(slot)`, `holds(entity)`.
+
+**Validation.** A test fixes the answer: with 5 candidates at known distances and 3 slots, `granted == 3`, `starved == 2`, and `holds` is true for exactly the three nearest; a hidden or out-of-reach candidate is not `wanting`; a dark pool reports nothing.
+
+**Deviations.** None: no default changes. Design default: the budget excludes reserve lights.
+
+**Pending index.** None; no new source was read.
