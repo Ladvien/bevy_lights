@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.4] - 2026-10-29
+
 ### Added
 
 - **`Flicker::intensity_at(t, kindle)`**: the lumens a fire gives at a virtual time and kindle age, the same function `flicker_lights` writes each frame (which now calls it). An editor draws a fire's curve, or scrubs a timeline, with no app running. No visual or default change.
