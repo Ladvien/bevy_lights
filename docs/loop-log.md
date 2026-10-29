@@ -3955,3 +3955,9 @@ Release: https://crates.io/crates/bevy_lights/0.2.0 (commit tagged v0.2.0).
 Outcome: log only; no `src/`, shader, default or media change.
 
 Open issues: none (#1 was closed by the 0.2.0 release). Tree clean at start (f9dee27). No `wiggum/parked-*` branches. The top 5 from iteration 170 stand unchanged; none has a new idea or an unblocked path, so nothing was started on speculation.
+
+## Iteration 184 — 2026-10-29 — no change shipped (backlog unchanged)
+
+Outcome: log only; no `src/`, shader, default or media change.
+
+Open issues: none. Tree clean at start (main). No `wiggum/parked-*` branches. The top 5 from iteration 170 stand unchanged; none has a new idea or an unblocked path, so nothing was started on speculation.
