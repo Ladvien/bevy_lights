@@ -144,6 +144,24 @@ impl FireKind {
         Some(FlameEmbers { rate })
     }
 
+    /// The flame and its light in one bundle: [`site`](Self::site) and [`candidate`](Self::candidate),
+    /// so a flame never goes without the light the pool hands it and both come from the same kind.
+    /// Spawn it on the entity at the flame's foot; `lux` and `over` are [`lumens`](Self::lumens)'
+    /// arguments. The sparks stay separate because a candle or a lantern has none and a bundle
+    /// cannot hold an absent component: `if let Some(e) = kind.embers() { entity.insert(e); }`.
+    ///
+    /// ```
+    /// # use bevy_lights::*;
+    /// # use bevy::prelude::*;
+    /// # let mut world = World::new();
+    /// let torch = world.spawn(FireKind::Torch.fire(40.0, 1.8)).id();
+    /// assert!(world.entity(torch).contains::<FlameSite>());
+    /// assert!(world.entity(torch).contains::<PoolCandidate>());
+    /// ```
+    pub fn fire(self, lux: f32, over: f32) -> (FlameSite, PoolCandidate) {
+        (self.site(), self.candidate(lux, over))
+    }
+
     /// The fire's name, as a picker shows it.
     pub const fn name(self) -> &'static str {
         match self {

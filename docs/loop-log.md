@@ -4583,3 +4583,17 @@ Gate: `cargo test`, `cargo test --features serde`, clippy `-D warnings`, rustdoc
 Top 5 remaining: (1) publish v0.2.21 (embers, relight clip, timing, `FireKind::embers`) once the v0.2.20 tag is 6 h old (after about 08:05 CDT); (2) cheaper ember quad if a weaker GPU shows it matters; (3) cited flicker amplitude as luminance; (4) overhead flame tongue structure; (5) heat haze (outside the ownership map).
 
 Removed: nothing made this pass. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 223 — 2026-10-30 — `FireKind::fire()`: the flame and its light in one bundle
+
+Outcome: `FireKind::fire(lux, over) -> (FlameSite, PoolCandidate)`, so a picker or editor that stores a kind spawns a flame and the light the pool hands it from one call and cannot forget the light (an unmotivated flame). Sparks stay `embers()`: Bevy 0.20 has no `Bundle` for `Option<Component>` (my first draft returned it as a third element and failed to compile; the doctest caught it). Recorded in `docs/research/fire-kinds.md` ("One call for the flame and its light", committed first). Test `a_fire_bundle_is_the_flame_and_the_light_of_one_kind` plus a doctest. Data only, no shader or visual change: no captures or bench (nothing on a hot path).
+
+Issues: none open (`gh` worked). Parked: only the old iteration-115 occlusion WIPs (stale). bevy_emerge #103: no new unmet crate-side need. Release: v0.2.20 tag 87 minutes old, the 6-hour rule blocks a publish.
+
+Ranked candidates: (1) flame+light bundle, the one omission an editor picker hits (won: smallest finished consumer-facing); (2) cheaper ember quad; (3) cited flicker amplitude as luminance (no source in corpus); (4) overhead tongue structure; (5) heat haze (outside the map).
+
+Gate: `cargo test`, `cargo test --features serde`, doctests, clippy `-D warnings`, rustdoc `-D warnings`, fmt, wasm lib build, release build clean.
+
+Top 5 remaining: (1) publish v0.2.21 once the v0.2.20 tag is 6 h old (after about 08:05 CDT); (2) cheaper ember quad if a weaker GPU shows it matters; (3) cited flicker amplitude as luminance; (4) overhead flame tongue structure; (5) heat haze (outside the ownership map).
+
+Removed: nothing made this pass. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.

@@ -10,6 +10,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 - **`FireKind::embers()`**: the sparks a kind of fire sheds, `None` for the candle and the lantern, rising from the torch (2 a second) through the brazier (the default 3) and campfire (5) to the bonfire (`MAX_EMBER_RATE`). A design default; `docs/research/fire-kinds.md`.
 
+- **`FireKind::fire(lux, over)`**: the flame and its light as one bundle, `(FlameSite, PoolCandidate)`, so a picker spawns both from one call and a flame never goes without the light the pool hands it (the sparks stay `embers()`, absent for a candle). No new numbers. `docs/research/fire-kinds.md`.
+
 ### Documentation
 
 - The courtyard example's `LIGHTS_GPU_TIMING=1` prints mean GPU time per render pass; with it the ember quad measures about 0.1 ms a frame (transparent pass 11 µs without embers, 107 to 137 µs with, RTX 3090, 52 flames).
