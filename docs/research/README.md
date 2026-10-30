@@ -26,6 +26,8 @@ plainly that it is a design default.
   temperature, and the lumens a fire needs for a pool of a given size.
 - [`pool-hand-off.md`](pool-hand-off.md) — the pool's hand-off: hysteresis (the overlap rule) and a
   fade, so a light that changes owner does not pop.
+- [`pool-template.md`](pool-template.md) — every setting of the pool's template on every pool light,
+  live and saved; Bevy's soft-shadow and contact-shadow levers, measured.
 - [`corpus.md`](corpus.md) — what the home-still library actually holds for cinematography,
   photography, CG and animation lighting, game-lighting craft, many-light rendering, fire physics and
   perception, with the stems to read and the gaps to fill.
