@@ -164,6 +164,40 @@ distance squared), so the shadowed lights are the best-ranked of the lights the 
   light. The budget is a count instead.
 - **No time slicing.** Bevy re-renders every shadowed cube every frame; the crate cannot ask it to
   refresh one light's shadow less often.
+- **No penumbra.** A torch's shadow is as crisp two metres from a figure as at its feet, where a 0.35 m
+  flame at that distance should give what `10.23856_6105` (Table 1, cited in `lighting-look.md`) calls
+  "fuzzy shadow contours". Bevy's point shadows soften only through PCSS (`soft_shadows_enabled` with a
+  light `radius`, behind Bevy's `experimental_pbr_pcss` feature), which the pool does not forward. The
+  braziers' shadows have the same edge, so the frame is consistent; this is the next item, not part of
+  this one.
+
+## Iteration 271's findings
+
+- **The design changed once, before it shipped.** The first draft made `shadowed: usize` the only path
+  and ignored the template's flag (naming it as a problem). That broke a consumer-visible behaviour an
+  existing test pins (the template's `shadow_maps_enabled` reaches every slot) and the meaning of a saved
+  project, so the flag stayed the switch and the budget became a cap, `max_shadowed: Option<usize>`.
+- **A settings change snaps.** Fading every light through one reserve after the flag is flipped took
+  `size × fade_seconds` (5.6 s for sixteen lights), so a change of the cap or the flag applies at once;
+  only a change of ranking cross-fades.
+- **Measured cross-fade** (a throwaway still scene: one shadow handed from one torch to another by moving
+  the focus, nothing else changing): the arriving shadow's region falls 24.08 → 19.27 DN over 21 frames,
+  largest step 0.35 DN; at `fade_seconds: 0` the same 4.81 DN in one frame. The lit ground around both
+  torches moved 0.000 DN once the two ends of the fade ran on one clock (it sagged 2.5 % before; see
+  `pool-hand-off.md`, iteration 271).
+- **Reserves**: at `reserve: 1` the courtyard's three shadows were all placed in 39 % of frames (hand-offs
+  hold the one reserve), at 2 in 99 % (93 % with the focus walking at 14 m).
+- **Cost** (RTX 3090, 1280x720, the courtyard, Bevy's `auxiliary_views` GPU time over frames 100-400):
+  2.16-2.48 ms with no pool shadow (the four braziers), 2.88 ms with one, 3.74 with two, 3.92 with three:
+  about 0.55-0.6 ms a shadowed point light. Above three pool shadows Bevy's render diagnostics drop
+  passes, so eight and sixteen were not measured directly.
+- **CPU** (`bench_lights`, three alternating runs each): `p50_us` 742/847/757 before, 714/756/788 after;
+  `pool_p50_us` 542/546/520 before, 577/508/501 after — within the machine's run-to-run noise.
+- **The look.** Figures had been `NotShadowCaster`; with them casting, the braziers' figure shadows
+  radiate from the four bowls (the top view's strongest read), and a lantern bearer near the focus
+  throws its own wedge away from its lantern (lit ground 116 DN, its shadow 39 DN, 52 DN with the pool's
+  shadows off). A figure's shadow on a pillar face the moon misses was black until the courtyard's sky
+  fill rose to 20 cd/m² (`lighting-look.md`).
 
 ## Pending index
 
