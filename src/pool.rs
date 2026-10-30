@@ -143,8 +143,9 @@ pub struct LightPool {
     /// fires, where a missing shadow shows — while the rest light without one. `None` (the default) is
     /// no cap: every pool light casts the template's shadow. With the template's flag off, none does.
     ///
-    /// Every shadowed point light renders a six-sided shadow map every frame, so this is the pool's
-    /// **shadow budget**, kept apart from its light budget: sixteen lights can afford three shadows.
+    /// Every shadowed point light renders a six-sided shadow map every frame (about 0.6 ms a light on an
+    /// RTX 3090 in the courtyard example), so this is the pool's **shadow budget**, kept apart from its
+    /// light budget: sixteen lights can afford three shadows.
     ///
     /// A light that earns or loses its shadow because the ranking moved gains or loses it the way it
     /// changes owner: a reserve light takes the light as it was and fades it out while the slot fades
@@ -153,8 +154,10 @@ pub struct LightPool {
     /// free reserve, after the frame's owner changes, and for the light's own fade to finish; with
     /// `reserve: 0` it dips and returns, as a hand-off does. A shadow keeps its light until a shadowless
     /// one is better by [`LightPool::hysteresis`] ([`shadow_set`](crate::shadow_set)). During such a fade
-    /// up to `max_shadowed + reserve` lights cast shadows. A change to this field or to the template's
-    /// flag is a settings change, and applies to every light at once.
+    /// up to `max_shadowed + reserve` lights cast shadows. A pool with shadows wants `reserve: 2`: on the
+    /// courtyard, with one reserve shared by hand-offs and shadow changes, three shadows were all placed
+    /// in 39 % of frames; with two, in 99 %. A change to this field or to the template's flag is a
+    /// settings change, and applies to every light at once.
     pub max_shadowed: Option<usize>,
 }
 
@@ -939,8 +942,11 @@ fn assign_pool<F: Component>(
         // A reserve light: it is not assigned a candidate, only used to fade a departure out.
         if slot.slot >= pool.size {
             let age = fade_at.entry(slot.slot).or_insert(f32::MAX);
-            *age += delta;
+            // Read before it ages, so the departing light runs on the arriving light's clock (which reads
+            // 0 on the frame of the hand-off): the two sum to exactly one on every frame of the fade. Read
+            // after, the pair dipped by up to 7 % of a light mid-fade, one frame's step of the smoothstep.
             let out = fade_out_factor(*age, pool.fade_seconds);
+            *age += delta;
             let live = departure_release.get(&slot.slot).copied();
             // On while there is light left to fade; the frame the fade ends it is hidden and freed, so a
             // finished reserve is never a dark light (or a dark shadow map) the renderer still draws.

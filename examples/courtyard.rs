@@ -14,7 +14,9 @@
 //! - **The 48 torch-bearers** (`Bearer`): capsules walking circles of 3–15 m, each with a
 //!   [`PoolCandidate`] at +1.8 m and a flame at the same place. Only the eight nearest the focus are
 //!   real lights; the other forty are a flame and nothing else. Walk the camera and watch the pool
-//!   hand its lights over.
+//!   hand its lights over. The three best-ranked of the eight cast shadows
+//!   ([`LightPool::max_shadowed`]): a figure by a near torch throws a shadow away from it, and a shadow
+//!   moving to another torch deepens there over a third of a second instead of appearing.
 //! - **The focus** (`Focus`): orbits at 6 m radius on a 20 s period, so a sixty-second capture sees
 //!   the pool travel the whole courtyard.
 //!
@@ -35,8 +37,9 @@
 //! (the pool's total every frame, the only way to see a hand-off) are also this example's own.
 //!
 //! Six more are this example's own: `LIGHTS_RESERVE` (reserve lights for a cross-faded hand-off, default
-//! 1; `0` dips instead), `LIGHTS_SHADOWED` (how many of the pool's lights cast shadows, the best-ranked
-//! first; default 0), `LIGHTS_HYSTERESIS` (the pool's overlap ratio, default 1.15),
+//! 2, one for hand-offs and one for shadows; `0` dips instead), `LIGHTS_SHADOWED` (how many of the pool's
+//! lights cast shadows, the best-ranked first; default 3, `0` for none), `LIGHTS_HYSTERESIS` (the pool's
+//! overlap ratio, default 1.15),
 //! `LIGHTS_FADE` (seconds a light takes to come back after a hand-off, default 0.35),
 //! `LIGHTS_BED` (the braziers' fuel-bed diameter in metres, default 0.34, which sizes their flicker
 //! through the puffing law) and `LIGHTS_UNSIZED=1` (ignore the bed and use the crate's inherited
@@ -332,9 +335,9 @@ const BRAZIERS: [Vec3; 4] = [
     Vec3::new(5.0, 0.0, -5.0),
 ];
 
-/// `LIGHTS_SHADOWED=N`: how many of the pool's lights cast shadows, the best-ranked first (default 0).
+/// `LIGHTS_SHADOWED=N`: how many of the pool's lights cast shadows, the best-ranked first (default 3).
 fn shadowed_env() -> usize {
-    std::env::var("LIGHTS_SHADOWED").ok().and_then(|v| v.parse().ok()).unwrap_or(0)
+    std::env::var("LIGHTS_SHADOWED").ok().and_then(|v| v.parse().ok()).unwrap_or(3)
 }
 
 /// `LIGHTS_GPU_TIMING=1` records the render graph's GPU timestamps and prints, once, the mean per pass
@@ -400,8 +403,8 @@ fn main() {
         .add_plugins((ExampleHarness, FlickerPlugin, LightPoolPlugin::<Focus>::default(), FlamePlugin))
         .insert_resource(CameraPlacement(eye, look))
         // The pool is inserted before the plugin's `init_resource`, so these numbers win: eight real
-        // lights over a 20 m reach, each an 8 m point light, the best-ranked `LIGHTS_SHADOWED` of them
-        // casting shadows (the braziers cast their own).
+        // lights over a 20 m reach, each an 8 m point light, the best-ranked three of them casting shadows
+        // (the braziers cast their own).
         .insert_resource(LightPool {
             size: std::env::var("LIGHTS_POOL").ok().and_then(|v| v.parse().ok()).unwrap_or(8),
             // `LIGHTS_RANK=distance` ranks by distance alone, the rule before the pool weighed a light's
@@ -410,8 +413,10 @@ fn main() {
                 Some("distance") => Rank::Distance,
                 _ => Rank::Illuminance,
             },
-            // `LIGHTS_RESERVE=0` makes a hand-off dip rather than cross-fade, which is the comparison.
-            reserve: std::env::var("LIGHTS_RESERVE").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
+            // `LIGHTS_RESERVE=0` makes a hand-off dip rather than cross-fade, which is the comparison. Two by
+            // default: a pool with shadows shares its reserves between hand-offs and shadow changes, and one
+            // left three shadows filled in 40 % of frames on this courtyard where two fill them in 99 %.
+            reserve: std::env::var("LIGHTS_RESERVE").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
             // The pool's shadow budget: the best-ranked `LIGHTS_SHADOWED` fires throw shadows and the rest
             // only light (the template's flag below turns them on at all).
             max_shadowed: Some(shadowed_env()),
