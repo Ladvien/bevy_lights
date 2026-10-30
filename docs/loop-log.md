@@ -4413,3 +4413,26 @@ Top 5 unchanged from iteration 210.
 Outcome: no code change. `cargo publish` of v0.2.20 retried from clean `main` (`ee32797`, equal to origin) and refused a third time: `429 Too Many Requests: You have published too many versions of this crate in the last 24 hours`. crates.io `max_version` is still 0.2.19. The tag `v0.2.20` already exists on origin (annotated, on `e47b014`, the release commit), so the next pass only publishes; do not re-bump, do not re-tag. No open issues on bevy_lights (list read), no parked branch. Backlog unchanged from iteration 210; no new code was started because each item needs a release the rate limit blocks, and the overhead-flame item is a multi-round visual job better started with a publish window open.
 
 Top 5 unchanged from iteration 210. The next pass: `cargo publish`, then `cargo info bevy_lights@0.2.20` and the crates.io URL here.
+
+## Iteration 213 — 2026-10-30 — Audit pass: nothing shipped (release window closed, no defect found)
+
+Outcome: no code change. Open issues on bevy_lights: none (list read). Parked branches: none new. bevy_emerge #103: every acceptance item it names for this crate already exists (`FireKind`, `PoolBudget`, serde types, `problems()`, `Flicker::intensity_at`); its latest comment is the bevy_light_grid 0.20 pin, not a crate-side request. Release: v0.2.20 is tagged and unpublished; the previous pass's 429 was the last retry, and per the 6-hour/429 rule this pass did not retry it. The next pass publishes 0.2.20 as is.
+
+What was checked, so the next pass does not redo it:
+- Fresh-eye captures at 1280x720, seed 7, frame 120 (`default`, ground 1.7 m, grazing 0.4 m, top-down 14 m, 60° elevated): no pop, seam, hard range cut-off or unmotivated light found; the top-down brazier's flame is a leaning tongue over a mottled coal bed (round 15's result).
+- README hero: `docs/media/showcase.gif` frame 30 coalesced against a fresh capture of the same sim frame (69, `LIGHTS_FOCUS_WALK=18`), RMSE 0.047 at 400x225: the GIF still shows the current look despite the six shader commits since it was encoded (they act at camera elevations above 45° and in the overhead view). No re-encode needed.
+- Flicker amplitude citation (backlog 2) tried again by three routes: `paper_search` (Maynard 2013 now lists `escholarship.org/uc/item/851832j6`), direct PDF fetch (`/content/qt851832j6/qt851832j6.pdf` and `.pdf` both HTTP 403 to an automated client), `web_search` (no figure surfaces). The IOP flicker-measurement paper (`10.1088/0957-0233/10/8/307`) and the sooting pool-fire radiation spectra paper (`10.1115/imece2001/htd-24248`) have no downloadable copy. `±0.15` stays a design default.
+- Pool micro-optimisation (`sort_by` to `sort_unstable_by` on the total order `(key, Entity bits)`): output-identical, but `bench_lights` moved p50 800 to 730 µs against a noise of ±50 µs on this loaded machine; reverted rather than claim an unproven win. A real gain needs a top-K selection in `assign_pool`, which touches the hand-off rules (`rank_of`, `worst`, `wanting`) and is not worth the risk for 0.4 ms at 5000 candidates.
+- Per-fire flame colour (candle against bonfire): rejected for now. The tag's 32 bits are full (height 16, phase 8, brightness 8), colour would need a second per-instance datum or 4 bits taken from height, and real soot-flame colour temperatures of the six kinds differ by a few hundred kelvin with no citable per-fuel table in the corpus. Flicker amplitude as temperature bound through T⁴ also gives only about ±50 K at ±15 %, so brightness-tracking colour is invisible; record, do not build.
+
+Ranked candidates this pass: (1) none workable as a defect, (2) cited flicker amplitude (blocked on a 403), (3) per-fire flame colour (no source), (4) pool top-K selection (perf, risk), (5) overhead flame tongue structure (round 15 left NOT YET).
+
+### Top 5 remaining, ranked
+
+1. Publish v0.2.20 (no re-bump, tag exists), crates.io URL here.
+2. Overhead flame: tongue structure from straight above; size against the bowl.
+3. Cited flicker amplitude: needs Maynard 2013 from a host with library access.
+4. Per-fire flame colour, if a per-fuel colour-temperature table is found (`paper_search` for soot-flame temperature by fuel).
+5. Pool top-K selection if a host reports the pool over 0.5 ms.
+
+Removed this pass: scratch `/tmp/l213`, `/tmp/m.html`, `/tmp/m.pdf`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
