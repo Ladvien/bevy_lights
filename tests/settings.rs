@@ -167,6 +167,34 @@ fn a_fires_lit_circle_is_the_reach_it_was_sized_for() {
     assert_eq!(fire_reach(1000.0, 0.0, 0.0), 0.0, "no lux threshold, no finite circle");
 }
 
+/// The ground is not square-on to a raised light, so an overlay painting it must carry the cosine:
+/// less than the square-on number everywhere but straight underneath, and its circle is inside the
+/// square-on one and is the circle where the painted value crosses the threshold.
+#[test]
+fn the_ground_gets_the_cosine_of_what_a_square_on_surface_does() {
+    for kind in FireKind::ALL {
+        let lumens = kind.lumens(12.0, 0.9);
+        for d in [1.0_f32, 2.0, kind.reach(), 2.0 * kind.reach()] {
+            let ground = ground_lux(lumens, d, 0.9);
+            let square_on = fire_lux(lumens, d, 0.9);
+            assert!(ground < square_on, "{} at {d}: {ground} vs {square_on}", kind.name());
+            let cos = 0.9 / d.hypot(0.9);
+            assert!((ground - square_on * cos).abs() < square_on * 1e-3, "{} at {d}", kind.name());
+        }
+        let circle = ground_reach(lumens, 3.0, 0.9);
+        assert!((ground_lux(lumens, circle, 0.9) - 3.0).abs() < 3.0 * 1e-3, "{}", kind.name());
+        assert!(circle < fire_reach(lumens, 3.0, 0.9), "{}: ground circle is inside", kind.name());
+    }
+    // Brighter, but never further in the wrong direction.
+    let lumens = fire_lumens(12.0, 4.0, 0.9);
+    assert!(ground_lux(lumens, 1.0, 0.9) > ground_lux(lumens, 2.0, 0.9));
+    // A light on or under the ground puts no light on it; no threshold, no circle.
+    assert_eq!(ground_lux(lumens, 2.0, 0.0), 0.0);
+    assert_eq!(ground_reach(lumens, 1.0, 0.0), 0.0);
+    assert_eq!(ground_reach(lumens, 0.0, 0.9), 0.0);
+    assert_eq!(ground_reach(lumens, 1.0e6, 0.9), 0.0, "brighter than the spot under the light");
+}
+
 /// A torch's pooled light and the torch's own light are the same fire: same mean, rate and depth.
 #[test]
 fn a_kinds_pool_candidate_is_the_same_fire_as_its_light() {
