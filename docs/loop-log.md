@@ -4745,3 +4745,11 @@ Issues: none open. Parked: none. Audit done this pass: every `Checked` type has 
 Blocker for a feature pick: (2)-(5) each need a multi-round visual job, a GPU timing tool not on hand, a sibling-owned feature or a source the corpus lacks; the API audit found no editor-facing gap.
 
 Removed: `/tmp/l233` (empty). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 234 — 2026-10-30 — No-op: gate re-verified, nothing workable
+
+Outcome: log only. Tree clean, no open issues, no parked branches. Gate re-run on `main` at 7f62e75: `cargo clippy --all-targets --all-features -- -D warnings` clean, `cargo test` all suites ok. bevy_emerge #103's newest comments concern bevy_light_grid's 0.20 move, not this crate. Release: v0.2.20 is ~3 h old, the 6-hour rule blocks v0.2.21; changes ride in it. Home-still, capture and bench not touched.
+
+Ranked candidates (unchanged from iteration 233): (1) publish v0.2.21 once the tag is 6 h old; (2) overhead flame construction (twelve NOT YET rounds); (3) cheaper ember quad (needs GPU timing); (4) heat haze (outside the map); (5) luminance-amplitude source (none citable).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
