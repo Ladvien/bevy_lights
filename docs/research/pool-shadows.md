@@ -187,6 +187,40 @@ distance squared), so the shadowed lights are the best-ranked of the lights the 
   without TAA. So neither is the pool's default; the pool now carries both, and every other template
   setting, to every light live.*
 
+## Iteration 275's findings (issue #10)
+
+- **"Applies to every light at once" was true of the slots and false of the reserves.** A change of the
+  template's flag or the cap snaps every *slot* (Model adopted, item 6), but a reserve light writes its
+  shadow flag from the snapshot it was handed (`LastLight::shadow`), and that snapshot was taken under the
+  old settings. So a reserve already fading a shadowed light out kept casting until its fade ended (up to
+  `fade_seconds`, 0.35 s), and a departure made on the very frame the flag went off handed a *new* reserve
+  `shadow: true`. With the flag off, or `max_shadowed: Some(0)`, the setting says no pool light casts and the
+  doc on `LightPool::max_shadowed` says "With the template's flag off, none does".
+- **Why it is a bug and not a rounding error.**
+  - *Craft.* A shadow whose source cannot be named reads as a lighting mistake. Orisayemi & Afabor
+    (`10.58709_niujhu.v8i3.1694`), on shots they call challenging: "one could hardly point out which of the
+    two lights (the key or the fill) that is throwing any of the cast shadows". Peh on Christopher Doyle
+    (`10.32657_10220_48312`): "the cinematic illusion must occur in a physically consistent universe". A
+    player who has switched shadows off and still sees a fire's shadow lean out of a light the menu says
+    does not cast one is looking at that inconsistency.
+  - *Production.* StarCraft II (`s2008-advances-chapter-5`, "Scalability First"): "We chose early on to
+    stress the GPU more than the CPU when ramping up quality levels within the game." A quality level is a
+    setting the player moves, and the cost is expected to move with it at once, which is why Model adopted
+    item 6 snaps the slots instead of fading them.
+  - *Technical.* Bevy 0.20 builds a point light's six shadow views for every visible light whose own
+    `shadow_maps_enabled` is set, and counts it against the cube-map array (`bevy_pbr-0.20.0/src/render/
+    light.rs`, the extraction at line 489 and the count at line 1231). The cost is a per-entity flag, so a
+    reserve's counts exactly as a slot's does: about 0.55-0.6 ms a light on an RTX 3090 (iteration 271, above).
+- **Model, amended.** A reserve's light casts a shadow only while the pool's shadow budget is above zero:
+  `last.shadow && shadow_budget > 0`, the same budget the slots are written under, evaluated on the frame
+  the reserve is written, so the departure that starts on the frame the flag goes off starts unshadowed.
+  A lowered cap above zero is *not* applied to a reserve: the slots snap to it, and a reserve fading a light
+  that had its shadow keeps it for the rest of the fade, so the pool shows at most `max_shadowed + reserve`
+  shadows, the bound the Parameters table already allows for a fade. Dropping a reserve's shadow to fit a
+  cap would need a ranking among reserves for 0.35 s of two lights' cost. Not done: the issue asks for
+  "none" and for the flag, and the smaller fix keeps both promises.
+- **No default changes.** The cost is one comparison per busy reserve per frame.
+
 ## Iteration 273's findings (issue #8)
 
 - **The claim above was only ever measured in a still scene with no wind** (iteration 271), and the
