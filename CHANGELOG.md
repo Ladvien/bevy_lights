@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Fixed
+
+- **No hard line across the coal bed from 60° up.** The tongue's heat stopped dead at its seat while its mask was ramped, so where the overhead disc overlaps the seat the colour stepped from cream to orange in two pixels. The heat now leaves with the same foot ramp, blended in with the overhead factor; frames at or below 50° are unchanged. `docs/research/flame-overhead.md`, round 14.
+
 ## [0.2.18] - 2026-10-30
 
 ### Changed
