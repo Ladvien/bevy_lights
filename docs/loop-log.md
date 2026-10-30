@@ -4833,3 +4833,11 @@ Outcome: worked issue #7 (only open issue; no parked branches). Straight down th
 Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: layered tongues / tongue tips by position noise on a ring, outer ring colour (red rim); (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
 
 Removed: scratch `/tmp/l243`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 244 — 2026-10-30 — Overhead flame round 21: tips and body heat rejected
+
+Outcome: worked issue #7 (only open issue; no parked branches; home-still not needed, no new research). Round 21 tried position-noise tongue tips on the disc's outline and a body heat across it (`src/flame.wesl`); captures `/tmp/l244/{b,a}` (td, e66, e76, e45) show no visible change (AE 18 px at 3 % fuzz, ≤9 DN on a radius): the disc ends ~25 px from the centre inside an ~80 px bowl, so the outline lies on dark floor. Verdict NOT YET, reverted; patch `docs/attempts/overhead-tips-round21.patch`, finding in `docs/research/flame-overhead.md` (capture closer, raise the outer-ring mask). No source change: gate, bench not run. Release: v0.2.20 tagged 02:03 CDT, blocked by the 6-hour rule until ~08:03 CDT; carries 231-243.
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: capture a brazier from 2-3 m up, then the outer ring's mask and layered tongues; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
+
+Removed: scratch `/tmp/l244`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.

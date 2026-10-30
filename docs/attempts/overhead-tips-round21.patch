@@ -1,0 +1,35 @@
+diff --git a/src/flame.wesl b/src/flame.wesl
+index 71976cc..cc68214 100644
+--- a/src/flame.wesl
++++ b/src/flame.wesl
+@@ -85,6 +85,8 @@ const OVERHEAD_CORE: f32 = 0.9;
+ const OVERHEAD_SQUASH: f32 = 0.18;
+ // The outward flow of the overhead disc's brightness: cycles a second, and how much each layer's features grow over a cycle.
+ // Design defaults, judged in captures (round 18).
++// How far the position noise moves the disc's outline, in flame half-widths: design default, judged in captures (round 21).
++const OVERHEAD_TIPS: f32 = 0.6;
+ const OVERHEAD_FLOW_RATE: f32 = 1.2;
+ const OVERHEAD_FLOW_GROWTH: f32 = 1.0;
+ 
+@@ -356,7 +358,10 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
+         let rq = length(q);
+         let dir = q / max(rq, 1e-4);
+         let lobes = fbm(dir * 0.9 + vec2<f32>(t * 0.6, 3.7));
+-        let radius = FLAME_HALF_WIDTH * (1.2 + 0.8 * (lobes - 0.5));
++        // Tongue tips (round 21): the outline is also eaten by a noise of the *position*, which breaks it into billows that come and go
++        // with the flow, where a finer noise of the direction drew rays (round 19).
++        let tips = fbm(q * 5.0 + vec2<f32>(3.3, -t * 0.9));
++        let radius = FLAME_HALF_WIDTH * (1.2 + 0.8 * (lobes - 0.5) + OVERHEAD_TIPS * (tips - 0.5));
+         let disc = 1.0 - rq / radius;
+         // The brightness flows outward from the axis, the way a flame's billows swell as they rise towards a camera above them: two
+         // layers sampled at a scale that shrinks over a cycle (so their features grow about the centre), half a cycle apart and
+@@ -373,6 +378,9 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
+         // The core is a round heat, only its outline is lobed: a heat that followed the lobes drew rays out of the centre.
+         let core_radius = 0.5 * (radius + FLAME_HALF_WIDTH);
+         heat = max(heat, clamp(1.0 - rq / core_radius, 0.0, 1.0) * (1.0 - 0.45 * rq / core_radius) * mix(0.75, 1.1, streak) * in.overhead.x);
++        // The body's own heat: orange through the middle ring and mottled by the billows, red only at the rim (round 21). The core alone left
++        // the rest of the disc at the red edge colour, a dark ring round a hot spot instead of a body of fire.
++        heat = max(heat, clamp(disc * 2.0, 0.0, 1.0) * mix(0.18, 0.62, streak) * in.overhead.x);
+         // The flame's foot on the bed: a second, smaller billow where the plume stands on its coals, found by the same screen offset
+         // the tongue's seat uses. Without it the cloud hovers half a flame above a bed that is lit and crisp below it (round 17).
+         let qf = vec2<f32>(x, (sy + (SOURCE_HEIGHT - 0.04) * in.overhead.y) / max(in.overhead.z, OVERHEAD_SQUASH));
