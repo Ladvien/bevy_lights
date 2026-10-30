@@ -5011,3 +5011,11 @@ Work: took candidate (2), the luminance-amplitude source. `hs status` at 09:45 C
 Ranked candidates: (1) publish 0.2.21 after ~02:03 CDT 2026-10-31; (2) luminance-amplitude source (retry `distill_search` when the GPU frees 5 GB; Raj & Prabhu 2018 may carry a radiative-fluctuation figure, try `paper_download` then); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester). Capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 268 — 2026-10-30 — No change: publish rate limit not cleared, GPU still 4.9 GB free
+
+Outcome: log only. Tree clean on `main` at 9136f98, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision (reopen needs a reference image); no owner comment since. 0.2.21 is not retried (429 at 08:41 CDT; window clears ~02:03 CDT on 2026-10-31). `hs status` at 10:02 CDT: scribe (two hosts) and distill up, 80 retryable failures, 900 queued; GPU free 4869 MiB, under the 5000 MB bge-m3 needs, so `distill_search` and capture stay blocked. Capture, bench and gate not run (no code changed).
+
+Ranked candidates: (1) publish 0.2.21 after ~02:03 CDT 2026-10-31; (2) luminance-amplitude source (retry `distill_search` when the GPU frees 5 GB); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
