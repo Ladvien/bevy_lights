@@ -4945,3 +4945,13 @@ Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `
 Outcome: log only. Tree clean on `main` at 4d4e4f6, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. 0.2.21 was refused with 429 at 08:03 CDT and is not retried (24 h window clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 257 (publish 0.2.21 before tagging; luminance-amplitude source, Maynard 2013 only; heat haze hook on bevy_elements#50; overhead flame awaiting a reference image; pool-to-grid fixture list, no requester). Home-still, capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 259 — 2026-10-30 — No change: fresh capture shows no defect, nothing unblocked
+
+Outcome: log only. Tree clean on `main` at 8c86de3, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. 0.2.21 was refused with 429 at 08:03 CDT and is not retried (24 h window clears ~02:03 CDT on 2026-10-31); publish before tagging, then check the exit status directly.
+
+Work: built the release examples and captured the courtyard at 300 frames from three angles (ground 6,1.7,9; grazing 12,0.4,0; high 0,14,10) and read all three at full frame. Ground: the brazier flame and its pool read as the key, warm/cool separation against the blue fill holds, figures separate from the dark ground by rim light. Grazing: the floor's reflection falloff is smooth with no visible cut-off at the range; torch flames sit on their sources. High: pools overlap without a seam and every pool has a visible flame. No artifact, no popping candidate and no beauty gap I could name with a file and region, so no item beats the existing blocked list. Bench and gate not run (no code changed).
+
+Ranked candidates: (1) publish 0.2.21 once the limit clears; (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (bevy_elements#50); (4) overhead flame (awaits a reference image, per #7); (5) pool-to-grid fixture list (no requester).
+
+Removed: `/tmp/l259` (this pass's captures). Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
