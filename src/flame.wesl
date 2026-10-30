@@ -360,6 +360,16 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
         // The core is a round heat, only its outline is lobed: a heat that followed the lobes drew rays out of the centre.
         let core_radius = 0.5 * (radius + FLAME_HALF_WIDTH);
         heat = max(heat, clamp(1.0 - rq / core_radius, 0.0, 1.0) * (1.0 - 0.45 * rq / core_radius) * mix(0.75, 1.1, streak) * in.overhead.x);
+        // The flame's foot on the bed: a second, smaller billow where the plume stands on its coals, found by the same screen offset
+        // the tongue's seat uses. Without it the cloud hovers half a flame above a bed that is lit and crisp below it (round 17).
+        let qf = vec2<f32>(x, (sy + (SOURCE_HEIGHT - 0.04) * in.overhead.y) / max(in.overhead.z, OVERHEAD_SQUASH));
+        let rf = length(qf);
+        let foot_radius = FLAME_HALF_WIDTH * (0.80 + 0.5 * (fbm(qf / max(rf, 1e-4) * 0.9 + vec2<f32>(t * 0.5, 9.1)) - 0.5));
+        let foot_disc = 1.0 - rf / foot_radius;
+        let foot_streak = fbm(qf * 8.0 + vec2<f32>(2.3, -t * 1.3));
+        let foot_mask = smoothstep(0.0, 0.42, foot_disc) * clamp(0.45 + 1.0 * foot_streak, 0.0, 1.1) * in.overhead.x;
+        mask = max(mask, 0.85 * foot_mask);
+        heat = max(heat, clamp(foot_disc * 1.4, 0.0, 1.0) * mix(0.35, 0.65, foot_streak) * in.overhead.x);
     }
     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));
