@@ -22,6 +22,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 - **`Flame` is `Reflect`.** The drawn flame was the one public component the `AGENTS.md` rule ("everything public is `Reflect`") missed, so a BRP client or an editor panel could not read its catch (`kindled`) or its torch (`source`). It now derives `Reflect`, registers as a component and is registered by `FlamePlugin`.
 
+- **A light linked by `FlameSite::fire` leans with its flame.** The pool's lean moved only a candidate that was itself a `FlameSite` entity; a torch whose light is a sibling of its flame, joined by `FlameSite::fire`, kept its light upright beside a bent flame. The site that names the winner now supplies the lean. `docs/research/flame-lean-linked.md`.
+
 ### Changed
 
 - **A catching or dying flame is taller for its share of the light.** The flame's (and its sparks') drawn size was its catch, `took`, in a straight line, so its area was `took²` against a light that goes with `took`: a third of the way through a catch the light was a third up and the flame a sliver. The size is now `took^(2/3)`, the intermediate-regime law for flame height against heat release rate (Delichatsios 2007), so a settled flame (`took` 1) and a put-out one (0) are exactly as before and the middle moves up (0.3 draws 0.45, 0.5 draws 0.63). On the courtyard's relight the flame shows about one saved frame (33 ms) earlier. `docs/research/flame-catch-size.md`.
