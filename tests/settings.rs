@@ -144,3 +144,18 @@ fn a_fire_kind_round_trips_as_its_name() {
         assert_eq!(serde_json::from_str::<FireKind>(&json).unwrap(), kind);
     }
 }
+
+/// A picker's text field and a command line name a kind the way `Display` writes it, in any case;
+/// an unknown word is an error that lists the valid ones.
+#[test]
+#[allow(clippy::unwrap_used)]
+fn a_fire_kind_parses_the_name_it_displays() {
+    for kind in FireKind::ALL {
+        assert_eq!(kind.to_string().parse(), Ok(kind));
+        assert_eq!(kind.name().to_uppercase().parse(), Ok(kind));
+    }
+    let err = "pyre".parse::<FireKind>().unwrap_err();
+    assert_eq!(err, UnknownFireKind("pyre".into()));
+    let msg = err.to_string();
+    assert!(FireKind::ALL.iter().all(|k| msg.contains(k.name())), "{msg}");
+}

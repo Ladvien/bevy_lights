@@ -149,3 +149,47 @@ impl FireKind {
         }
     }
 }
+
+impl core::fmt::Display for FireKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str(self.name())
+    }
+}
+
+/// A name that is not a [`FireKind`]: [`FireKind::from_str`](core::str::FromStr) rejects it.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnknownFireKind(pub String);
+
+impl core::fmt::Display for UnknownFireKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "unknown fire kind {:?}; expected one of ", self.0)?;
+        for (i, kind) in FireKind::ALL.iter().enumerate() {
+            f.write_str(if i == 0 { "" } else { ", " })?;
+            f.write_str(kind.name())?;
+        }
+        Ok(())
+    }
+}
+
+impl core::error::Error for UnknownFireKind {}
+
+/// Parses a [`name`](FireKind::name), ignoring case and surrounding whitespace, so a text field, a
+/// command line or an environment variable can pick a kind. [`Display`](core::fmt::Display) is the
+/// inverse.
+///
+/// ```
+/// # use bevy_lights::*;
+/// assert_eq!(" torch ".parse(), Ok(FireKind::Torch));
+/// assert!("pyre".parse::<FireKind>().is_err());
+/// ```
+impl core::str::FromStr for FireKind {
+    type Err = UnknownFireKind;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        let s = s.trim();
+        FireKind::ALL
+            .into_iter()
+            .find(|k| k.name().eq_ignore_ascii_case(s))
+            .ok_or_else(|| UnknownFireKind(s.to_owned()))
+    }
+}

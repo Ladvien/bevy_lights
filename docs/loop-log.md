@@ -4186,3 +4186,17 @@ Verdict: no render path changed (a const table and two pure functions; the court
 5. Bearers are placeholder capsules; GIF banding in the pool gradients.
 
 Release: v0.2.9 published, https://crates.io/crates/bevy_lights/0.2.9 (tag `v0.2.9`; semver-checks: no update required). Cleanup: no worktree or `/tmp` scratch made this pass. Earlier-pass baselines listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 200 — 2026-10-29 — `FireKind` parses and displays its name
+
+Outcome: `FireKind: Display + FromStr` (case-insensitive, trimmed) and `UnknownFireKind` (its message lists the valid names), re-exported flat; the courtyard's `LIGHTS_KIND` uses it. Test `a_fire_kind_parses_the_name_it_displays` in `tests/settings.rs`. No numbers, shader or runtime path changed: no capture, no bench, no research note change (API only).
+
+Why: no open issues, no parked branch; the editor-needs rule (bevy_emerge #103, picker of fire kinds) wanted a text round trip beside the serde one. Runner-up: overhead flame at EV 9 (still no researched construction). Small slice by choice; Display/FromStr is pure API.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
+4. Spatial gust coherence if a host reports it.
+5. Bearers are placeholder capsules; GIF banding.
