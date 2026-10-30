@@ -4142,3 +4142,5 @@ Gate: build (release, dev), test, test --features serde, build --examples --all-
 3. Spatial gust coherence (a gust crossing the courtyard) if a host reports wind-in-step looking wrong; needs a source.
 4. Bearers are placeholder capsules.
 5. GIF banding in the pool gradients.
+
+Release: v0.2.7 published, https://crates.io/crates/bevy_lights/0.2.7 (tag `v0.2.7`, commit `c593eff`; semver-checks: no breaking change). Cleanup: removed `/tmp/l197` and `/tmp/wes.xml`; this pass made no worktree. Leftover baseline worktrees from earlier passes, listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
