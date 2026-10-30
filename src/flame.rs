@@ -21,10 +21,10 @@ use bevy::time::Real;
 
 use crate::LightsSystems;
 use crate::chain_sets;
-use crate::flicker::{Flicker, Kindle};
+use crate::flicker::{Flicker, Kindle, Snuff};
 use crate::model::{
     DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, KINDLE_SECONDS, flame_tilt, flicker_swing, kindle_gain,
-    pack_flame_tag, set_flame_brightness,
+    pack_flame_tag, set_flame_brightness, snuff_gain,
 };
 use crate::pool::PoolCandidate;
 
@@ -585,6 +585,16 @@ fn update_flames(
                 tag.value = packed;
             }
         }
+        // A linked fire put out is its light's `Snuff`, on the same `snuff_gain` the light's intensity is multiplied by,
+        // so the flame leaves with its light. It outranks a catch, as `Snuff` outranks `Kindle` on the light; removing
+        // it hands the scale back through the settled branch below.
+        if let Some(elapsed) = site.and_then(|site| sites.snuff_of(site)) {
+            set_scale(&mut transform, snuff_gain(elapsed).max(0.001), lean);
+            if flame.kindled < f32::MAX {
+                flame.kindled = f32::MAX;
+            }
+            continue;
+        }
         // A linked fire's catch is its light's `Kindle`, on the same `kindle_gain` the light's intensity uses, so a
         // fire put out and lit again is born small again in step with its light. While that kindle runs it owns the
         // scale and the site's own catch is finished; a `Kindle` already settled leaves the site's own catch alone.
@@ -640,6 +650,7 @@ struct Sites<'w, 's> {
     sites: Query<'w, 's, (&'static FlameSite, Option<&'static ChildOf>)>,
     lights: Query<'w, 's, (Option<&'static Flicker>, Option<&'static PoolCandidate>)>,
     kindles: Query<'w, 's, &'static Kindle>,
+    snuffs: Query<'w, 's, &'static Snuff>,
     wind: Option<Res<'w, FlameWind>>,
 }
 
@@ -647,6 +658,11 @@ impl Sites<'_, '_> {
     /// The `elapsed` of the [`Kindle`] on the entity a site's [`FlameSite::fire`] names, when it has one.
     fn kindle_of(&self, site: &FlameSite) -> Option<f32> {
         self.kindles.get(site.fire?).ok().map(|kindle| kindle.elapsed)
+    }
+
+    /// The `elapsed` of the [`Snuff`] on the entity a site's [`FlameSite::fire`] names, when it has one.
+    fn snuff_of(&self, site: &FlameSite) -> Option<f32> {
+        self.snuffs.get(site.fire?).ok().map(|snuff| snuff.elapsed)
     }
 
     /// The `(diameter, depth, phase)` a site's flame breathes by: its light's when [`FlameSite::fire`] names one that still
@@ -674,7 +690,7 @@ impl Sites<'_, '_> {
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
     use super::*;
-    use crate::model::{FLICKER_DEPTH, unpack_flame_tag};
+    use crate::model::{FLICKER_DEPTH, SNUFF_SECONDS, unpack_flame_tag};
     use core::f32::consts::TAU;
 
     /// The headless half of the plugin: assets, a look, and the two systems, with no render app (a
@@ -991,6 +1007,53 @@ mod tests {
             scales(&mut app).iter().all(|(_, s)| *s == 1.0),
             "a flame is whole once its light's kindle is gone"
         );
+    }
+
+    /// A fire put out: a `Snuff` on the light the site names shrinks the flame on the light's own `snuff_gain`, an
+    /// unlinked flame is left alone, and removing the `Snuff` makes the flame whole again.
+    #[test]
+    fn a_snuffed_fire_takes_its_flame_out_with_its_light() {
+        let mut app = dressing_app();
+        let light = app.world_mut().spawn(Kindle { elapsed: KINDLE_SECONDS }).id();
+        let site = |fire| {
+            (
+                FlameSite {
+                    height: 0.35,
+                    phase: 0.0,
+                    kindle: 0.0,
+                    diameter: None,
+                    depth: FLICKER_DEPTH,
+                    depth_fade: false,
+                    fire,
+                },
+                Transform::default(),
+            )
+        };
+        let linked = app.world_mut().spawn(site(Some(light))).id();
+        let free = app.world_mut().spawn(site(None)).id();
+        for _ in 0..5 {
+            app.update();
+        }
+        let scale_of = |app: &mut App, site: Entity| {
+            app.world_mut()
+                .query_filtered::<(&Transform, &ChildOf), With<Flame>>()
+                .iter(app.world())
+                .find(|(_, c)| c.parent() == site)
+                .map(|(t, _)| t.scale.x)
+                .unwrap_or_default()
+        };
+        for step in [0.0, 0.3, 0.6, 0.9, SNUFF_SECONDS] {
+            app.world_mut().entity_mut(light).insert(Snuff { elapsed: step });
+            app.update();
+            let wanted = snuff_gain(step).max(0.001);
+            let got = scale_of(&mut app, linked);
+            assert!((got - wanted).abs() < 1e-6, "linked flame {got} at elapsed {step}, wanted {wanted}");
+            assert_eq!(scale_of(&mut app, free), 1.0, "the unlinked flame is untouched");
+        }
+        app.world_mut().entity_mut(light).remove::<Snuff>();
+        app.update();
+        app.update();
+        assert_eq!(scale_of(&mut app, linked), 1.0, "a flame is whole once its light's snuff is gone");
     }
 
     /// A sized fire and an un-sized one must not read the same, or the size a host gives the light would

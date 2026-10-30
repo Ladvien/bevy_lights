@@ -364,3 +364,65 @@ fn a_host_literal_naming_only_base_and_phase_takes_the_defaults() {
     assert_eq!(f.diameter, None);
     assert_eq!(f.depth, FLICKER_DEPTH);
 }
+
+/// Every [`Snuffed`] a test's app has heard.
+#[derive(Resource, Default)]
+struct Out(Vec<Entity>);
+
+fn hear_snuffed(mut out: ResMut<Out>, mut snuffed: MessageReader<Snuffed>) {
+    out.0.extend(snuffed.read().map(|message| message.entity));
+}
+
+#[test]
+fn a_snuffed_light_falls_to_exactly_nothing_is_heard_once_and_can_be_lit_again() {
+    let mut app = app();
+    app.init_resource::<Out>().add_systems(Update, hear_snuffed.after(LightsSystems::Flicker));
+    let light = app
+        .world_mut()
+        .spawn((
+            PointLight { intensity: 0.0, ..default() },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None, depth: 0.0, ..default() },
+        ))
+        .id();
+    app.update();
+    assert!((intensities(&mut app)[0] - 1000.0).abs() < 1e-2, "a plain fire burns at its base");
+
+    app.world_mut().entity_mut(light).insert(Snuff::default());
+    let mut last = f32::MAX;
+    for _ in 0..(SNUFF_SECONDS * 60.0) as usize + 5 {
+        app.update();
+        let now = intensities(&mut app)[0];
+        assert!(now <= last + 1e-3, "a dying fire never brightens: {last} -> {now}");
+        last = now;
+    }
+    assert_eq!(last, 0.0, "out is exactly out");
+    assert_eq!(app.world().resource::<Out>().0, [light], "announced once, for this light");
+
+    for _ in 0..30 {
+        app.update();
+    }
+    assert_eq!(app.world().resource::<Out>().0.len(), 1, "an extinguished fire says nothing more");
+
+    app.world_mut().entity_mut(light).remove::<Snuff>().insert(Kindle::default());
+    for _ in 0..((KINDLE_SECONDS * 60.0) as usize + 3) {
+        app.update();
+    }
+    assert!((intensities(&mut app)[0] - 1000.0).abs() < 1e-2, "removing Snuff and kindling lights it again");
+}
+
+#[test]
+fn a_snuff_beats_a_kindle_and_a_loaded_out_fire_says_nothing() {
+    let mut app = app();
+    app.init_resource::<Out>().add_systems(Update, hear_snuffed.after(LightsSystems::Flicker));
+    app.world_mut().spawn((
+        PointLight { intensity: 500.0, ..default() },
+        Flicker { base: 1000.0, phase: 0.0, diameter: None, depth: 0.0, ..default() },
+        Kindle::default(),
+        Snuff { elapsed: SNUFF_SECONDS },
+    ));
+    for _ in 0..10 {
+        app.update();
+    }
+    assert_eq!(intensities(&mut app)[0], 0.0, "put out wins over kindling");
+    assert!(app.world().resource::<Out>().0.is_empty(), "a fire that loaded as out is not announced");
+}

@@ -9,7 +9,10 @@ use bevy::time::Time;
 
 use crate::LightsSystems;
 use crate::chain_sets;
-use crate::model::{FLICKER_DEPTH, KINDLE_SECONDS, flicker_depth, flicker_mean, flicker_swing, kindle_gain};
+use crate::model::{
+    FLICKER_DEPTH, KINDLE_SECONDS, SNUFF_SECONDS, flicker_depth, flicker_mean, flicker_swing, kindle_gain,
+    snuff_gain,
+};
 
 /// [`FlickerPlugin`]: modulates every [`Flicker`] light and advances every [`Kindle`].
 pub struct FlickerPlugin;
@@ -18,8 +21,10 @@ impl Plugin for FlickerPlugin {
     fn build(&self, app: &mut App) {
         chain_sets(app);
         app.add_message::<Kindled>()
+            .add_message::<Snuffed>()
             .register_type::<Flicker>()
             .register_type::<Kindle>()
+            .register_type::<Snuff>()
             .register_type::<crate::FireKind>()
             .add_systems(Update, flicker_lights.in_set(LightsSystems::Flicker));
     }
@@ -113,7 +118,8 @@ impl Flicker {
     }
 
     /// The lumens this fire gives at virtual time `t` seconds, `kindle` seconds after it was lit
-    /// (`None`: already burning). This is exactly what `flicker_lights` writes each frame, so an
+    /// (`None`: already burning). This is what `flicker_lights` writes each frame before any [`Snuff`]
+    /// multiplies it by [`snuff_gain`], so an
     /// editor's timeline scrubber or a settings preview can draw a fire's curve with no app running.
     pub fn intensity_at(&self, t: f32, kindle: Option<f32>) -> f32 {
         let gain = kindle.map_or(1.0, kindle_gain);
@@ -177,6 +183,45 @@ pub struct Kindled {
     pub entity: Entity,
 }
 
+/// A light going out: its intensity falls to nothing over [`SNUFF_SECONDS`] instead of switching off.
+///
+/// Insert [`Snuff::default()`] to put a fire out (a dousing, a torch burnt down, rain on a lantern). The
+/// crate advances [`Snuff::elapsed`] on virtual time and multiplies the light's intensity by
+/// [`snuff_gain`]; a [`FlameSite`](crate::FlameSite) whose [`fire`](crate::FlameSite::fire) names this
+/// light is drawn at the same factor, so light and flame go out together. At the end the intensity is
+/// exactly 0 and [`Snuffed`] is written once; the fire then stays out until the host removes `Snuff`
+/// (and inserts [`Kindle::default()`] to light it again). With both present, `Snuff` wins.
+///
+/// Like [`Kindle`], it acts on a [`Flicker`] light, not on a pool candidate.
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
+#[reflect(Component)]
+pub struct Snuff {
+    /// Seconds since the fire began to go out. The crate stops advancing it at [`SNUFF_SECONDS`]. A
+    /// value already at [`SNUFF_SECONDS`] is a fire that is out: it is not announced again.
+    pub elapsed: f32,
+}
+
+impl Snuff {
+    /// What is unusable in this state, field by field; empty when it is fine. See
+    /// [`Flicker::problems`](crate::Flicker::problems).
+    pub fn problems(&self) -> Vec<crate::Problem> {
+        let mut out = Vec::new();
+        crate::model::problem::non_negative(&mut out, "elapsed", self.elapsed);
+        out
+    }
+}
+
+/// A fire went out this frame: its [`Snuff`] ran its course, so the host can play the hiss, spawn the
+/// smoke and despawn or hide the prop.
+///
+/// Written once per [`Snuff`], on the frame its `elapsed` reaches [`SNUFF_SECONDS`].
+#[derive(Message, Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Snuffed {
+    /// The light that went out.
+    pub entity: Entity,
+}
+
 /// A light with a single intensity: what [`flicker_lights`] needs of the types it modulates.
 ///
 /// Implemented for [`PointLight`] and [`SpotLight`] only. The trait is private, so adding a third
@@ -203,6 +248,7 @@ type PointLightFrame<'w> = (
     &'w mut PointLight,
     &'w Flicker,
     Option<&'w mut Kindle>,
+    Option<&'w mut Snuff>,
     Option<&'w ViewVisibility>,
     Option<&'w Visibility>,
 );
@@ -213,6 +259,7 @@ type SpotLightFrame<'w> = (
     &'w mut SpotLight,
     &'w Flicker,
     Option<&'w mut Kindle>,
+    Option<&'w mut Snuff>,
     Option<&'w ViewVisibility>,
     Option<&'w Visibility>,
 );
@@ -233,6 +280,7 @@ fn flicker_lights(
     mut spots: Query<SpotLightFrame, Without<PointLight>>,
     cameras: Query<(), With<Camera>>,
     mut kindled: MessageWriter<Kindled>,
+    mut snuffed: MessageWriter<Snuffed>,
 ) {
     let t = time.elapsed_secs();
     let dt = time.delta_secs();
@@ -241,17 +289,38 @@ fn flicker_lights(
     // never write an intensity at all: a headless bench, a test, a server-side simulation. A light is
     // only culled when there is a camera to cull it from.
     let watched = !cameras.is_empty();
-    for (entity, mut light, flicker, kindle, seen, visibility) in &mut points {
+    for (entity, mut light, flicker, kindle, snuff, seen, visibility) in &mut points {
         let hidden = is_hidden(visibility, seen, watched);
-        if modulate(&mut *light, *flicker, kindle, hidden, t, dt) {
-            kindled.write(Kindled { entity });
-        }
+        let heard = modulate(&mut *light, *flicker, kindle, snuff, hidden, t, dt);
+        announce(entity, heard, &mut kindled, &mut snuffed);
     }
-    for (entity, mut light, flicker, kindle, seen, visibility) in &mut spots {
+    for (entity, mut light, flicker, kindle, snuff, seen, visibility) in &mut spots {
         let hidden = is_hidden(visibility, seen, watched);
-        if modulate(&mut *light, *flicker, kindle, hidden, t, dt) {
-            kindled.write(Kindled { entity });
-        }
+        let heard = modulate(&mut *light, *flicker, kindle, snuff, hidden, t, dt);
+        announce(entity, heard, &mut kindled, &mut snuffed);
+    }
+}
+
+/// What one light's frame told the host.
+#[derive(Clone, Copy, Default)]
+struct Heard {
+    /// The fire was lit this frame.
+    lit: bool,
+    /// The fire went out this frame.
+    out: bool,
+}
+
+fn announce(
+    entity: Entity,
+    heard: Heard,
+    kindled: &mut MessageWriter<Kindled>,
+    snuffed: &mut MessageWriter<Snuffed>,
+) {
+    if heard.lit {
+        kindled.write(Kindled { entity });
+    }
+    if heard.out {
+        snuffed.write(Snuffed { entity });
     }
 }
 
@@ -265,8 +334,8 @@ fn is_hidden(visibility: Option<&Visibility>, seen: Option<&ViewVisibility>, wat
         || (watched && seen.is_some_and(|seen| !seen.get()))
 }
 
-/// One light's frame: advance its kindle and write its intensity. Answers whether the fire was lit
-/// this frame, so the caller can announce it.
+/// One light's frame: advance its kindle and snuff and write its intensity. Answers what the host should
+/// hear of it.
 ///
 /// The one place either light type's intensity is written, so a point light and a spot light cannot
 /// drift apart.
@@ -277,24 +346,35 @@ fn is_hidden(visibility: Option<&Visibility>, seen: Option<&ViewVisibility>, wat
 /// leave it at 0 and announce the same fire twice, so the advance is floored at the smallest positive
 /// float. (Bevy's `Added<Kindle>` is no substitute: replacing a component leaves its added tick
 /// alone, so a re-lit fire would never be heard again.)
+///
+/// A snuff is announced on the frame it *reaches* [`SNUFF_SECONDS`], so a `Snuff` already there (a fire
+/// loaded from a scene as out) says nothing, and a zero-delta frame cannot announce it twice.
 fn modulate<L: Emits>(
     light: &mut L,
     flicker: Flicker,
     kindle: Option<Mut<Kindle>>,
+    snuff: Option<Mut<Snuff>>,
     hidden: bool,
     t: f32,
     dt: f32,
-) -> bool {
-    let mut lit = false;
+) -> Heard {
+    let mut heard = Heard::default();
     let elapsed = kindle.map(|mut kindle| {
-        lit = kindle.elapsed == 0.0;
+        heard.lit = kindle.elapsed == 0.0;
         if kindle.elapsed < KINDLE_SECONDS {
             kindle.elapsed = (kindle.elapsed + dt).max(f32::MIN_POSITIVE);
         }
         kindle.elapsed
     });
+    let out = snuff.map(|mut snuff| {
+        if snuff.elapsed < SNUFF_SECONDS {
+            snuff.elapsed = (snuff.elapsed + dt).min(SNUFF_SECONDS);
+            heard.out = snuff.elapsed >= SNUFF_SECONDS;
+        }
+        snuff_gain(snuff.elapsed)
+    });
     if !hidden {
-        *light.intensity() = flicker.intensity_at(t, elapsed);
+        *light.intensity() = flicker.intensity_at(t, elapsed) * out.unwrap_or(1.0);
     }
-    lit
+    heard
 }

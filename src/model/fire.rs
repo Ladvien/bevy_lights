@@ -194,6 +194,13 @@ pub fn flicker_swing(diameter: Option<f32>, depth: f32, t: f32, phase: f32) -> f
 /// [`Kindle`]: crate::Kindle
 pub const KINDLE_SECONDS: f32 = 0.6;
 
+/// How long a fire takes to go out, in seconds: a light that has a [`Snuff`] falls to nothing over
+/// this long. Design default (`docs/research/flame-snuff.md`): quicker than a catch, about the length of
+/// a hand closing over a flame.
+///
+/// [`Snuff`]: crate::Snuff
+pub const SNUFF_SECONDS: f32 = 1.2;
+
 /// The flicker multiplier of a fire light at time `t` seconds and clock `phase` radians: a sum of two
 /// sines mapped to 0.70..1.00 of the light's base intensity, mean 0.85.
 ///
@@ -218,6 +225,24 @@ pub fn kindle_gain(t: f32) -> f32 {
     let s = (t / KINDLE_SECONDS).clamp(0.0, 1.0);
     let s = s * s * (3.0 - 2.0 * s);
     s + 0.35 * (PI * s).sin()
+}
+
+/// The share of its burn a fire has `t` seconds after it began to go out: exactly 1 at the start, then a
+/// smoothstep down (`1 - s²(3 - 2s)`, `s = t / `[`SNUFF_SECONDS`]) to exactly 0 from [`SNUFF_SECONDS`] on.
+///
+/// The mirror of [`kindle_gain`] without its flare: a failing flame does not flare
+/// (`docs/research/flame-snuff.md`). The slope is zero at both ends, so the first instant still reads as
+/// lit and the last glow does not click off. Design default, not a measurement.
+///
+/// ```
+/// # use bevy_lights::model::fire::*;
+/// assert_eq!(snuff_gain(0.0), 1.0);
+/// assert_eq!(snuff_gain(SNUFF_SECONDS), 0.0);
+/// assert!((snuff_gain(SNUFF_SECONDS / 2.0) - 0.5).abs() < 1e-6);
+/// ```
+pub fn snuff_gain(t: f32) -> f32 {
+    let s = (t / SNUFF_SECONDS).clamp(0.0, 1.0);
+    1.0 - s * s * (3.0 - 2.0 * s)
 }
 
 /// The most a flame is allowed to lean, in radians (70°): `sin θ` is 0.94.
@@ -362,6 +387,20 @@ mod tests {
             kindle_gain(KINDLE_SECONDS),
             "the gain is exactly 1 after KINDLE_SECONDS"
         );
+    }
+
+    #[test]
+    fn a_snuffed_fire_falls_from_one_to_exactly_zero_and_never_rises() {
+        assert_eq!(snuff_gain(0.0), 1.0);
+        assert_eq!(snuff_gain(SNUFF_SECONDS), 0.0);
+        assert_eq!(snuff_gain(100.0), 0.0, "out stays out");
+        assert_eq!(snuff_gain(-1.0), 1.0, "before the start it is still lit");
+        let mut last = 1.0;
+        for i in 0..=240 {
+            let g = snuff_gain(i as f32 * SNUFF_SECONDS / 240.0);
+            assert!(g <= last + 1e-6, "rose at step {i}: {last} -> {g}");
+            last = g;
+        }
     }
 }
 

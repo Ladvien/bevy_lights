@@ -77,6 +77,8 @@ fn a_pool_candidate_and_a_kindle_report_their_bad_fields() {
     assert!(Kindle::default().problems().is_empty());
     assert_eq!(fields(Kindle { elapsed: -0.5 }.problems()), ["elapsed"]);
     assert_eq!(fields(Kindle { elapsed: f32::NAN }.problems()), ["elapsed"]);
+    assert!(Snuff::default().problems().is_empty());
+    assert_eq!(fields(Snuff { elapsed: -0.5 }.problems()), ["elapsed"]);
 }
 
 /// The preview curve is the same function the system writes: a fire flares up while kindling and
