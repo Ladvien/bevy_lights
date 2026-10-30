@@ -208,3 +208,16 @@ live from the running index, not from memory.
 
 Two `EmbedSkip` rows in the scan (`10.5463_thesis.122`, `10.54612_a.3e1a1pjirr`) failed on
 `gpu busy: 1842 MB free < 5000 MB required`; both are unrelated to lighting.
+
+## Added by the 2026-10-30 re-scan (iteration 276)
+
+`catalog_recent` (200 rows, 23:20-23:40 UTC) is a bulk import of a graphics and geometry-processing library plus unrelated
+books and papers. Read live from the running index. Nothing in it is cinematography, photography or fire physics; two groups
+are worth a row, the rest are listed so the next scan does not re-investigate them.
+
+| stem | what it is | use |
+|---|---|---|
+| `PBR3_01_Introduction` to `PBR3_15_Light_Transport_III_Bidirectional_Methods` (15 chapters; `PBR3_05` and `PBR3_12` are listed above) | *Physically Based Rendering* 3rd ed. | the radiometry and light-source references stay `PBR3_05` and `PBR3_12`; `PBR3_04_Primitives_and_Intersection_Acceleration` is the spatial-structure reference for any future candidate culling |
+| `Idiomatic Rust- Code like a Rustacean`, `Effective Rust- 35 Specific Ways to Improve Your Rust Code` | Rust idiom books (Anna's Archive imports) | not lighting; the reference for per-frame code that must not allocate or scan |
+| `Evaluation-of-Reverse-Tone-Mapping-through-Varying-Exposure-Conditions` | already listed under *Perception and tone* | re-embedded, unchanged |
+| the mesh, garment, motion-synthesis, retargeting and parameterization papers (`Laplacian-*`, `Instant-Field-Aligned-Meshes`, `Neural-Cages-*`, `MoDi-*`, `Frame-Fields-*`, `Cosserat-Rods-*` and their `_supp` files), the medical, psychology and relationship books and papers (`NEJM200009073431002`, `Fight Right-*`, `Legion A Novel*`) | geometry processing, animation, health | **not lighting** |
