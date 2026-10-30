@@ -4184,3 +4184,5 @@ Verdict: no render path changed (a const table and two pure functions; the court
 3. Index a luminous-flux / radiative-fraction source for fires and replace the reach and height design defaults.
 4. Spatial gust coherence if a host reports wind-in-step looking wrong.
 5. Bearers are placeholder capsules; GIF banding in the pool gradients.
+
+Release: v0.2.9 published, https://crates.io/crates/bevy_lights/0.2.9 (tag `v0.2.9`; semver-checks: no update required). Cleanup: no worktree or `/tmp` scratch made this pass. Earlier-pass baselines listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
