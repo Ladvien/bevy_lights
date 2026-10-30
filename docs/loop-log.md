@@ -4817,3 +4817,11 @@ Release: v0.2.20 tagged 02:03 CDT, 3.6 h old; 6-hour rule blocks v0.2.21 until ~
 Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: lower the mask's gain so the flow shows (gain is why the mottle barely reads), then layered tongues; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze lands in bevy_elements#50, hook here once it exists.
 
 Removed: nothing outside the clone; scratch `/tmp/l241`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 242 — 2026-10-30 — Overhead flame round 19: fine outline lobes rejected
+
+Outcome: worked issue #7 (only open issue). Round 19 added a finer direction-keyed lobe noise to the disc's radius to break the polygon outline straight down; it drew a spiky starburst (round 15's defect) and was reverted, patch in `docs/attempts/overhead-finelobes-round19.patch`, note in `docs/research/flame-overhead.md`. Verdict: FAIL, nothing shipped in `src/`. Captures `/tmp/l242/{b,a}` (td, a76 at 2x). Gate, bench not run (no source change; wesl-check passed on the attempt). Release: v0.2.20 is ~3.9 h old, v0.2.21 blocked until ~08:03 CDT; carries 231-241. Issues: only #7 open; no parked branches.
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: tongue tips by position noise on a ring, or layered tongues; lower the mask's gain; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
+
+Removed: scratch `/tmp/l242`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
