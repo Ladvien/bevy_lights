@@ -4983,3 +4983,9 @@ Work: re-verified `main` rather than assume it: `cargo build --release`, `cargo 
 Ranked candidates: (1) publish 0.2.21 after ~02:03 CDT 2026-10-31; (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 264 — 2026-10-30 — No change: publish rate limit not cleared, no unblocked item
+
+Outcome: log only. Tree clean on `main` at e9203da, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision (reopen needs a reference image); no owner comment since. crates.io newest is still 0.2.19 (06:45 UTC = 01:45 CDT, checked 09:29 CDT); 0.2.21 is not retried (429 at 08:41 CDT; window clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 263: (1) publish 0.2.21 after the limit clears; (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester). Home-still, capture, bench and gate not run (no code changed).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
