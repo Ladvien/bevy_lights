@@ -6,6 +6,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **The pool's light follows a flame's lean.** With a `FlameWind`, the pool moves the light of a candidate on a `FlameSite` entity to the leaning flame's middle (downwind and slightly lower) by the new `lean_light_shift(height, speed, diameter, toward)`; still air, no wind resource or no `FlameSite` change nothing. `docs/research/flame-lean-light.md`.
+
 - **`FlameEmbers`: sparks that leave a flame.** Add the component (`rate`, sparks a second, `0..=MAX_EMBER_RATE`, default 3) to a `FlameSite` and its flame gets one more child, a camera-facing additive quad (`src/embers.wesl`) on which sixteen hashed slots each emit a spark per cycle: a capsule along its own velocity that climbs under drag, weaves, drifts downwind with the flame's lean and cools yellow to orange to red (Newton cooling). No particle state, no buffers; the quad inherits the flame's catch and lean, honours `depth_fade`, and sites without the component are unchanged. `FlameEmbers::problems()`, serde under the `serde` feature, `LIGHTS_EMBERS=r` in the courtyard. `docs/research/flame-embers.md`.
 
 - **`FireKind::embers()`**: the sparks a kind of fire sheds, `None` for the candle and the lantern, rising from the torch (2 a second) through the brazier (the default 3) and campfire (5) to the bonfire (`MAX_EMBER_RATE`). A design default; `docs/research/fire-kinds.md`.

@@ -73,7 +73,7 @@ A row of braziers in a crosswind, each leaning the same way, the large ones less
 - The correlation was fitted to liquid pool fires of 0.1–1 m; a torch is smaller. Used anyway (a lab flame does lean at 0.3 m/s); `FLAME_TILT_LIMIT` bounds the extreme.
 - A lean towards or away from the camera is drawn only as the axis's foreshortening, not as a billboard turned out of the screen plane.
 - Flame *length* does not shrink with wind (Wen), only its height through the tilt.
-- The light's position and its flicker do not move with the lean (the light sits at the flame's foot-third, which moves by under 0.1 of the height at the tilts shown).
+- The light follows the lean since iteration 229 (`flame-lean-light.md`); its flicker is unchanged.
 
 ## Pending index
 
