@@ -119,6 +119,21 @@ fn fire_kinds_slow_down_as_they_grow() {
     assert!(rates.windows(2).all(|w| w[0] > w[1]), "{rates:?}");
 }
 
+/// A bigger fire lights more ground, and its light budget follows the inverse square of that reach.
+#[test]
+fn fire_kinds_light_more_ground_as_they_grow() {
+    let reaches: Vec<f32> = FireKind::ALL.iter().map(|k| k.reach()).collect();
+    assert!(reaches.windows(2).all(|w| w[0] < w[1]), "{reaches:?}");
+    assert!(reaches[0] >= 1.0, "below fire_lumens' floor a kind's reach would be silently raised");
+    for kind in FireKind::ALL {
+        let lumens = kind.lumens(12.0, 0.9);
+        assert_eq!(lumens, fire_lumens(12.0, kind.reach(), 0.9), "{}", kind.name());
+        assert!((kind.light(12.0, 0.9).mean() - lumens).abs() < lumens * 1e-5, "{}", kind.name());
+    }
+    let ratio = FireKind::Bonfire.lumens(12.0, 0.0) / FireKind::Candle.lumens(12.0, 0.0);
+    assert!((ratio - 81.0).abs() < 1e-2, "9 m against 1 m at equal lux is 81x: {ratio}");
+}
+
 #[cfg(feature = "serde")]
 #[test]
 #[allow(clippy::unwrap_used)]
