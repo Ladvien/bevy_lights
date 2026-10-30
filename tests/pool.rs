@@ -893,3 +893,83 @@ mod saved_pool {
         assert_eq!((pool.reach, pool.reserve, pool.rank), (defaults.reach, defaults.reserve, defaults.rank));
     }
 }
+
+#[derive(Resource, Default)]
+struct Heard {
+    lit: usize,
+    out: usize,
+}
+
+fn listen(app: &mut App) {
+    app.init_resource::<Heard>().add_systems(
+        Update,
+        |mut lit: MessageReader<Kindled>, mut out: MessageReader<Snuffed>, mut heard: ResMut<Heard>| {
+            heard.lit += lit.read().count();
+            heard.out += out.read().count();
+        },
+    );
+}
+
+/// The one real light's flicker base and visibility.
+fn only_slot(app: &mut App) -> (f32, Visibility) {
+    let found = assigned(app, 1);
+    (found[0].3, found[0].2)
+}
+
+#[test]
+fn a_pooled_fire_that_is_snuffed_dims_its_light_to_nothing_and_frees_the_slot() {
+    let mut app = app(LightPool { size: 1, reserve: 0, reach: 30.0, gain: 1.0, ..default() });
+    listen(&mut app);
+    focus_at(&mut app, Vec3::ZERO);
+    let near = candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 1000.0);
+    let far = candidate(&mut app, Vec3::new(9.0, 0.0, 0.0), 400.0);
+    settle(&mut app);
+    assert_eq!(only_slot(&mut app).0, 1000.0, "the nearer fire holds the only light");
+
+    app.world_mut().entity_mut(near).insert(Snuff::default());
+    let mut previous = 1000.0;
+    for frame in 0..(SNUFF_SECONDS * 60.0) as usize - 2 {
+        app.update();
+        let (base, _) = only_slot(&mut app);
+        assert!(base <= previous + 1e-3, "frame {frame}: rose from {previous} to {base}");
+        assert!(base < 1000.0 || frame == 0, "frame {frame}: still at full");
+        previous = base;
+    }
+    assert!(previous < 60.0, "nearly out by the end: {previous}");
+    assert_eq!(app.world().resource::<Heard>().out, 0, "not announced before it is out");
+
+    for _ in 0..4 {
+        app.update();
+    }
+    assert_eq!(app.world().resource::<Heard>().out, 1, "announced once, on the frame it went out");
+    // The freed slot is the next fire's, which fades in over `fade_seconds`.
+    for _ in 0..60 {
+        app.update();
+    }
+    assert_eq!(only_slot(&mut app).0, 400.0);
+    assert_eq!(app.world().resource::<PoolBudget>().holder_of(0), Some(far));
+    assert_eq!(app.world().resource::<PoolBudget>().wanting, 1, "a fire that is out wants nothing");
+    assert_eq!(app.world().resource::<Heard>().out, 1);
+}
+
+#[test]
+fn a_pooled_fire_that_is_kindled_lends_a_light_that_flares_up_and_is_heard_once() {
+    let mut app = app(LightPool { size: 1, reserve: 0, reach: 30.0, gain: 1.0, ..default() });
+    listen(&mut app);
+    focus_at(&mut app, Vec3::ZERO);
+    let torch = candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 1000.0);
+    settle(&mut app);
+    app.world_mut().entity_mut(torch).insert(Kindle::default());
+    app.update();
+    let first = only_slot(&mut app).0;
+    assert!(first < 100.0, "a fire just lit is small: {first}");
+    let mut previous = first;
+    for _ in 0..(KINDLE_SECONDS * 60.0) as usize + 2 {
+        app.update();
+        let (base, _) = only_slot(&mut app);
+        assert!(base >= previous - 1e-3, "kindle never falls: {previous} then {base}");
+        previous = base;
+    }
+    assert_eq!(previous, 1000.0, "settled at the candidate's own intensity");
+    assert_eq!(app.world().resource::<Heard>().lit, 1);
+}
