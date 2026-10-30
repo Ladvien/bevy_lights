@@ -141,6 +141,12 @@ pub struct LightPool {
     /// **cross-fade**: the departing owner's light fades out while the arriving one fades in, and the
     /// subject never brightens or darkens.
     ///
+    /// The departing light keeps moving with the candidate it fades out — its position, its
+    /// [`PoolCandidate::offset`] and the flame's lean in the wind, as the arriving light works them out —
+    /// for as long as that candidate is in the pool, so both ends of a cross-fade of one light stand on one
+    /// point; once the candidate has left it (hidden, out of reach, despawned) the light stays where it
+    /// last stood.
+    ///
     /// It is also the pool's **hand-off budget**: a reserve light is busy for the whole fade it carries,
     /// so the pool changes at most `reserve` lights' owners in a frame and the rest wait for the next
     /// frame. One by default, which cross-fades one hand-off per frame; raise it in a scene where many
@@ -529,12 +535,16 @@ type CandidateRead<'w, 's> = Query<
     Without<PoolLight>,
 >;
 
-/// A pool light as it last stood: where, how bright (its candidate's intensity, before the pool's gain
-/// and fade), its flicker, and whether it cast a shadow. A reserve light fading a light out takes all of
-/// it, so the light that leaves keeps moving, and shadowing, exactly as the one that left did —
-/// otherwise the departing and arriving lights swing out of step and their sum wobbles.
+/// A pool light as it last stood: whose light it was, where (the point its `Transform` was given: the
+/// candidate's position plus offset plus the flame's lean), how bright (its candidate's intensity, before
+/// the pool's gain and fade), its flicker, and whether it cast a shadow. A reserve light fading a light out
+/// takes all of it, so the light that leaves keeps moving, and shadowing, exactly as the one that left did —
+/// otherwise the departing and arriving lights swing out of step and their sum wobbles. `at` is where it
+/// last stood, not where it stands: while `owner` is still in the pool the reserve re-reads that candidate's
+/// light point every frame, and `at` only holds the last point it followed it to.
 #[derive(Clone, Copy)]
 struct LastLight {
+    owner: Entity,
     at: Vec3,
     intensity: f32,
     phase: f32,
@@ -875,9 +885,10 @@ fn assign_pool<F: Component>(
     //    A light that changes owner (or is a slot's first light) takes its new owner's shadow at once: it
     //    is fading in from nothing anyway, and the reserve fading the old owner out carries the old flag.
     //    A light that **keeps** its owner and gains or loses its shadow is cross-faded to itself: a free
-    //    reserve takes it as it stood and fades it out while the slot fades back in with the new flag, so
-    //    the shadow deepens (or lifts) over the fade and the lit ground around it does not move. That
-    //    waits for a free reserve and for the slot's own fade to finish; with no reserves at all it dips.
+    //    reserve takes it (and then follows its candidate, as the slot does) and fades it out while the slot
+    //    fades back in with the new flag, so the shadow deepens (or lifts) over the fade and the lit ground
+    //    around it does not move. That waits for a free reserve and for the slot's own fade to finish; with
+    //    no reserves at all it dips.
     //    Losses are applied before gains, so a gain that has to wait never puts the pool over budget.
     //
     //    A change of the *settings* (the template's flag, the cap) is not a hand-off: like the template's
@@ -986,6 +997,28 @@ fn assign_pool<F: Component>(
         })
         .collect();
 
+    // Where a candidate's light stands relative to the point the pool puts it at: a flame leaning in the
+    // wind has its middle, and so its light, off the upright axis. The site is the candidate's own, or the
+    // one that names it as its `fire`. `diameter` is the candidate's own fire diameter, if it gives one.
+    // One rule for the slot and for the reserve fading the same light out, so the two ends of a cross-fade
+    // cannot stand apart.
+    let lean_of = |entity: Entity, diameter: Option<f32>| -> Vec3 {
+        match &wind {
+            Some(wind) if wind.velocity != Vec2::ZERO => {
+                match sites.get(entity).ok().or_else(|| sites.iter().find(|s| s.fire == Some(entity))) {
+                    Some(site) => {
+                        let speed = wind.velocity.length();
+                        let diameter = diameter.or(site.diameter).unwrap_or(DEFAULT_FIRE_DIAMETER);
+                        let toward = wind.velocity / speed;
+                        Vec3::from(lean_light_shift(site.height, speed, diameter, [toward.x, toward.y]))
+                    }
+                    None => Vec3::ZERO,
+                }
+            }
+            _ => Vec3::ZERO,
+        }
+    };
+
     for (_, slot, mut transform, mut visibility, mut flicker, mut light) in &mut slots {
         // A reserve light: it is not assigned a candidate, only used to fade a departure out.
         if slot.slot >= pool.size {
@@ -999,8 +1032,21 @@ fn assign_pool<F: Component>(
             // On while there is light left to fade; the frame the fade ends it is hidden and freed, so a
             // finished reserve is never a dark light (or a dark shadow map) the renderer still draws.
             if out > 0.0
-                && let Some(last) = live
+                && let Some(mut last) = live
             {
+                // The departing light is a candidate's light, and it stands where that light does now: the
+                // candidate's position plus offset plus lean, as the slot works it out. A light cross-faded
+                // to itself therefore has both ends on one point, and a light displaced by a nearer one
+                // keeps moving with its torch. Once the candidate has left the pool (hidden, out of reach,
+                // despawned) there is no "now", and the light holds the last point it followed it to.
+                if let Some(at) = lit
+                    .iter()
+                    .find(|(_, _, _, candidate, ..)| *candidate == last.owner)
+                    .map(|(.., at, _)| *at)
+                {
+                    last.at = at + lean_of(last.owner, last.diameter);
+                    departure_release.insert(slot.slot, last);
+                }
                 transform.translation = last.at;
                 // The departing light keeps the flicker it had (the phase, rate and depth of the light that
                 // left), so the two ends of the cross-fade move together instead of beating against each
@@ -1056,32 +1102,8 @@ fn assign_pool<F: Component>(
         }
         match assigned {
             Some((at, intensity, entity)) => {
-                // A flame leaning in the wind has its middle, and so its light, off the upright axis. The
-                // site is the candidate's own, or the one that names it as its `fire`.
-                let lean = match &wind {
-                    Some(wind) if wind.velocity != Vec2::ZERO => {
-                        match sites.get(entity).ok().or_else(|| sites.iter().find(|s| s.fire == Some(entity)))
-                        {
-                            Some(site) => {
-                                let speed = wind.velocity.length();
-                                let diameter = winners
-                                    .get(&entity)
-                                    .and_then(|(_, diameter, _)| *diameter)
-                                    .or(site.diameter)
-                                    .unwrap_or(DEFAULT_FIRE_DIAMETER);
-                                let toward = wind.velocity / speed;
-                                Vec3::from(lean_light_shift(
-                                    site.height,
-                                    speed,
-                                    diameter,
-                                    [toward.x, toward.y],
-                                ))
-                            }
-                            None => Vec3::ZERO,
-                        }
-                    }
-                    _ => Vec3::ZERO,
-                };
+                // A flame leaning in the wind has its middle, and so its light, off the upright axis.
+                let lean = lean_of(entity, winners.get(&entity).and_then(|(_, diameter, _)| *diameter));
                 transform.translation = at + lean;
                 // The slot keeps its own phase until a candidate says otherwise: the light handed to a
                 // prop must breathe on that prop's clock, or it beats against the flame drawn on it.
@@ -1110,11 +1132,12 @@ fn assign_pool<F: Component>(
             }
         }
         // Remember how this slot's light now stands, so a departure next frame fades out exactly this.
-        if let Some((at, intensity, ..)) = assigned {
+        if let Some((_, intensity, entity)) = assigned {
             old_look.insert(
-                chosen.unwrap_or(Entity::PLACEHOLDER),
+                entity,
                 LastLight {
-                    at,
+                    owner: entity,
+                    at: transform.translation,
                     intensity,
                     phase: flicker.phase,
                     diameter: flicker.diameter,
