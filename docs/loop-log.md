@@ -4895,3 +4895,9 @@ Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `
 Outcome: log only. Tree clean on `main` at 165a82a, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner reply. Release: v0.2.20 tagged 02:03 CDT, 4.5 h old at 06:36, so v0.2.21 waits until ~08:03 CDT; it carries 231-249. Candidates unchanged from iteration 250 (v0.2.21 publish, luminance-amplitude source, heat haze hook blocked on bevy_elements#50, overhead flame awaiting a reference image). Home-still, capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 252 — 2026-10-30 — No change: nothing unblocked, release window still closed
+
+Outcome: log only. Tree clean on `main` at 709574a, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner reply since. Release: v0.2.20 tagged 02:03 CDT, 4.7 h old at 06:45, so v0.2.21 waits until ~08:03 CDT; it carries 231-249. Candidates unchanged from iteration 251. Home-still, capture, bench and gate not run (no code changed).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
