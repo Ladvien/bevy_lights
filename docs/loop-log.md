@@ -4735,3 +4735,13 @@ Gate: build release and debug, test, test --features serde, examples, clippy, do
 Top 5 remaining: (1) publish v0.2.21 after ~08:03 CDT; (2) overhead flame construction; (3) cheaper ember quad; (4) heat haze; (5) luminance-amplitude source.
 
 Removed: `/tmp/em_l232` (bevy_emerge shallow clone). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 233 — 2026-10-30 — The `problems()` docs name what the crate checks
+
+Outcome: `src/model/problem.rs`'s module doc said "the five" components were reported on add and omitted `Kindle`, `Snuff`-as-checked, `FlameEmbers` from the settings list and the resources checked on change. It now lists every checked type and the add/change split (a false line in rustdoc, the editor's reference). Docs only: no capture, bench, research note, or code change; doc and fmt gates green.
+
+Issues: none open. Parked: none. Audit done this pass: every `Checked` type has `problems()` and a watcher; `Rank`, `FireKind` and the settings types are in the type registry (throwaway test, removed); `FireKind`, `Display`/`FromStr`, `Flicker::intensity_at` already give the editor its picker and scrubber; bevy_emerge #103 has no unmet need here. Release: v0.2.20 tag 2.8 h old at the start, the 6-hour rule blocks v0.2.21 until ~08:03 CDT; the changes ride in it. Ranked candidates: (1) publish v0.2.21; (2) overhead flame construction (twelve NOT YET rounds); (3) cheaper ember quad (GPU cost unmeasured); (4) heat haze (outside the map); (5) luminance-amplitude source (none citable). Home-still not touched this pass.
+
+Blocker for a feature pick: (2)-(5) each need a multi-round visual job, a GPU timing tool not on hand, a sibling-owned feature or a source the corpus lacks; the API audit found no editor-facing gap.
+
+Removed: `/tmp/l233` (empty). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
