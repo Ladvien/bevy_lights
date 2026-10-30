@@ -232,6 +232,8 @@ drawn upright from straight overhead. No `FlameWind` (or a zero one) draws every
 lean. `LIGHTS_WIND=x,z cargo run --release --example courtyard` shows it; `docs/research/flame-wind.md`
 has the sources.
 
+**Gusts.** Insert `FlameGust { mean, intensity, timescale, seed }` instead of writing `FlameWind` yourself and `FlamePlugin` writes `FlameWind::velocity` every frame from `gust_velocity`: the mean wind with a stationary Gaussian fluctuation of relative size `intensity` (the turbulence intensity, 0.25 by default) that stays correlated for `timescale` seconds (2 by default), with the heading wandering about `intensity` radians. It is a pure function of `Time<Real>` and the `seed`, so two machines see the same wind and a paused world's fires still sway. The tilt law is steep at a breeze and flat at a gale, so gusts read best at 0.2–0.8 m/s (a flame easing between roughly 20° and 40°); at 3 m/s the flame is already near its cap. `LIGHTS_WIND=0.4,0 LIGHTS_GUST=0.5 cargo run --release --example courtyard` shows it; `docs/research/flame-gust.md` has the sources and what is a design default.
+
 ### The lighting look
 
 The numbers a cinematographer sets, as plain functions in `bevy_lights::model::cinematography`:
@@ -272,7 +274,7 @@ engine-free.
 The components a game spawns or marks are `Reflect` and registered by the plugins — `Flicker`, `Kindle`,
 `PoolCandidate`, `FlameSite` — so a BRP front end can read and drive them, and so are the resources a
 host sets, `LightPool` (size, reach, gain, rank, hysteresis, fade, reserve, the slot light's template)
-`FlameLook` (colour, strength, the set-once `max_height`) and `FlameWind` (the wind the flames lean in). The crate spawns `PoolLight` (registered
+`FlameLook` (colour, strength, the set-once `max_height`) and `FlameWind` / `FlameGust` (the wind the flames lean in, and a gusting one the plugin writes into it). The crate spawns `PoolLight` (registered
 too: recolour it for a palette; name its lights what you like) and `Flame`, a plain component a host
 finds or counts and never spawns. `Kindled { entity }` is the message a host hears when a fire catches.
 
