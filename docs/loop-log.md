@@ -4511,3 +4511,21 @@ Top 5 remaining, ranked:
 5. Overhead flame: tongue structure from straight above.
 
 Removed this pass: scratch `/tmp/l217` (captures, gate log). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 218 — 2026-10-30 — Embers verified: depth fade, relight, snuff (no code change)
+
+Outcome: no source change; closes the three unrun checks iteration 217 listed. Issues: none open; no parked branch; tree clean. Release: v0.2.20 is under 6 hours old, so no publish; embers ride in the next release.
+
+Ranked candidates: (1) verify embers under `LIGHTS_DEPTH_FADE=1`, across relight and snuff, and cost (the only unproven part of the newest feature); (2) embers in the hero GIF; (3) cited flicker amplitude as luminance; (4) overhead tongue structure; (5) heat haze (outside the ownership map).
+
+Runs (1280x720, `LIGHTS_EMBERS=5` unless noted, ground eye `0,1.7,9` looking at `0,1.2,0`; `/tmp/l218`):
+- Depth fade on vs off, frame 300: sparks render in both, none cut by the flame's depth probe; a spark behind a figure's body is hidden, one beside it is not (`dfz.png`). No `failed to process shader`/error lines in any log.
+- Relight at 2 s (frames every 20 from 20): flames regrow from the coals with sparks trailing the growing flame; no stray sparks before the flame exists.
+- Snuff at 3 s (frames from 120): flames shrink, sparks stop with them; the last frame has no flame and no spark, the scene lit by the moon fill only (`snz.png`).
+- Cost: 900-frame unpaced courtyard wall time, embers off 40.3 and 45.2 s, `LIGHTS_EMBERS=8` 42.3 and 53.8 s. Run-to-run noise (about 5 s) exceeds the difference, so the quad's GPU cost is not resolved by this method; it stays unmeasured (a GPU timestamp query would be needed).
+
+Verdict: GREAT stands for embers in the three previously unchecked states; no defect found, so no change.
+
+Top 5 remaining: (1) publish the next release (embers) once v0.2.20 is 6 h old; (2) embers in the hero GIF; (3) cited flicker amplitude as luminance (Maynard 2013); (4) overhead flame tongue structure; (5) GPU timestamp measurement of the ember quad.
+
+Removed: scratch `/tmp/l218`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
