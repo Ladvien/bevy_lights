@@ -34,6 +34,7 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `src/pool.rs` — `LightPoolPlugin<F>`, `LightPool`, `PoolCandidate`, `PoolLight`, `assign_pool::<F>`.
 - `src/flame.rs` — `FlamePlugin`, `FlameMaterial`, `FlameLook`, `FlameSite`, `Flame`, `dress_flames`, `update_flames`.
 - `src/flame.wesl` — the flame shader, embedded with `embedded_asset!`.
+- `src/embers.rs`, `src/embers.wesl` — `FlameEmbers` and the spark quad (a child of the `Flame`, registered by `FlamePlugin`).
 - `examples/common/mod.rs` — the `LIGHTS_*` run switches and the fly camera.
 - `examples/courtyard.rs` — the showcase and capture scene: four braziers, 48 torch-bearers, an orbit focus.
 - `examples/bench_lights.rs` — the CPU bench, no window and no GPU.

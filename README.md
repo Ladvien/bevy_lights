@@ -225,6 +225,8 @@ sliding across a torch dims its flame over a few pixels instead of popping it. G
 as before, with no depth read. `cargo run --release --example occlusion` shows both, and
 `LIGHTS_DEPTH_FADE=1` runs the same scene faded.
 
+**Embers.** Add `FlameEmbers { rate }` (sparks a second, `0..=MAX_EMBER_RATE`, default 3) to a `FlameSite` and its flame sheds sparks: short orange streaks that leave the flame, climb under drag, weave, and cool from yellow through orange to red before they go out (`src/embers.wesl`). It is one extra camera-facing quad per fire, a child of the flame, with no particle state: every spark is a function of the shared clock and an integer hash, so a fire's sparks are the same on every machine and cost one draw. The quad takes the flame's catch and wind lean, so a fire not yet caught sheds nothing, a snuffed one stops, and a wind carries the sparks 1.5 times as far downwind as it leans the flame; `depth_fade` hides the sparks of a hidden source too. A site without the component draws exactly as before. `LIGHTS_EMBERS=3 cargo run --release --example courtyard` shows it; `docs/research/flame-embers.md` has the sources.
+
 **Wind.** Insert `FlameWind { velocity }` (metres per second on the ground plane; the host copies it from
 its weather, which this crate does not own) and every flame leans downwind by the Welker–Sliepcevich
 pool-fire tilt for *its own fire's* `diameter`, so a brazier bends less than a torch in the same gust and

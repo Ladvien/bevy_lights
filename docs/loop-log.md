@@ -4484,3 +4484,30 @@ Fallbacks, with the concrete reason each yields no slice: (1) editor needs: none
 5. Pool top-K selection if a host reports the pool over 0.5 ms.
 
 Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 217 — 2026-10-30 — FlameEmbers: sparks leave a flame
+
+Outcome: shipped `FlameEmbers` (opt-in component, `rate` sparks a second, default 3, max `MAX_EMBER_RATE` 8). Issues: none open on bevy_lights; no parked branch newer than iteration 115. Release: v0.2.20 tagged about 40 minutes before this pass, so the 6-hour rule blocks a publish; the next release carries this under `[Unreleased]` (new API, additive: PATCH bump per the pre-1.0 rule, confirm with `cargo semver-checks`). The preceding audit passes (213-216) had judged embers outside the ownership map for want of a particle system; this pass found they need none (hashed slots in a fragment shader, as the production fire's "extrude along velocity" and "crossfade over the lifetime" ask), so the item was taken from fallback 2.
+
+Ranked candidates: (1) embers (a shipping fire's signature read, absent); (2) overhead tongue structure (taste); (3) light-position dance (invisible with shadows off); (4) heat haze/smoke (screen-texture pass, outside the map); (5) pool top-K (unjustified). Embers beat (2) because every flame lacked a feature a shipped fire has, where (2) is a taste call.
+
+Sources: craft `10.7456_tojdac.1674124` (motivation; no corpus stem describes sparks, listed under Pending index), production `s2011-advances-pdf-slides` (streak along velocity, lifetime crossfade, hotness to blackbody colour), technical `sig2024_Scintilla_Simulating_Combustible_Vegetation_for_Wildfires` (Sec. 5.7 ember cooling and drag, ~10^3 particles per kg) plus `GPU Gems` ch. 6. Note: `docs/research/flame-embers.md`. Distill live (18 067 embedded docs); scribe idle.
+
+Design: one quad per flame, a child of the `Flame`, so the instance scale (catch, lean) arrives unchanged; camera-facing at every elevation with lengths in flame heights (rise lands `cos(e)` up the screen, lane `sin(e)` down it), so no overhead special case. 16 slots, one spark per cycle (`16/rate` s) born at a hashed moment; capsule along velocity, glow core + small halo, 1.2 px floor with energy dimming; Newton-cooled colour yellow, orange, red. The flame's depth-fade probe is copied. Tuned over four rounds: radius 0.030 to 0.010-0.018 fh (smudges), heat `exp(-2.2s)` to `exp(-1.4s)` (sparks were dull red blobs), climb 0.45-1.0 fh/s under drag 1.3 (sparks hung two flame heights up).
+
+Critique and verdict (`/tmp/l217/critique.md`; frames `/tmp/l217/{s6,elev,top,wind,far,fin}`): GREAT at ground level (`m4.png`, `z2.png`), elevated (`m8.png`, `fin_c.png`), in wind (`m9.png`: slanted downwind) and far (`far.png`: dim, no crawling). Flaws: nearest sparks read as short pills; a birth spark can look like a pale dash; from straight above only a few pin dots (`m6.png`), which is physically right. Not captured: depth-fade on (the probe is a copy of the flame's, wesl-checked both variants but never run with `LIGHTS_DEPTH_FADE=1`), the catch and snuff transitions.
+
+Benchmark: `bench_lights` (CPU, no flames) 5000 candidates, p50 546 us, min 322 us (the pool/flicker path is untouched; the new systems early-return with no embers). No baseline build was made: the change adds no work to a scene without `FlameEmbers`. GPU cost of the quad (about 1.4 x (2.6 cos e + 0.7) flame heights squared of 16-slot loop per fire) was not measured.
+
+Craft checklist: flame size and key-to-fill unchanged (no change to flame or light); motivated-light: sparks leave the visible flame; flicker, hand-off: unchanged.
+
+Gate: build release/debug, test, test --features serde, examples, clippy -D, doc -D, fmt, wasm, wesl-check (both DEPTH_PREPASS variants for flame and embers): green. Tests: 4 new in `embers.rs` (one quad per asking site and not twinned, tag carries height/phase/rate, rate change and removal and re-add, problems/clamp).
+
+Top 5 remaining, ranked:
+1. Publish the next release (v0.2.20 plus embers) at or after about 13:05 UTC; crates.io URL here.
+2. Run embers with `LIGHTS_DEPTH_FADE=1` and across a kindle and a snuff, and measure the quad's GPU frame time.
+3. Embers in the README hero GIF if the showcase should show them (courtyard default is off; the GIF is unchanged).
+4. Cited flicker amplitude as luminance (Maynard 2013).
+5. Overhead flame: tongue structure from straight above.
+
+Removed this pass: scratch `/tmp/l217` (captures, gate log). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
