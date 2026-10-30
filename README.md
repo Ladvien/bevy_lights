@@ -222,6 +222,16 @@ sliding across a torch dims its flame over a few pixels instead of popping it. G
 as before, with no depth read. `cargo run --release --example occlusion` shows both, and
 `LIGHTS_DEPTH_FADE=1` runs the same scene faded.
 
+**Wind.** Insert `FlameWind { velocity }` (metres per second on the ground plane; the host copies it from
+its weather, which this crate does not own) and every flame leans downwind by the Welker–Sliepcevich
+pool-fire tilt for *its own fire's* `diameter`, so a brazier bends less than a torch in the same gust and
+every flame in the scene bends the same way. The flame keeps its foot and its length and turns about its
+foot (a 3 m/s wind lays a 0.34 m brazier's flame over by about 60°; the lean is capped at 70°), and it is
+drawn upright from straight overhead. No `FlameWind` (or a zero one) draws every flame exactly as before.
+`flame_tilt(speed, diameter)` is the same law as a plain function. The fire's light does not move with the
+lean. `LIGHTS_WIND=x,z cargo run --release --example courtyard` shows it; `docs/research/flame-wind.md`
+has the sources.
+
 ### The lighting look
 
 The numbers a cinematographer sets, as plain functions in `bevy_lights::model::cinematography`:
@@ -250,7 +260,7 @@ Every curve the crate runs, as plain `f32` functions with no `bevy` in them, so 
 its own systems: `flicker_factor` and `flicker_factor_of` with `flicker_rate` and `PUFFING_CONSTANT`,
 `flicker_swing` (the sized-or-un-sized choice, and the depth, the light and the flame both read) with
 `flicker_depth` and `FLICKER_DEPTH` / `MAX_FLICKER_DEPTH`, `kindle_gain`, `raised_light` and
-`flame_light_offset` (where a fire's light belongs, so a flame and the real light it motivates cannot
+`flame_tilt` (how far a flame leans in a wind, with `FLAME_TILT_LIMIT`), `flame_light_offset` (where a fire's light belongs, so a flame and the real light it motivates cannot
 drift apart), `pack_flame_tag` and its inverse with `set_flame_brightness`; the pool's `hand_off` and
 `preferred` (the overlap rule, on distances and on any "smaller is better" quantity) with its
 `fade_factor` / `fade_out_factor`, `HYSTERESIS` and `FADE_SECONDS`; the whole of
@@ -262,7 +272,7 @@ engine-free.
 The components a game spawns or marks are `Reflect` and registered by the plugins — `Flicker`, `Kindle`,
 `PoolCandidate`, `FlameSite` — so a BRP front end can read and drive them, and so are the resources a
 host sets, `LightPool` (size, reach, gain, rank, hysteresis, fade, reserve, the slot light's template)
-and `FlameLook` (colour, strength, the set-once `max_height`). The crate spawns `PoolLight` (registered
+`FlameLook` (colour, strength, the set-once `max_height`) and `FlameWind` (the wind the flames lean in). The crate spawns `PoolLight` (registered
 too: recolour it for a palette; name its lights what you like) and `Flame`, a plain component a host
 finds or counts and never spawns. `Kindled { entity }` is the message a host hears when a fire catches.
 
