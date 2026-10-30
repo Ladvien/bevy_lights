@@ -4256,3 +4256,19 @@ Why: no open issues, no parked branch. Editor-needs rule (bevy_emerge #103, 3 co
 Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). No worktrees or scratch made; earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
 
 Release: v0.2.13 published, https://crates.io/crates/bevy_lights/0.2.13 (tag `v0.2.13`; semver-checks: no update required).
+
+## Iteration 204 — 2026-10-29 — `ground_lux` and `ground_reach`
+
+Outcome: `model::ground_lux(lumens, distance, over)` and `model::ground_reach(lumens, lux, over)` (re-exported flat): illuminance on flat ground with Lambert's cosine term, and the radius of its iso-lux circle. `fire_lux`/`fire_reach` are the square-on law a light is sized by; used for an overlay they overstate the ground (0.22 of the number at 4 m out, 0.9 m up; the circle ~2x too wide), and their docs claimed "ground". Docs now name the surface; no number or default changed. Test `the_ground_gets_the_cosine_of_what_a_square_on_surface_does` in `tests/settings.rs` plus doctests.
+
+Why: no open issues, no parked branch. Editor-needs rule (bevy_emerge #103, the light-map overlay): a correctness gap in what the previous iteration added for it. Runner-up: overhead flame at EV 9 (eleven rounds already NOT YET, no new construction); flicker amplitude re-searched live (`distill_search` returned only Gergely 2020 again; `paper_search` timed out), still no citable luminance depth. Skipped issues: none filed. home-still live state: distill answering, `paper_search` timed out at 30 s. Sources: technical `book_real_time_rendering_4th_akenine` (cosine law); `docs/research/fire-reach.md` "Flat ground". No render path changed: no capture, no bench.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
+4. Spatial gust coherence if a host reports it.
+5. Bearers are placeholder capsules; GIF banding.
+
+Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). Scratch removed: `/tmp/blg_probe`. Earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.

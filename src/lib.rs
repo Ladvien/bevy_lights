@@ -92,8 +92,9 @@ pub use model::{
     HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY, MAX_FLICKER_DEPTH, MOON_KEY, Problem, ProblemKind,
     RANGE_MARGIN, WHIPPING_FLICKER_DEPTH, blackbody_colour, blackbody_luminance, char_field, char_radiance,
     coal_radiance, fade_factor, fill_for, fire_lumens, fire_lux, fire_reach, flame_light_offset, flame_tilt,
-    flicker_depth, flicker_factor, flicker_mean, flicker_swing, hand_off, key_to_fill, kindle_gain,
-    pack_flame_tag, preferred, raised_light, stops, unpack_flame_tag, white_balanced,
+    flicker_depth, flicker_factor, flicker_mean, flicker_swing, ground_lux, ground_reach, hand_off,
+    key_to_fill, kindle_gain, pack_flame_tag, preferred, raised_light, stops, unpack_flame_tag,
+    white_balanced,
 };
 pub use pool::{LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
 

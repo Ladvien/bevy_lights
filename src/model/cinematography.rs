@@ -114,8 +114,9 @@ pub fn fire_lumens(lux: f32, reach: f32, over: f32) -> f32 {
 /// `over` below it: [`fire_lumens`] read the other way.
 ///
 /// `reach` and `over` are clamped exactly as [`fire_lumens`] clamps them (a reach under 1 reads as 1),
-/// so `fire_lux(fire_lumens(lux, r, h), r, h) == lux` for any `r >= 1`. This is the number an overlay
-/// paints: the brightness a placed fire gives each spot of ground, from the light's own budget.
+/// so `fire_lux(fire_lumens(lux, r, h), r, h) == lux` for any `r >= 1`. This is the illuminance on a
+/// surface square-on to the light, the number a light is *sized* by; flat ground at that spot gets
+/// less (the cosine term), which is [`ground_lux`], the number an overlay paints.
 ///
 /// ```
 /// # use bevy_lights::model::cinematography::*;
@@ -133,8 +134,8 @@ pub fn fire_lux(lumens: f32, reach: f32, over: f32) -> f32 {
 }
 
 /// How far out along the ground, in world units, a point light of `lumens` and `over` world units
-/// above it still lights the ground to `lux`: the radius of an iso-illuminance circle, and the
-/// reach an editor draws round a placed fire.
+/// above it still lights a surface square-on to it to `lux`: the radius of an iso-illuminance circle
+/// by the law a light is sized with. The circle flat ground shows is [`ground_reach`].
 ///
 /// `0.0` where even the ground square under the light is dimmer than `lux`, or where `lux` is not
 /// positive (no finite circle). Never under 1 where it answers at all, because [`fire_lumens`] and
@@ -155,6 +156,64 @@ pub fn fire_reach(lumens: f32, lux: f32, over: f32) -> f32 {
     let slant_sq = lumens / (4.0 * core::f32::consts::PI * lux);
     let reach = (slant_sq - over * over).max(0.0).sqrt();
     if reach < 1.0 { 0.0 } else { reach }
+}
+
+/// The illuminance, in lux, a point light of `lumens` puts on **flat horizontal ground** `distance`
+/// world units out from the point under it, `over` world units above it.
+///
+/// [`fire_lux`] is the illuminance on a surface square-on to the light. Ground is not: a surface
+/// facing straight up receives `E = I · cos θ / slant²`, with `I = Φ / 4π` the candela Bevy gives a
+/// point light and `cos θ = over / slant` (Lambert's cosine law, the same `N·L` the renderer shades
+/// stone with). So at 4 m out and 0.9 m up the ground gets 0.22 of what [`fire_lux`] says, and the
+/// difference grows with distance: this is the number to paint over a map, [`fire_lux`] the number
+/// to size a light by.
+///
+/// `distance` is clamped at 0. A light at or below the ground (`over <= 0`) puts no light on it, so
+/// that answers `0.0`, as does a `NaN` or non-positive `lumens`.
+///
+/// ```
+/// # use bevy_lights::model::cinematography::*;
+/// let lumens = fire_lumens(12.0, 4.0, 0.9);
+/// // Square-on is 12 lx at the 4 m reach; flat ground there gets the cosine of it.
+/// let slant = 4.0_f32.hypot(0.9);
+/// let cos = 0.9 / slant;
+/// assert!((ground_lux(lumens, 4.0, 0.9) - 12.0 * cos).abs() < 1e-2);
+/// // Straight underneath, slant is `over`: all of the candela, `lumens / 4π / over²`.
+/// let under = lumens / (4.0 * core::f32::consts::PI) / (0.9 * 0.9);
+/// assert!((ground_lux(lumens, 0.0, 0.9) - under).abs() < 1e-2 * under);
+/// ```
+pub fn ground_lux(lumens: f32, distance: f32, over: f32) -> f32 {
+    if lumens.is_nan() || lumens <= 0.0 || over.is_nan() || over <= 0.0 {
+        return 0.0;
+    }
+    let distance = if distance.is_nan() { 0.0 } else { distance.max(0.0) };
+    let slant_sq = distance * distance + over * over;
+    lumens / (4.0 * core::f32::consts::PI) * over / (slant_sq * slant_sq.sqrt())
+}
+
+/// How far out along flat ground, in world units, a point light of `lumens` and `over` world units
+/// above it still lights the ground to `lux`: [`ground_lux`] solved for the distance, the radius of
+/// the iso-illuminance circle an overlay draws.
+///
+/// Unlike [`fire_reach`] it carries the cosine term, so it is the circle the ground really shows.
+/// `0.0` where even the spot under the light is dimmer than `lux`, where `lux` is not positive, or
+/// where the light is not above the ground. Unlike [`fire_reach`] there is no floor at 1: this is a
+/// geometric answer, not a light size.
+///
+/// ```
+/// # use bevy_lights::model::cinematography::*;
+/// let lumens = fire_lumens(12.0, 4.0, 0.9);
+/// let r = ground_reach(lumens, 5.0, 0.9);
+/// assert!((ground_lux(lumens, r, 0.9) - 5.0).abs() < 1e-2);
+/// ```
+pub fn ground_reach(lumens: f32, lux: f32, over: f32) -> f32 {
+    if lumens.is_nan() || lux.is_nan() || over.is_nan() || lux <= 0.0 || lumens <= 0.0 || over <= 0.0 {
+        return 0.0;
+    }
+    // E = I·h / s³ with s the slant, so s² = (I·h / E)^(2/3).
+    let intensity = lumens / (4.0 * core::f32::consts::PI);
+    let slant_sq = (intensity * over / lux).powf(2.0 / 3.0);
+    (slant_sq - over * over).max(0.0).sqrt()
 }
 
 /// The linear RGB colour of a blackbody at `kelvin`, scaled by `strength`.
