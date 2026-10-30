@@ -4865,3 +4865,11 @@ Outcome: worked issue #7 (only open issue; no parked branches; no new research, 
 Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: tongues that rise toward the viewer (height cue); (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
 
 Removed: scratch `/tmp/l247`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 248 — 2026-10-30 — Overhead flame round 25: crest height cue rejected
+
+Outcome: worked issue #7 (only open issue; no parked branches; no new research, home-still not needed). Round 25 tried a continuous crest gain on the cleft noise (`src/flame.wesl`, overhead branch) so each mass runs yellower on its nearest crest; three gains were captured at 2.3 m (`/tmp/l248/{b,a,a2,a3}`): 1.3-1.6x is invisible against round 24, 2.0x draws white-hot spark-like blotches away from the core. Verdict NOT YET; reverted, patch `docs/attempts/overhead-crest-round25.patch`, note in `docs/research/flame-overhead.md`. No source change: gate, bench not run (wesl-check passed on the attempt). Blocker for this slice: the cleft `fbm` has too narrow a range to double as a height field; it needs its own depth field. Release: v0.2.20 tagged 02:03 CDT, 4.3 h old at 06:27; v0.2.21 blocked until ~08:03 CDT; carries 231-247. bevy_emerge#103 read: the editor needs nothing new from this crate (last comments are about light_grid pins).
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: a separate depth field for tongues rising toward the viewer, or stop at 24 rounds and treat the straight-down view as done (owner's call on #7); (3) luminance-amplitude source; (4) pool-to-grid fixture list (plain-data export of lit fires beside `ground_ramp`); (5) heat haze hook once bevy_elements#50 lands.
+
+Removed: nothing outside the clone; scratch `/tmp/l248` left until the next pass reads it? No: removed below. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
