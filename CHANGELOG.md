@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Fixed
+
+- **A cross-fade's departing light stands where its light is.** The reserve light fading a light out was a snapshot of last frame's position without the wind's lean, and it was never updated, so a shadow cross-fade of a leaning torch held half a metre of the light upwind of its flame (0.51 m for a metre-tall torch in a 3 m/s wind) and one of a walking torch-bearer left the departing end a step further behind every frame (1.0 m by the end of a fade at 3 m/s); under wind every ordinary hand-off also made the departing light jump from the flame's leaned middle back to the upright axis. The reserve now re-reads its candidate's light point (position, offset and lean, as the arriving light works them out) every frame while the candidate is in the pool, so both ends of a cross-fade of one light stand on one point and a displaced owner's light keeps moving with its torch; once the candidate has left the pool it stays at the last point it followed it to (`docs/research/pool-shadows.md`, issue #8).
+
 ## [0.3.0] - 2026-10-30
 
 The first release on crates.io since 0.2.19: 0.2.20 and 0.2.21 were tagged but crates.io refused both (too many versions in 24 hours), so their entries below ship here too. Breaking: `LightPool` gained a public field (`max_shadowed`), so a struct literal that names every field needs `..default()` or the new field.

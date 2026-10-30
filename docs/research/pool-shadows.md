@@ -19,6 +19,8 @@ holders, and a shadow that arrives and leaves by a cross-fade rather than a pop.
 | `s2017-advances-pdf-slides-3` — Drobot, *Improved Culling for Tiled and Clustered Rendering* (Call of Duty: Infinite Warfare), SIGGRAPH 2017 *Advances* | a stress scene of 128 shadowed lights | production: what many shadowed lights cost |
 | `book_real_time_rendering_4th_akenine` — Akenine-Möller et al., *Real-Time Rendering* 4th ed., §7.4 and §20.4 | many-light shadows; cascade boundary blending | technical: shadow only the closest and brightest; blend across a boundary |
 | GPU Gems ch. 12 — Gerasimov, *Omnidirectional Shadow Mapping* (corpus file `GP/GPU Gems- …`) | the cube shadow map a point light needs | technical: one cube (six views) per light, every frame |
+| `s2008-advances-chapter-5` — Filion & McNaughton, *StarCraft II: Effects & Techniques*, SIGGRAPH 2008 *Advances* | the lights a unit moves through | production: a light that stops where it was when the unit moved on reads as popping |
+| `s2006-advances-materials-13` — Mitchell, McTaggart & Green, *Shading in Valve's Source Engine*, SIGGRAPH 2006 *Advances* | ambient and local lighting as a character moves | production: lighting discontinuities as a character moves are "visual popping", and are time-averaged away |
 | `bevy_pbr-0.20.0/src/render/light.rs:1170-1233` | Bevy's point-light shadow allocation | the engine's own cap: texture-array layers / 6, not a budget |
 
 ## Craft principle
@@ -99,6 +101,11 @@ distance squared), so the shadowed lights are the best-ranked of the lights the 
    the occluded ground the shadowed light contributes nothing, so the shadow deepens smoothly over
    `fade_seconds`. RTR4 §7.4 is the technical precedent: at a cascade boundary "samples taken in these
    overlap zones gather results from both adjoining shadow maps and are blended."
+   **Both ends of the cross-fade stand where the light is.** The reserve is not a snapshot: it is the
+   same light, on the same candidate, so every frame it takes the candidate's current light point — its
+   position plus offset plus the wind's lean, exactly as the slot computes it — and it holds the last
+   point it followed it to only once the candidate has left the pool (hidden, out of reach, despawned).
+   The light that leaves a hand-off keeps moving as the torch that was displaced does.
 5. **It shares the hand-off budget.** A shadow change needs a free reserve, after the frame's owner
    changes have taken theirs; with none free it waits for the next frame (the same rule that stops a
    move the pool cannot cross-fade), and so does a light still fading from its last change. Losses are
@@ -126,6 +133,11 @@ distance squared), so the shadowed lights are the best-ranked of the lights the 
 
 ## Validation targets
 
+- **Both ends of a cross-fade stand in the same flame** (tests, iteration 273): under a 3 m/s wind a
+  shadow cross-fade of a torch's light sums to the light's full base at the *leaned* flame's middle on
+  every frame; the same cross-fade of a walking torch-bearer sums to the full base at the bearer's
+  current light point on every frame; and the light a displaced owner leaves stands at that owner's
+  current light point while it stays in the pool and holds the last one after it leaves.
 - **The budget holds**: with a pool of 8 and `max_shadowed: Some(3)`, exactly 3 of the slots' lights
   have `shadow_maps_enabled`, and they are the 3 best-ranked holders (test).
 - **The template's flag is the switch**: with it off no slot casts a shadow whatever the cap, and with
@@ -174,6 +186,34 @@ distance squared), so the shadowed lights are the best-ranked of the lights the 
   softens only at a radius of metres that also flattens the specular, and contact shadows dot a lit wall
   without TAA. So neither is the pool's default; the pool now carries both, and every other template
   setting, to every light live.*
+
+## Iteration 273's findings (issue #8)
+
+- **The claim above was only ever measured in a still scene with no wind** (iteration 271), and the
+  reserve was not the same light but a snapshot of one. The snapshot was last frame's *un-leaned*
+  position (`LastLight::at` left the lean out) and it was never refreshed, so under wind the departing
+  light stood on the flame's upright axis while the arriving one stood in the leaned flame, and a walking
+  torch-bearer left the departing end behind.
+- **Measured before the fix** (new tests, a torch one metre tall under `FlameWind { velocity: (3, 0) }`):
+  on the first frame of a shadow cross-fade the slot stands at `(3.439, 0.240, 0)` and the reserve
+  carrying the other end at `(3.0, 0.5, 0)`, 0.51 m apart, so the leaned flame's own light is 0 of 100
+  where the cross-fade should hold all of it; a hand-off under wind made the departing light jump from
+  `P + lean` to `P`. A bearer walking at 3 m/s (0.05 m a frame) leaves the reserve one step further behind
+  every frame: 1.0 m apart by the end of a 0.35 s fade.
+- **Why it matters to the look.** Bordwell & Thompson on why a film overlaps its keys (quoted above): the
+  point is "to maintain a constant intensity as actors move around the set". An actor who moves is the
+  torch-bearer, and a light that stands where it was when the move began is the opposite of that: the
+  pool of light the viewer reads as the torch's splits into two dimmer pools one stride apart, then
+  closes. StarCraft II names the cost in the same terms: "This would cause light popping as units moved
+  from one of light influences to another"; Valve's answer to the same kind of discontinuity as a
+  character moves was to "time-average" it "to limit the effect of lighting discontinuities, lessening
+  the visual popping in practice". Here the fix is exact rather than averaged, because both ends of the
+  fade are one light on one candidate: they take one position, so they cannot disagree.
+- **The technical rule is RTR4 §7.4's**, already quoted in the model: a blend is two results *of the same
+  sample* — "samples taken in these overlap zones gather results from both adjoining shadow maps and are
+  blended". Two lights at different places are not the same sample.
+- **No default changes.** The cost is one search of the frame's candidate list per busy reserve per frame
+  (at most `reserve` of them, for the 0.35 s of a fade).
 
 ## Iteration 271's findings
 
