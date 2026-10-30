@@ -814,7 +814,9 @@ fn spawn_scene(
                     NotShadowCaster,
                     NotShadowReceiver,
                 ));
-                bearer.spawn((
+                let mut torch = bearer.spawn_empty();
+                let fire = torch.id();
+                torch.insert((
                     Name::new("Torch fire"),
                     PoolCandidate {
                         offset: Vec3::from(flame_light_offset(flame_height)),
@@ -835,7 +837,7 @@ fn spawn_scene(
                         diameter: None,
                         depth: FLICKER_DEPTH,
                         depth_fade: depth_fade_on(),
-                        fire: None,
+                        fire: Some(fire),
                     },
                     Transform::from_translation(at),
                 ));
@@ -877,7 +879,7 @@ fn orbit_focus(time: Res<Time>, mut focus: Query<&mut Transform, With<Focus>>) {
     }
 }
 
-/// `K` re-lights every brazier: re-inserting [`Kindle::default()`] restarts the flare, and the
+/// `K` re-lights every brazier and every torch: re-inserting [`Kindle::default()`] restarts the flare, and the
 /// message is written again. `LIGHTS_RELIGHT=<seconds>` does it once at that elapsed time, so an
 /// unattended capture can show the flame catching with its light again.
 fn relight_braziers(
@@ -886,6 +888,7 @@ fn relight_braziers(
     time: Res<Time>,
     braziers: Query<&Children, With<Brazier>>,
     lights: Query<(), With<Kindle>>,
+    torches: Query<Entity, With<PoolCandidate>>,
     mut timed: Local<Option<Option<f32>>>,
 ) {
     let at = *timed.get_or_insert_with(|| std::env::var("LIGHTS_RELIGHT").ok().and_then(|v| v.parse().ok()));
@@ -901,10 +904,14 @@ fn relight_braziers(
             }
         }
     }
+    for torch in &torches {
+        commands.entity(torch).remove::<Snuff>().insert(Kindle::default());
+    }
 }
 
-/// `O` puts every brazier out: inserting [`Snuff::default()`] dims each light to nothing and shrinks the
-/// flame linked to it, and [`Snuffed`] is written when the last of it is gone. `LIGHTS_SNUFF=<seconds>`
+/// `O` puts every brazier and every torch out: inserting [`Snuff::default()`] dims each light to nothing and
+/// shrinks the flame linked to it (a torch's light is the pool's: it dims on its candidate), and [`Snuffed`] is
+/// written when the last of it is gone. `LIGHTS_SNUFF=<seconds>`
 /// does it once at that elapsed time, so an unattended capture can show a fire going out. `K` lights them
 /// again.
 fn snuff_braziers(
@@ -913,6 +920,7 @@ fn snuff_braziers(
     time: Res<Time>,
     braziers: Query<&Children, With<Brazier>>,
     lights: Query<(), With<Kindle>>,
+    torches: Query<Entity, With<PoolCandidate>>,
     mut timed: Local<Option<Option<f32>>>,
 ) {
     let at = *timed.get_or_insert_with(|| std::env::var("LIGHTS_SNUFF").ok().and_then(|v| v.parse().ok()));
@@ -927,6 +935,9 @@ fn snuff_braziers(
                 commands.entity(child).insert(Snuff::default());
             }
         }
+    }
+    for torch in &torches {
+        commands.entity(torch).insert(Snuff::default());
     }
 }
 
