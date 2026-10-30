@@ -64,11 +64,11 @@ Basis: Scintilla (`sig2024_Scintilla_Simulating_Combustible_Vegetation_for_Wildf
 
 Validation: every returned value passes `problems()`; rate never falls from one kind to the next; `Candle` and `Lantern` are `None`; the courtyard's Brazier is the `FlameEmbers` default.
 
-## One call for the whole fire
+## One call for the flame and its light
 
-A picker that stores a kind spawns three things from it by hand: `site()`, `candidate(lux, over)` and the optional `embers()`. Forgetting the second leaves a flame that lights nothing; forgetting the third drops the sparks. `FireKind::fire(lux, over)` returns them as one bundle, `(FlameSite, PoolCandidate, Option<FlameEmbers>)`, so a flame, the light it is handed from the pool and its sparks always come from the same kind. No new number: every value is the existing accessor's (a design default where that accessor's is). The bundle holds the pool's candidate, not a `Flicker`: the pool is the crate's way to light a fire; a host that owns a real light spells `kind.flicker(..)` itself. Craft basis is the note's own: a motivated source is a flame with its light (cinematography: every visible flame should light something), so the call that makes one makes both.
+A picker that stores a kind spawns `site()` and `candidate(lux, over)` by hand; forgetting the second leaves a flame that lights nothing, which a cinematographer reads as an unmotivated prop. `FireKind::fire(lux, over)` returns them as one bundle, `(FlameSite, PoolCandidate)`. No new number: every value is the existing accessor's. The bundle holds the pool's candidate, not a `Flicker` (the pool is the crate's way to light a fire; a host with its own real light spells `kind.flicker(..)`). The sparks stay `embers()`: Bevy 0.20 has no `Bundle` for `Option<Component>`, and a candle's absent sparks are the point of the `Option`.
 
-Validation: each part equals its accessor's value; every part passes `problems()`; spawned on an entity the pool assigns the candidate a light.
+Validation: each part equals its accessor's value and the light's diameter and depth are the flame's.
 
 ## Deviations
 

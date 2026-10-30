@@ -147,6 +147,22 @@ fn fire_kinds_shed_embers_by_size() {
     }
 }
 
+/// The bundle is the flame and its light together, so nothing a picker spawns can disagree with the kind.
+#[test]
+fn a_fire_bundle_is_the_flame_and_the_light_of_one_kind() {
+    for kind in FireKind::ALL {
+        let (site, candidate) = kind.fire(40.0, 1.8);
+        assert_eq!(site, kind.site(), "{}", kind.name());
+        assert_eq!(candidate, kind.candidate(40.0, 1.8), "{}", kind.name());
+        assert_eq!(
+            (candidate.diameter, candidate.depth),
+            (site.diameter, Some(site.depth)),
+            "{}",
+            kind.name()
+        );
+    }
+}
+
 /// Bigger fires flicker slower, and the list runs smallest first.
 #[test]
 fn fire_kinds_slow_down_as_they_grow() {
