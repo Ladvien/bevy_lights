@@ -330,3 +330,9 @@ At `LIGHTS_EV100=9`, straight down (eye 5.3,9,5), the flame reads as a ragged bu
 
 **Result.** Same window, new shader: drift (-0.03, +0.005) px a frame (the conveyor is gone), radial +0.031 (was +0.014); frame-to-frame RMSE of the disc 1.8-2.2 % per 6 frames, and a 6x difference image of frames 70 and 88 shows rings of change around the core instead of a one-way slide. Mean window luminance 67.4 against 67.8 before (no brightness shift). GPU `main_transparent_pass_3d` 32.1 µs against 28.2-28.8 µs before at this view (+3.5 µs, one more `fbm` in the overhead branch). Verdict: the drift slice GREAT (the measured defect is gone, no visible change in stills); the overhead flame as a whole is still NOT YET, because a still of it is the same blob as round 17's and the radial flow is weak (the mask's gain hides most of the layer's contrast).
 
+
+### Round 19 — fine lobes on the disc's outline (iteration 242) — NOT YET, not shipped
+
+**Aimed at.** Straight down (seed 7, EV 9, brazier at (5, 0, 5), eye (5, 9, 5.05), 1280x720, frame 90) the disc's outline reads as a smooth six-sided polygon: one low-frequency lobe noise (`fbm(dir · 0.9)`) has too few lobes for tongues.
+
+**Tried (patch in `docs/attempts/overhead-finelobes-round19.patch`).** A second, finer lobe noise `fbm(dir · 2.6 + (−0.9t, 11.3))` at 0.7 amplitude added to the radius, mean radius 0.92. Result: a spiky starburst, the very read round 15 removed (rays from direction-only noise). FAIL; reverted, `src/flame.wesl` is as at iteration 241. Direction-keyed noise on the outline cannot make tongues from above at any frequency; the untried construction is tongue *tips* placed by position noise on a ring (billows, not rays), or the layered-tongue construction listed in round 17.
