@@ -369,7 +369,7 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
         let layer_b = fbm(q * 8.0 / (1.0 + OVERHEAD_FLOW_GROWTH * cycle_b) + vec2<f32>(-2.7, 8.4));
         let streak = clamp(0.5 + (weight_a * (layer_a - 0.5) + weight_b * (layer_b - 0.5)) * inverseSqrt(weight_a * weight_a + weight_b * weight_b), 0.0, 1.0);
         let licks = mix(1.0, clamp(0.3 + 1.4 * streak, 0.0, 1.3), smoothstep(0.0, 0.35, rq / radius));
-        mask = max(mask, smoothstep(0.0, 0.42, disc) * licks * in.overhead.x);
+        mask = max(mask, smoothstep(0.0, 0.18, disc) * licks * in.overhead.x);
         // The core is a round heat, only its outline is lobed: a heat that followed the lobes drew rays out of the centre.
         let core_radius = 0.5 * (radius + FLAME_HALF_WIDTH);
         heat = max(heat, clamp(1.0 - rq / core_radius, 0.0, 1.0) * (1.0 - 0.45 * rq / core_radius) * mix(0.75, 1.1, streak) * in.overhead.x);

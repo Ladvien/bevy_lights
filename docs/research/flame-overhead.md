@@ -356,3 +356,11 @@ At `LIGHTS_EV100=9`, straight down (eye 5.3,9,5), the flame reads as a ragged bu
 **Result.** Seed 7, EV 9, 1280x720, frame 90, straight down (eye (5, 9, 5.05)) and 66°: `/tmp/l244/{b,a}`. Over the whole frame AE is 18 px at 3 % fuzz, and the sampled luminance along a radius moves by at most 9 DN (118 against 109 at 20 px, equal at 0, 30 and 38 px). The reason is geometric, not tuning: at this distance the bowl is ~80 px wide and the flame's disc ends ~25 px from its centre, so the outline that (a) reshapes lies on the bowl's dark floor at ~0 brightness (the mask has already faded to zero), and (b) lifts a ring only 10-15 px wide. Neither reads. Verdict: NOT YET (no visible change); reverted, `src/flame.wesl` is as at iteration 243.
 
 **Next.** Tongue tips only read where the disc is large on screen: capture a closer brazier (eye 2-3 m above it) before adding detail, since at the courtyard's default distance the disc is ~50 px across and layered detail is below what a viewer resolves. Raising the disc's mask at its outer ring (not its heat) is the untried lever.
+
+### Round 22 — the disc's outer ring reaches full brightness (iteration 245) — slice ships
+
+**Aimed at.** Round 21's untried lever: the disc's mask at its outer ring, not its heat.
+
+**Changed.** `smoothstep(0.0, 0.42, disc)` became `smoothstep(0.0, 0.18, disc)` in the disc's mask (`src/flame.wesl`), so the mask is full a short way inside the lobed outline instead of a ramp over the outer 42 % of the radius.
+
+**Result.** Seed 7, EV 9, 1280x720, frame 90, eye 2.3 m above the brazier (5, 3.2, 5.05) and straight down at 9 m: `/tmp/l245`. Close, the outer ring is now a billowy orange cloud with a lobed outline round the yellow core, where before it was a dim, smooth red annulus. At 9 m the change is below a viewer's resolution; at 66° (eye (9, 5, 5.05)) the tongue and bowl are unchanged. Verdict: slice GREAT at close range; the overhead flame as a whole is still NOT YET (no layered tongues).
