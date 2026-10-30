@@ -192,7 +192,8 @@ pub struct Kindled {
 /// exactly 0 and [`Snuffed`] is written once; the fire then stays out until the host removes `Snuff`
 /// (and inserts [`Kindle::default()`] to light it again). With both present, `Snuff` wins.
 ///
-/// Like [`Kindle`], it acts on a [`Flicker`] light, not on a pool candidate.
+/// It acts on a [`Flicker`] light, or on a [`PoolCandidate`](crate::PoolCandidate) (see there): the pool lends the
+/// candidate's light at the same factor.
 #[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 #[reflect(Component)]
@@ -358,6 +359,20 @@ fn modulate<L: Emits>(
     t: f32,
     dt: f32,
 ) -> Heard {
+    let (elapsed, out, heard) = advance_fire(kindle, snuff, dt);
+    if !hidden {
+        *light.intensity() = flicker.intensity_at(t, elapsed) * out.unwrap_or(1.0);
+    }
+    heard
+}
+
+/// Advances a fire's [`Kindle`] and [`Snuff`] by `dt`. Answers the kindle's `elapsed` and the snuff's
+/// [`snuff_gain`] (each `None` when the fire has none), and what the host should hear.
+fn advance_fire(
+    kindle: Option<Mut<Kindle>>,
+    snuff: Option<Mut<Snuff>>,
+    dt: f32,
+) -> (Option<f32>, Option<f32>, Heard) {
     let mut heard = Heard::default();
     let elapsed = kindle.map(|mut kindle| {
         heard.lit = kindle.elapsed == 0.0;
@@ -373,8 +388,28 @@ fn modulate<L: Emits>(
         }
         snuff_gain(snuff.elapsed)
     });
-    if !hidden {
-        *light.intensity() = flicker.intensity_at(t, elapsed) * out.unwrap_or(1.0);
+    (elapsed, out, heard)
+}
+
+/// Advances the [`Kindle`] and [`Snuff`] of every [`PoolCandidate`](crate::PoolCandidate) that is not itself a
+/// [`Flicker`] light, and announces them. [`flicker_lights`] does this for a light; a pooled fire has none of its
+/// own, so the pool's plugin runs this one, before it assigns, so the lent light and the flame linked to the
+/// candidate read the same frame's state.
+///
+/// Matches only entities that carry a `Kindle` or a `Snuff`, so a pool whose candidates have neither pays
+/// nothing for it.
+pub(crate) fn advance_candidate_fires(
+    time: Res<Time>,
+    mut fires: Query<
+        (Entity, Option<&mut Kindle>, Option<&mut Snuff>),
+        (With<crate::PoolCandidate>, Without<Flicker>, Or<(With<Kindle>, With<Snuff>)>),
+    >,
+    mut kindled: MessageWriter<Kindled>,
+    mut snuffed: MessageWriter<Snuffed>,
+) {
+    let dt = time.delta_secs();
+    for (entity, kindle, snuff) in &mut fires {
+        let (.., heard) = advance_fire(kindle, snuff, dt);
+        announce(entity, heard, &mut kindled, &mut snuffed);
     }
-    heard
 }
