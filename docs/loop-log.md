@@ -4555,3 +4555,17 @@ Files: `docs/media/relight.gif`, README (hero caption narrowed, clip and caption
 Top 5 remaining: (1) publish v0.2.21 (embers, relight clip) once v0.2.20 is 6 h old (after about 08:05 CDT; check the tag time first); (2) cited flicker amplitude as luminance (needs Maynard 2013, not in the corpus); (3) overhead tongue structure; (4) GPU timestamp measurement of the ember quad; (5) heat haze (outside the ownership map).
 
 Removed: `~/tmp-lights/relight`, `~/tmp-lights/rl64`, `~/tmp-lights/relight.log`, `/tmp/l220`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 221 — 2026-10-30 — GPU timestamps for the courtyard: the ember quad costs about 0.1 ms
+
+Outcome: closes the "ember quad's GPU cost unmeasured" gap iterations 217-220 carried (wall-time runs were inside the noise). The courtyard example gains `LIGHTS_GPU_TIMING=1` (Bevy's `RenderDiagnosticsPlugin` plus the wgpu timestamp-query features; prints `gpu_us <pass> <mean>` over frames 100-400). Example, README, DEMOS, CHANGELOG only; no `src/` change. Issues: none open; no parked branch except old iteration-115 occlusion WIPs (stale). Release: v0.2.20 tag was 78 minutes old, so the 6-hour rule blocks a publish.
+
+Ranked candidates: (1) the one unmeasured performance number (ember quad GPU cost; the perf gate is equal in weight to beauty); (2) cited flicker amplitude as luminance (no new source in the corpus); (3) overhead tongue structure (taste); (4) heat haze (outside the map); (5) flame-lags-light on a re-light (by design: flame on `Time<Real>`, flicker on virtual time).
+
+Measured (RTX 3090, xvfb, 1280x720 window, 52 flames, frames 100-400, `LIGHTS_FRAMES=420`): `main_transparent_pass_3d` 11.2 and 11.5 us with embers off; 106.9, 137.3 (and 115.5 in a second 1080p-display run, window size unchanged) us with `LIGHTS_EMBERS=8`. `main_opaque_pass_3d` 159-166 us in all runs, shadow pass 1.2-1.3 us. So the sparks cost about 0.1 ms a frame, roughly ten times the 52 flames themselves, under 1 % of a 16.6 ms frame. Run-to-run spread is about 30 us; resolution scaling was not measured (the window did not follow xvfb's screen size). No shader or visual change, so no new verdict; embers' GREAT from iterations 217/218 stands.
+
+Gate: fmt, clippy `--all-targets --all-features -D warnings`, rustdoc `-D warnings` clean; `cargo build --release --examples --all-features` built and ran. Tests and wasm not rerun: no library code changed.
+
+Top 5 remaining: (1) publish v0.2.21 (embers, relight clip, timing) once the v0.2.20 tag is 6 h old (after about 08:05 CDT); (2) cheaper ember quad if a weaker GPU shows it matters (fill-bound? measure with a smaller `rate`); (3) cited flicker amplitude as luminance (Maynard 2013 not in corpus); (4) overhead flame tongue structure; (5) heat haze (outside the ownership map).
+
+Removed: `/tmp/l221`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
