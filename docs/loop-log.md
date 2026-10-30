@@ -4933,3 +4933,9 @@ Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `
 Outcome: log only. Tree clean on `main` at dddfb4b, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner reply. crates.io still reports 0.2.19 as newest (checked via the API at 08:08 CDT); 0.2.21 was refused with 429 at 08:03 and is not retried. bevy_emerge #103: newest comment is the `bevy_light_grid` 0.20 pin, no unmet crate-side need. bevy_elements#50 open, zero comments. Candidates unchanged from 255. Home-still, capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 257 — 2026-10-30 — No change: publish rate limit not cleared, no unblocked item
+
+Outcome: log only. Tree clean on `main` at ff99d9c, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. crates.io newest version still 0.2.19 (checked 08:12 CDT); 0.2.21 was refused with 429 at 08:03 and is not retried (24 h window from the 01:24-02:03 publishes clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 256. Home-still, capture, bench and gate not run (no code changed).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
