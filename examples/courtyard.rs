@@ -244,7 +244,7 @@ fn brazier_bed() -> Option<f32> {
 /// that [`FireKind`], to look at a kind's numbers on the real scene (the bed's box is unchanged).
 fn brazier_kind() -> Option<FireKind> {
     let name = std::env::var("LIGHTS_KIND").ok()?;
-    FireKind::ALL.into_iter().find(|k| k.name().eq_ignore_ascii_case(&name))
+    name.parse().ok()
 }
 /// How far a brazier's pool reaches, in metres: the ground it lights to [`POOL_LUX`].
 const BRAZIER_POOL: f32 = FireKind::Brazier.reach();
