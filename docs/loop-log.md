@@ -4400,3 +4400,4 @@ Bench (`bench_lights`, CPU only, shader change does not touch it): p50_us 549, m
 5. Bearers placeholder capsules; GIF banding.
 
 Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`. Removed this pass: worktree `~/l210_base` (never built), scratch `/tmp/l210`.
+Release: v0.2.20 prepared (`release: v0.2.20`, changelog moved, semver-checks: no update required) but `cargo publish` was refused: `429 Too Many Requests: You have published too many versions of this crate in the last 24 hours`. Not tagged. The next pass publishes 0.2.20 as is (do not re-bump), tags `v0.2.20` and puts the crates.io URL here.
