@@ -280,3 +280,11 @@ At `LIGHTS_EV100=9`, straight down (eye 5.3,9,5), the flame reads as a ragged bu
 **Model.** The tongue's dimming is `OVERHEAD_TONGUE · topdown⁵` instead of `· topdown`: nothing below ~60°, the full 0.6 only at 76° and past, where the disc is fully in. Design default, judged in captures. Frames at or below 55° and at 76° and past are unchanged (`magick compare` AE 0.01 px at 45°, 55°, 85°; 0.7 px at 76°).
 
 **Result.** Same window, same seed: 131.3, 123.6, 116.2, 113.2, 111.4 at 60°, 66°, 70°, 73°, 76° (steps 7.7, 7.4, 3.0, 1.8), so the fall is spread evenly instead of landing between 60° and 66°. At 66° the tongue's mean is +5.5 DN over round 11's. Still NOT YET as a whole: the flame is lower in contrast than at 45° because the floor behind it is lit orange, and a faint stub of the tongue's tip stands above the bowl's rim at 60°-66°.
+
+### Round 13 — the core out-shines the floor it lit (iteration 208)
+
+**Defect.** From 60° up the flame is an additive (alpha 0) layer over ground the fire itself has lit orange (about 130-150 DN), so it cannot darken that ground and its contrast falls to the difference of two oranges; at 76° the cream core also took a sage-grey cast where `CORE_YELLOW` summed with the coal bed (`/tmp/l208/before/e76.png`, 3x zoom of the core). Craft: Doğaner (`10.7456_tojdac.1674124`), a practical must stay visibly where its light is; production: Gregory §11.4.3 and `s2011-advances-pdf-slides`, shipped fire keeps its hot core over what it lights; technical: RTR4 §13.6.3, the cross-section stands in for the flame from above, so it carries the flame's brightness. All quoted in the sections above.
+
+**Model.** `colour *= 1 + OVERHEAD_CORE · topdown · smoothstep(0.30, 0.80, heat)` with `OVERHEAD_CORE = 0.9`: extra emission in the hot core only, rising with the overhead blend, exactly 1 at or below 50° (frames at 45° are pixel-identical, `magick compare` AE 0.0013 over 1280x720 from GPU noise). Design default, judged in captures.
+
+**Result.** Core-window mean grey (60x60 px, seed 7, frame 90) at 60°, 66°, 76°: 148.1, 137.6, 131.4 before; 149.2, 141.0, 139.6 after; peak 225 to 250 at 76°. The 76° core is cream-yellow instead of grey-green. Still NOT YET as a whole: a hard horizontal line crosses the coal bed where the tongue's seat meets the disc, and the 60°-66° plume stays pale against the lit floor.
