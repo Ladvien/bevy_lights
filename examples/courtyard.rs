@@ -424,6 +424,12 @@ fn depth_fade_on() -> bool {
     std::env::var("LIGHTS_DEPTH_FADE").is_ok_and(|v| v != "0")
 }
 
+/// `LIGHTS_EMBERS=r` gives every flame `FlameEmbers { rate: r }` (sparks a second); unset or `0`, the courtyard draws no sparks.
+fn embers_on() -> Option<FlameEmbers> {
+    let rate: f32 = std::env::var("LIGHTS_EMBERS").ok()?.trim().parse().ok()?;
+    (rate > 0.0).then_some(FlameEmbers { rate })
+}
+
 /// `LIGHTS_EV100=x` overrides the camera's exposure (default [`NIGHT_EV100`]). A higher value is a darker
 /// frame: with the ground not saturated, a flame's own contrast can be judged against it.
 fn exposure_ev100() -> f32 {
@@ -702,7 +708,7 @@ fn spawn_scene(
                         Transform::from_xyz(0.0, BRAZIER_LIGHT - BRAZIER_TOP * 0.5, 0.0),
                     ))
                     .id();
-                brazier.spawn((
+                let mut site = brazier.spawn((
                     Name::new("Flame site"),
                     // The flame names the coals as its fire, so it catches with them: at the start, and again
                     // whenever the coals are re-lit (`K`, or `LIGHTS_RELIGHT`), the fire grows rather than
@@ -719,6 +725,9 @@ fn spawn_scene(
                     // The flame's foot is on the coals, below the lip with them.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04 - BED_BELOW_LIP, 0.0),
                 ));
+                if let Some(embers) = embers_on() {
+                    site.insert(embers);
+                }
             });
     }
 
@@ -841,6 +850,9 @@ fn spawn_scene(
                     },
                     Transform::from_translation(at),
                 ));
+                if let Some(embers) = embers_on() {
+                    torch.insert(embers);
+                }
             });
     }
 

@@ -42,6 +42,7 @@ impl Plugin for FlamePlugin {
     fn build(&self, app: &mut App) {
         chain_sets(app);
         embedded_asset!(app, "flame.wesl");
+        crate::embers::build(app);
         app.add_plugins(MaterialPlugin::<FlameMaterial>::default())
             .init_resource::<FlameLook>()
             .init_resource::<FlameAssets>()
@@ -51,7 +52,15 @@ impl Plugin for FlamePlugin {
             .register_type::<FlameSite>()
             .add_systems(
                 Update,
-                (gust_wind, dress_flames, update_flames).chain().in_set(LightsSystems::Flame),
+                (
+                    gust_wind,
+                    dress_flames,
+                    update_flames,
+                    crate::embers::dress_embers,
+                    crate::embers::update_embers,
+                )
+                    .chain()
+                    .in_set(LightsSystems::Flame),
             )
             .add_systems(Startup, build_flame_assets);
     }
@@ -412,7 +421,7 @@ fn set_scale(transform: &mut Transform, took: f32, lean: Vec2) {
 
 /// The one mesh, the two materials, and the height scale every flame in the scene shares.
 #[derive(Resource, Default)]
-struct FlameAssets {
+pub(crate) struct FlameAssets {
     mesh: Handle<Mesh>,
     material: Handle<FlameMaterial>,
     /// The same material with the depth fade on, for the sites that set [`FlameSite::depth_fade`]. Two
@@ -428,6 +437,16 @@ struct FlameAssets {
 }
 
 impl FlameAssets {
+    /// Whether the handles have been made.
+    pub(crate) fn built(&self) -> bool {
+        self.built
+    }
+
+    /// The height scale a flame's tag is packed against.
+    pub(crate) fn max_height(&self) -> f32 {
+        self.max_height
+    }
+
     /// The shared material a site's flame is drawn with.
     fn material_for(&self, depth_fade: bool) -> &Handle<FlameMaterial> {
         if depth_fade { &self.faded_material } else { &self.material }
@@ -437,11 +456,11 @@ impl FlameAssets {
 /// The marker that a [`FlameSite`] already has its flame: `Without<Flamed>` on the site is why a
 /// second frame does not twin it.
 #[derive(Component)]
-struct Flamed;
+pub(crate) struct Flamed;
 
 /// Builds the flame mesh and material once, at `Startup`: the quad the vertex stage billboards, and
 /// the material every flame shares.
-fn build_flame_assets(
+pub(crate) fn build_flame_assets(
     mut assets: ResMut<FlameAssets>,
     look: Res<FlameLook>,
     mut meshes: ResMut<Assets<Mesh>>,
@@ -482,7 +501,7 @@ fn material_for(look: FlameLook, depth_fade: bool) -> FlameMaterial {
 ///
 /// Spawned through `queue_silenced`: a site despawned in the same frame it was created (a short
 /// fire's lifetime running out, a carried torch going away) must not panic the insert.
-fn dress_flames(
+pub(crate) fn dress_flames(
     mut commands: Commands,
     sites: Query<(Entity, &FlameSite), Without<Flamed>>,
     assets: Res<FlameAssets>,
@@ -529,7 +548,7 @@ fn dress_flames(
 /// write only on the frames its quantised byte changes, and skipped entirely for a flame whose site has
 /// no `FlameSite` parent. `MeshTag` is in `bevy_pbr`'s `Changed<MeshTag>` re-extraction set, so a write
 /// past the change is a render-world re-extract for that flame.
-fn update_flames(
+pub(crate) fn update_flames(
     real: Res<Time<Real>>,
     time: Res<Time>,
     look: Res<FlameLook>,
@@ -646,7 +665,7 @@ fn update_flames(
 
 /// The flame sites, and the lights their [`FlameSite::fire`] links may name: one parameter, since `update_flames` reads both.
 #[derive(bevy::ecs::system::SystemParam)]
-struct Sites<'w, 's> {
+pub(crate) struct Sites<'w, 's> {
     sites: Query<'w, 's, (&'static FlameSite, Option<&'static ChildOf>)>,
     lights: Query<'w, 's, (Option<&'static Flicker>, Option<&'static PoolCandidate>)>,
     kindles: Query<'w, 's, &'static Kindle>,
