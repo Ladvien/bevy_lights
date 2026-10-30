@@ -14,6 +14,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 - **A bad setting is reported when it arrives.** `Flicker`, `Snuff`, `FlameSite`, `FlameEmbers` and `PoolCandidate` call their own `problems()` as they are added and log one `warn!` per type (the first bad one, with the entity and each field), so a scene file or BRP call that writes a `NaN` phase no longer just goes dark in silence. Nothing is refused or clamped. `docs/research/settings-report.md`.
 
+- **A bad settings resource is reported when it is written.** `LightPool`, `FlameLook`, `FlameWind` and `FlameGust`, the resources a panel edits live, are checked on every frame they change and warn once per distinct set of problems, so a slider dragged through `NaN` is one line, not one a frame, and a fix followed by a new mistake warns again. Nothing is refused or clamped; a missing optional resource is silent. `docs/research/settings-report-resources.md`.
+
 ### Changed
 
 - **A catching or dying flame is taller for its share of the light.** The flame's (and its sparks') drawn size was its catch, `took`, in a straight line, so its area was `took²` against a light that goes with `took`: a third of the way through a catch the light was a third up and the flame a sliver. The size is now `took^(2/3)`, the intermediate-regime law for flame height against heat release rate (Delichatsios 2007), so a settled flame (`took` 1) and a put-out one (0) are exactly as before and the middle moves up (0.3 draws 0.45, 0.5 draws 0.63). On the courtyard's relight the flame shows about one saved frame (33 ms) earlier. `docs/research/flame-catch-size.md`.

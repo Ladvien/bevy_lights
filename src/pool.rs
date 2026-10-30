@@ -63,6 +63,7 @@ impl<F: Component> Plugin for LightPoolPlugin<F> {
                 (advance_candidate_fires, assign_pool::<F>).chain().in_set(LightsSystems::Pool),
             );
         crate::report::watch::<PoolCandidate>(app);
+        crate::report::watch_resource::<LightPool>(app);
     }
 
     fn finish(&self, app: &mut App) {
