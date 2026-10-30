@@ -4341,3 +4341,21 @@ Gate green: build (release and debug), test, serde test, examples, clippy, doc, 
 Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13` (all detached, not mine). Removed this pass: scratch `/tmp/l207` (below).
 
 Release: v0.2.17 published, https://crates.io/crates/bevy_lights/0.2.17 (tag `v0.2.17`; semver-checks: no update required). Removed this pass: `/tmp/l207` (no baseline worktree was made: the before captures came from the starting build).
+
+## Iteration 208 — 2026-10-30 — The flame's core out-shines the floor it lit (overhead round 13)
+
+Outcome: `OVERHEAD_CORE` (`src/flame.wesl`) raises the hot core's emission by up to 90 % with the overhead blend; frames at or below 50° are unchanged. Core-window mean grey at 60°, 66°, 76°: 148.1, 137.6, 131.4 before; 149.2, 141.0, 139.6 after; the 76° core is cream-yellow, not the grey-green it was (`/tmp/l208/pair76.png`).
+
+Why: no open issues on bevy_lights (list read), no parked branch, bevy_emerge #103 unchanged and the editor-facing `problems()` validation already exists on every settings type. Ranked: (1) overhead contrast against the lit floor, (2) cited flicker amplitude, (3) flux/radiative-fraction source (distill searched again this pass: only photometry chapters and candle papers, no flame flux), (4) gust coherence, (5) bearers/GIF banding. Sources: as `flame-overhead.md` (Doğaner, Gregory §11.4.3 + `s2011-advances-pdf-slides`, RTR4 §13.6.3).
+
+Verdict: core GREAT; overhead flame as a whole NOT YET. Remaining flaws: a hard horizontal line across the coal bed where the tongue's seat meets the disc; the 60°-66° plume is pale against the lit floor. Bench not run (shader only). Hero GIF not re-encoded (showcase camera at 0-45°, unchanged). Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm, wesl-check).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame: the hard line across the coal bed at 76°, plume contrast at 60°-66°, then a non-disc construction.
+2. A cited, luminance-measured flicker amplitude.
+3. A luminous-flux / radiative-fraction source for reach and height defaults.
+4. Spatial gust coherence if a host reports it.
+5. Bearers placeholder capsules; GIF banding.
+
+Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`. Scratch `/tmp/l208` removed.
