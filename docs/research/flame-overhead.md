@@ -364,3 +364,11 @@ At `LIGHTS_EV100=9`, straight down (eye 5.3,9,5), the flame reads as a ragged bu
 **Changed.** `smoothstep(0.0, 0.42, disc)` became `smoothstep(0.0, 0.18, disc)` in the disc's mask (`src/flame.wesl`), so the mask is full a short way inside the lobed outline instead of a ramp over the outer 42 % of the radius.
 
 **Result.** Seed 7, EV 9, 1280x720, frame 90, eye 2.3 m above the brazier (5, 3.2, 5.05) and straight down at 9 m: `/tmp/l245`. Close, the outer ring is now a billowy orange cloud with a lobed outline round the yellow core, where before it was a dim, smooth red annulus. At 9 m the change is below a viewer's resolution; at 66° (eye (9, 5, 5.05)) the tongue and bowl are unchanged. Verdict: slice GREAT at close range; the overhead flame as a whole is still NOT YET (no layered tongues).
+
+### Round 23 — the disc's body heat (iteration 246) — slice ships
+
+**Aimed at.** Round 21's other lever, judged at the close range round 22 found it needs: the disc's heat was the core alone, so the rest of the cloud sat at one deep-orange colour inside a red rim, a flat ring round a hot spot.
+
+**Changed.** `heat = max(heat, clamp(2·disc, 0, 1) · mix(0.18, 0.62, streak) · overhead)` in the disc's branch (`src/flame.wesl`): orange through the middle ring, mottled by the billows already flowing outward (round 18), red only at the rim. Design default, judged in captures.
+
+**Result.** Seed 7, EV 9 (`LIGHTS_EV100=9`), 1280x720, frame 90, eye 2.3 m above the brazier (5, 3.2, 5.05): the cloud's body is now a yellow-orange gradient from the core outwards, mottled, with a red outline, where before it was one uniform deep orange. At 66° and 45° AE is 0 over the frame; straight down at 9 m AE 31 px at 3 % fuzz (below a viewer's resolution, as in round 22). Verdict: slice better at close range, not a step change; the overhead flame as a whole is still NOT YET (no layered tongues, the outline is still one billow).
