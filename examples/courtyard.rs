@@ -60,7 +60,7 @@ use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy_lights::*;
 
-use common::{Draw, ExampleHarness, camera, camera_placement, seed, wind_env};
+use common::{Draw, ExampleHarness, camera, camera_placement, gust_env, seed, wind_env};
 
 /// How many torch-bearers walk the courtyard.
 const BEARERS: usize = 48;
@@ -373,12 +373,24 @@ fn main() {
         .insert_resource(FlameLook { color: fire_temperature(), strength: 0.82, max_height: 4.0 })
         .insert_resource(FlameWind { velocity: wind_env().unwrap_or_default() })
         .insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 0.0, ..default() })
-        .add_systems(Startup, (spawn_scene, spawn_camera).chain())
+        .add_systems(Startup, (spawn_scene, spawn_camera, gust_from_env).chain())
         .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers).chain())
         .add_systems(Update, report_kindled)
         .add_systems(Update, report_look)
         .add_systems(Update, report_flicker)
         .run();
+}
+
+/// `LIGHTS_GUST=I`: the wind gusts about `LIGHTS_WIND` with turbulence intensity `I`.
+fn gust_from_env(mut commands: Commands) {
+    if let Some(intensity) = gust_env() {
+        commands.insert_resource(FlameGust {
+            mean: wind_env().unwrap_or_default(),
+            intensity,
+            seed: seed() as u32,
+            ..default()
+        });
+    }
 }
 
 /// The one entity the pool measures distance from: an invisible point orbiting the courtyard, which

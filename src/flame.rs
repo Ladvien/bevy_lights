@@ -47,8 +47,12 @@ impl Plugin for FlamePlugin {
             .init_resource::<FlameAssets>()
             .register_type::<FlameLook>()
             .register_type::<FlameWind>()
+            .register_type::<FlameGust>()
             .register_type::<FlameSite>()
-            .add_systems(Update, (dress_flames, update_flames).chain().in_set(LightsSystems::Flame))
+            .add_systems(
+                Update,
+                (gust_wind, dress_flames, update_flames).chain().in_set(LightsSystems::Flame),
+            )
             .add_systems(Startup, build_flame_assets);
     }
 }
@@ -312,6 +316,86 @@ impl FlameWind {
         finite(&mut out, "velocity.x", self.velocity.x);
         finite(&mut out, "velocity.y", self.velocity.y);
         out
+    }
+}
+
+/// A wind with gusts: add it and [`FlamePlugin`] writes [`FlameWind::velocity`] every frame, so the
+/// flames lean and ease with the air instead of standing at one angle.
+///
+/// The wind is `mean` (metres per second on the world's XZ plane, as [`FlameWind::velocity`]) with a
+/// stationary Gaussian fluctuation of relative size `intensity` (the turbulence intensity,
+/// `σ / |mean|`) and correlation time `timescale` seconds; the heading wanders by about `intensity`
+/// radians too. It is [`gust_velocity`](crate::model::gust_velocity) of `Time<Real>`, like the
+/// flames' own clock, so it is the same on every machine and a paused world's fires still sway. The
+/// `seed` picks the night: two seeds give two different, equally plausible winds.
+///
+/// The host still owns the *mean* (weather is `bevy_elements`'): write `mean` when the weather
+/// changes. Without a `FlameGust` the plugin never touches [`FlameWind`], so a host that drives its
+/// own wind each frame is unaffected. A zero `mean` is still air: a gust is relative to a mean.
+/// Defaults are design defaults (`docs/research/flame-gust.md`).
+#[derive(Resource, Clone, Copy, Debug, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
+#[reflect(Resource)]
+pub struct FlameGust {
+    /// The mean wind, in metres per second on the world's XZ plane.
+    pub mean: Vec2,
+    /// Turbulence intensity, `σ / |mean|`: 0 is a steady wind, 0.12 a faint sway, 0.25 a lively
+    /// courtyard.
+    pub intensity: f32,
+    /// How long a gust stays correlated, in seconds (clamped at 0.05 s from below).
+    pub timescale: f32,
+    /// Which wind: the same seed is the same wind.
+    pub seed: u32,
+}
+
+impl Default for FlameGust {
+    fn default() -> Self {
+        Self {
+            mean: Vec2::ZERO,
+            intensity: crate::model::GUST_INTENSITY,
+            timescale: crate::model::GUST_TIMESCALE,
+            seed: 0,
+        }
+    }
+}
+
+impl FlameGust {
+    /// What is unusable in these settings, field by field; empty when they are fine. See
+    /// [`Flicker::problems`](crate::Flicker::problems).
+    pub fn problems(&self) -> Vec<crate::Problem> {
+        use crate::model::problem::{finite, non_negative};
+        let mut out = Vec::new();
+        finite(&mut out, "mean.x", self.mean.x);
+        finite(&mut out, "mean.y", self.mean.y);
+        non_negative(&mut out, "intensity", self.intensity);
+        non_negative(&mut out, "timescale", self.timescale);
+        out
+    }
+}
+
+/// Writes the gusting wind into [`FlameWind`], inserting it if the host has not.
+fn gust_wind(
+    real: Res<Time<Real>>,
+    gust: Option<Res<FlameGust>>,
+    wind: Option<ResMut<FlameWind>>,
+    mut commands: Commands,
+) {
+    let Some(gust) = gust else { return };
+    let (x, z) = crate::model::gust_velocity(
+        (gust.mean.x, gust.mean.y),
+        gust.intensity,
+        gust.timescale,
+        gust.seed,
+        real.elapsed_secs_f64(),
+    );
+    let velocity = Vec2::new(x, z);
+    match wind {
+        Some(mut wind) => {
+            if wind.velocity != velocity {
+                wind.velocity = velocity;
+            }
+        }
+        None => commands.insert_resource(FlameWind { velocity }),
     }
 }
 
@@ -1214,7 +1298,7 @@ mod catch_colour_tests {
                 1.0 / 60.0,
             )));
         app.add_systems(Startup, build_flame_assets)
-            .add_systems(Update, (dress_flames, update_flames).chain());
+            .add_systems(Update, (gust_wind, dress_flames, update_flames).chain());
         app.update();
         app
     }
@@ -1372,5 +1456,45 @@ mod catch_colour_tests {
             app.insert_resource(FlameWind { velocity });
             assert_eq!(flame_scale(&mut app), Vec3::ONE, "{velocity:?}");
         }
+    }
+
+    #[test]
+    fn a_gust_drives_the_wind_and_the_lean_changes_smoothly_frame_to_frame() {
+        let mut app = app();
+        app.world_mut().spawn((site_with(Some(0.34)), Transform::default()));
+        app.insert_resource(FlameGust { mean: Vec2::new(2.0, 0.0), seed: 5, ..default() });
+        let mut leans = Vec::new();
+        for _ in 0..600 {
+            let scale = flame_scale(&mut app);
+            leans.push(scale.y - 1.0);
+        }
+        let (lo, hi) = leans.iter().fold((f32::MAX, f32::MIN), |(lo, hi), &l| (lo.min(l), hi.max(l)));
+        assert!(hi - lo > 0.1, "the lean never moved: {lo}..{hi}");
+        let worst = leans.windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0, f32::max);
+        assert!(worst < 0.05, "one frame jumped the lean by {worst}");
+        assert!(app.world().get_resource::<FlameWind>().is_some(), "the plugin inserted the wind it drives");
+    }
+
+    #[test]
+    fn without_a_gust_a_hosts_own_wind_is_left_alone() {
+        let mut app = app();
+        app.world_mut().spawn((site_with(Some(0.34)), Transform::default()));
+        app.insert_resource(FlameWind { velocity: Vec2::new(3.0, 0.0) });
+        for _ in 0..30 {
+            app.update();
+        }
+        assert_eq!(app.world().resource::<FlameWind>().velocity, Vec2::new(3.0, 0.0));
+    }
+
+    #[test]
+    fn a_gust_with_no_turbulence_is_the_steady_mean_and_a_bad_setting_is_reported() {
+        let mut app = app();
+        app.insert_resource(FlameGust { mean: Vec2::new(0.0, 2.0), intensity: 0.0, ..default() });
+        app.update();
+        assert_eq!(app.world().resource::<FlameWind>().velocity, Vec2::new(0.0, 2.0));
+        let bad = FlameGust { mean: Vec2::new(f32::NAN, 0.0), intensity: -1.0, ..default() };
+        let fields: Vec<_> = bad.problems().iter().map(|p| p.field).collect();
+        assert_eq!(fields, ["mean.x", "intensity"]);
+        assert!(FlameGust::default().problems().is_empty());
     }
 }

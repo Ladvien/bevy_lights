@@ -15,6 +15,8 @@
 //! - `LIGHTS_POOL=N` overrides the pool's size (the courtyard's default is 8).
 //! - `LIGHTS_WIND=x,z` blows a wind of that velocity (metres per second, on the ground plane) through
 //!   the flames; unset is still air.
+//! - `LIGHTS_GUST=I` makes that wind gust with turbulence intensity `I` (0.25 is a lively courtyard);
+//!   `LIGHTS_WIND` is then the mean, and `LIGHTS_SEED` picks the wind.
 //!
 //! Keys: WASD + Q/E move (Shift ×5), hold the right mouse button to look.
 //!
@@ -44,6 +46,11 @@ pub fn wind_env() -> Option<Vec2> {
     let v: Vec<f32> =
         std::env::var("LIGHTS_WIND").ok()?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
     (v.len() == 2).then(|| Vec2::new(v[0], v[1]))
+}
+
+/// The turbulence intensity from `LIGHTS_GUST=I`; `None` is a steady wind.
+pub fn gust_env() -> Option<f32> {
+    std::env::var("LIGHTS_GUST").ok()?.trim().parse().ok()
 }
 
 /// `LIGHTS_SEED` (default 7): the seed the examples' own randomness draws from.
