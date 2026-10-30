@@ -35,6 +35,7 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 - **A light linked by `FlameSite::fire` leans with its flame.** The pool's lean moved only a candidate that was itself a `FlameSite` entity; a torch whose light is a sibling of its flame, joined by `FlameSite::fire`, kept its light upright beside a bent flame. The site that names the winner now supplies the lean. `docs/research/flame-lean-linked.md`.
 
 ### Changed
+- **The overhead flame parts into masses** (`src/flame.wesl`): seen from above at close range the cloud is a few lit masses with darker clefts that show the coal bed, not one even mottle; the core stays whole. Overhead branch only; 45° and 66° are unchanged.
 
 - **The flame from straight above is as wide as its bowl's fire.** The overhead cross-section's mean radius is `1.2` of the flame's half-width (was `0.85`): from above the fire fills about two thirds of a brazier bowl instead of a third, and the spiky burst is a round billow. Cameras at or below 50° are unchanged. `docs/research/flame-overhead.md`, round 20.
 

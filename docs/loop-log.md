@@ -4857,3 +4857,11 @@ Outcome: worked issue #7 (only open issue; no parked branches; no new research).
 Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: layered tongues; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
 
 Removed: scratch `/tmp/l246` after the pass. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 247 — 2026-10-30 — Overhead flame round 24: clefts between the masses
+
+Outcome: worked issue #7 (only open issue; no parked branches; no new research, flame-overhead note extended). The straight-down cloud was one even mottle round the core; `src/flame.wesl` now gates it outside the core with a coarser `fbm(q·2.6)` noise on the round-18 outward flow (`masses`, licks floor 0.05, body heat `crest` floor 0.3). Captures `/tmp/l247/{b,a2}` (close 2.3 m, td, e66, e45; seed 7, EV 9, frame 90): close, three or four distinct orange masses with dark clefts showing the bed, core whole; a first, softer pass (floor 0.35) was barely visible and was strengthened. 45° and 66° AE 0; td AE 126 px at 3 % fuzz. Temporal: close-window mean luminance 69-77 DN over 11 frames every 3rd, smooth. Verdict: slice GREAT close; overhead flame as a whole better, still lacking tongues that rise toward the viewer. Two more `fbm` in the overhead branch only; bench not run (CPU-only, shader change). Gate green (build, dev build, test, serde test, examples, clippy, doc, fmt, wasm, wesl-check). Release: v0.2.20 tagged 02:03 CDT, blocked by the 6-hour rule until ~08:03 CDT; carries 231-247.
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: tongues that rise toward the viewer (height cue); (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
+
+Removed: scratch `/tmp/l247`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
