@@ -4401,3 +4401,9 @@ Bench (`bench_lights`, CPU only, shader change does not touch it): p50_us 549, m
 
 Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`. Removed this pass: worktree `~/l210_base` (never built), scratch `/tmp/l210`.
 Release: v0.2.20 prepared (`release: v0.2.20`, changelog moved, semver-checks: no update required) but `cargo publish` was refused: `429 Too Many Requests: You have published too many versions of this crate in the last 24 hours`. Not tagged. The next pass publishes 0.2.20 as is (do not re-bump), tags `v0.2.20` and puts the crates.io URL here.
+
+## Iteration 211 — 2026-10-30 — Release retry only
+
+Outcome: no code change. `cargo publish` of v0.2.20 retried from the clean `main` (`75b619c`, equal to origin) and refused again: `429 Too Many Requests: You have published too many versions of this crate in the last 24 hours`. Not tagged. No open issues on bevy_lights, no parked branch. The backlog's remaining items are not workable with sources in hand: flicker amplitude was already searched without a citable result (`docs/research/fire-light.md`, "The amplitude is still uncited"), and the overhead flame is at round 15 with the last verdict NOT YET; any further code would need another release that the rate limit blocks anyway. The next pass publishes 0.2.20 as is (no re-bump), tags `v0.2.20`, and puts the crates.io URL here.
+
+Top 5 unchanged from iteration 210.
