@@ -56,6 +56,12 @@ A picker where a bonfire lights a courtyard, a torch a doorway and a candle a ta
 
 The same inverse-square law (`E = Φ / 4π / slant²`, `book_real_time_rendering_4th_akenine`) read the other way, for an editor that draws a placed fire's reach: `fire_lux(lumens, reach, over)` is the ground illuminance, `fire_reach(lumens, lux, over)` the radius of the iso-lux circle. Both clamp as `fire_lumens` does, so they invert it exactly for reach >= 1. No new constant.
 
+## Flat ground: `ground_lux` and `ground_reach`
+
+`fire_lux` and `fire_reach` are the illuminance on a surface square-on to the light, the law a light is *sized* with. Ground is horizontal, and a surface receives `E = I cos θ / d²` (Lambert's cosine law, `book_real_time_rendering_4th_akenine`, the same `N·L` the renderer shades stone with), with `I = Φ / 4π` Bevy's candela for a point light (`bevy_pbr-0.20.0/src/render/light.rs`) and `cos θ = over / slant` for ground under a light `over` high. So `ground_lux(lumens, distance, over) = Φ/4π · over / (distance² + over²)^1.5`, and `ground_reach` solves it for `distance`: `slant² = (I·over / lux)^(2/3)`. At 4 m out and 0.9 m up the ground gets 0.22 of the square-on number, so an overlay painting `fire_lux` would draw a lit circle about 2x too wide at 12 lx. The craft reading is a gaffer's: a lamp hung low throws a pool on the floor that is bright under it and falls off faster than inverse square, which is why a hung practical is "a pool of light" and a tall one a wash. No constant is added and no existing function or default changes; sizing (`fire_lumens`, `FireKind::light`) stays square-on.
+
+A light at or below the ground (`over <= 0`) puts no light on it: both functions answer 0, there is no clamp to a minimum height (a fire's height is the host's).
+
 ## Deviations
 
 None: Brazier and Torch are the shipped constants. The other four are design defaults, flagged above.
