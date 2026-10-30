@@ -381,7 +381,7 @@ fn a_snuffed_light_falls_to_exactly_nothing_is_heard_once_and_can_be_lit_again()
         .world_mut()
         .spawn((
             PointLight { intensity: 0.0, ..default() },
-            Flicker { base: 1000.0, phase: 0.0, diameter: None, depth: 0.0, ..default() },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None, depth: 0.0 },
         ))
         .id();
     app.update();
@@ -416,7 +416,7 @@ fn a_snuff_beats_a_kindle_and_a_loaded_out_fire_says_nothing() {
     app.init_resource::<Out>().add_systems(Update, hear_snuffed.after(LightsSystems::Flicker));
     app.world_mut().spawn((
         PointLight { intensity: 500.0, ..default() },
-        Flicker { base: 1000.0, phase: 0.0, diameter: None, depth: 0.0, ..default() },
+        Flicker { base: 1000.0, phase: 0.0, diameter: None, depth: 0.0 },
         Kindle::default(),
         Snuff { elapsed: SNUFF_SECONDS },
     ));
