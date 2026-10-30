@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.13] - 2026-10-29
+
 ### Added
 
 - **`FireKind::candidate(lux, over)`**: the `PoolCandidate` for a kind, sized like `FireKind::light` and carrying the kind's diameter and depth, so a placed fire's three components (`flicker`/`light`, `site`, `candidate`) all come from one name. No numbers changed.
