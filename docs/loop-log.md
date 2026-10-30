@@ -4359,3 +4359,23 @@ Verdict: core GREAT; overhead flame as a whole NOT YET. Remaining flaws: a hard 
 5. Bearers placeholder capsules; GIF banding.
 
 Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`. Scratch `/tmp/l208` removed.
+
+## Iteration 209 — 2026-10-30 — The seam across the coal bed is gone (overhead round 14)
+
+Outcome: `heat` in `src/flame.wesl` is multiplied by `mix(1, foot, topdown)`, the same foot ramp the mask already used, so the hot core no longer stops dead at the tongue's seat. At 76° the column through the core fell `255,255,168` to `225,98,8` in two pixels before; it now falls over about ten. Frames at 45° are identical (AE 0.003 over 1280x720).
+
+Why: no open issues on bevy_lights, no parked branch for this item (only the old iteration-115 WIP), bevy_emerge #103 unchanged. Ranked: (1) the hard line at 76° (a visible artifact, named by iterations 207 and 208), (2) plume contrast at 60°-66°, (3) cited flicker amplitude, (4) flux/radiative-fraction source, (5) bearers/GIF banding. Cause found with debug renders (disc only, tongue only, `sy` sign): not depth and not the mask ramp (widening it changed nothing), but the unramped heat. Sources: as `docs/research/flame-overhead.md` (Doğaner, Gregory §11.4.3 + `s2011-advances-pdf-slides`, RTR4 §13.6.3), which gained round 14.
+
+Verdict (`/tmp/l209/{before,after}`, seed 7, frame 90, brazier at 4 m, 45°/60°/66°/76°, plus 90° seed 3): the seam GREAT; the overhead flame as a whole NOT YET. Remaining flaws: the core's lower half is now orange so the 76° core mean grey fell 157.9 to 153.0; the disc is still a round blob; the 66° plume is pale against the lit floor and keeps a stub of the tongue's tip above the rim.
+
+Bench not run (shader only). Hero GIF not re-encoded (showcase camera at 0°-45°, unchanged). Gate green (build release and debug, test, serde test, examples, clippy, doc, fmt, wasm, wesl-check).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame: plume contrast at 60°-66°, the tip stub, then a non-disc construction.
+2. A cited, luminance-measured flicker amplitude.
+3. A luminous-flux / radiative-fraction source for reach and height defaults.
+4. Spatial gust coherence if a host reports it.
+5. Bearers placeholder capsules; GIF banding.
+
+Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`. Removed this pass: worktree `~/l209_base` (made, never built) and scratch `/tmp/l209`.
