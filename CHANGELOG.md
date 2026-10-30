@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **`Kindle` and `Snuff` on a `PoolCandidate`: a pooled torch can be lit and put out.** A candidate entity (one with no `Flicker` of its own) that carries `Kindle` or `Snuff` now has them advanced by the crate, announced as `Kindled` / `Snuffed` for the candidate, and the light the pool lends is `intensity · kindle_gain · snuff_gain`, the product a `Flicker` light uses. A `FlameSite` whose `fire` names the candidate follows through the existing link. A candidate whose snuff has finished wants no light: its slot is freed (`PoolBudget::wanting` drops). Ranking keeps using the plain `intensity`, so a dying fire keeps its slot until it is out. A pool whose candidates carry neither pays nothing extra. The courtyard's `O` / `K` / `LIGHTS_SNUFF` / `LIGHTS_RELIGHT` now reach the 48 bearers' torches too. Design defaults, `docs/research/pool-fire-state.md`. Nothing existing changed.
+
 ## [0.2.15] - 2026-10-30
 
 ### Added
