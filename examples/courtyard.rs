@@ -339,6 +339,12 @@ const BRAZIERS: [Vec3; 4] = [
 fn shadowed_env() -> usize {
     std::env::var("LIGHTS_SHADOWED").ok().and_then(|v| v.parse().ok()).unwrap_or(3)
 }
+fn zz_soft() -> f32 {
+    std::env::var("ZZ_SOFT").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0)
+}
+fn zz_contact() -> f32 {
+    std::env::var("ZZ_CONTACT").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0)
+}
 
 /// `LIGHTS_GPU_TIMING=1` records the render graph's GPU timestamps and prints, once, the mean per pass
 /// (microseconds, frames 100 to 400) on stdout as `gpu_us <pass> <mean>`. It needs a Vulkan or DX12
@@ -436,6 +442,9 @@ fn main() {
                 range: TORCH_POOL * POOL_RANGE_MARGIN,
                 intensity: 0.0,
                 shadow_maps_enabled: shadowed_env() > 0,
+                radius: zz_soft(),
+                soft_shadows_enabled: zz_soft() > 0.0,
+                contact_shadows_enabled: zz_contact() > 0.0,
                 ..default()
             },
             ..default()
@@ -524,6 +533,9 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
     // The depth fade reads the depth prepass, so a camera that asks for it carries one.
     if depth_fade_on() {
         camera.insert(DepthPrepass);
+    }
+    if zz_contact() > 0.0 {
+        camera.insert(bevy::pbr::ContactShadows { length: zz_contact(), ..default() });
     }
     // The moon: the host's directional light (the crate never adds one), a sky-coloured fill at the
     // illuminance that makes the target key-to-fill against the braziers' pools.
@@ -771,6 +783,9 @@ fn spawn_scene(
                             intensity: lumens,
                             range: BRAZIER_POOL * POOL_RANGE_MARGIN,
                             shadow_maps_enabled: true,
+                            radius: zz_soft(),
+                            soft_shadows_enabled: zz_soft() > 0.0,
+                            contact_shadows_enabled: zz_contact() > 0.0,
                             ..default()
                         },
                         Flicker {
