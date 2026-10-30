@@ -846,6 +846,41 @@ fn the_budget_names_who_holds_a_light_and_who_went_without() {
     assert_eq!((budget.granted(), budget.wanting, budget.starved()), (0, 0, 0), "{budget:?}");
 }
 
+#[derive(Resource, Default)]
+struct BudgetWrites(usize);
+
+#[test]
+fn the_budget_is_flagged_changed_only_when_the_schedule_changes() {
+    let mut app = app(LightPool { size: 2, reach: 10.0, reserve: 0, ..default() });
+    app.init_resource::<BudgetWrites>().add_systems(
+        Update,
+        |budget: Res<PoolBudget>, mut writes: ResMut<BudgetWrites>| {
+            if budget.is_changed() {
+                writes.0 += 1;
+            }
+        },
+    );
+    focus_at(&mut app, Vec3::ZERO);
+    candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    app.world_mut().resource_mut::<BudgetWrites>().0 = 0;
+
+    for _ in 0..30 {
+        app.update();
+    }
+    assert_eq!(
+        app.world().resource::<BudgetWrites>().0,
+        0,
+        "a steady pool must not mark its schedule changed"
+    );
+
+    // A closer third candidate takes a slot: the schedule changes, so the flag must fire.
+    candidate(&mut app, Vec3::new(0.5, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    assert!(app.world().resource::<BudgetWrites>().0 >= 1);
+}
+
 #[cfg(feature = "serde")]
 mod saved_pool {
     use bevy::light::PointLight;

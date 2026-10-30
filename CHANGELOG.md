@@ -20,6 +20,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Fixed
 
+- **`PoolBudget` is flagged changed only when the schedule changes.** The pool wrote it through `ResMut` every frame, so `resource_changed::<PoolBudget>` (an editor's panel, a game's "pool too small" warning) fired every frame. It now compares and writes only when a slot changes owner or the count of wanting candidates moves. Test `the_budget_is_flagged_changed_only_when_the_schedule_changes`.
+
 - **`Flame` is `Reflect`.** The drawn flame was the one public component the `AGENTS.md` rule ("everything public is `Reflect`") missed, so a BRP client or an editor panel could not read its catch (`kindled`) or its torch (`source`). It now derives `Reflect`, registers as a component and is registered by `FlamePlugin`.
 
 - **A light linked by `FlameSite::fire` leans with its flame.** The pool's lean moved only a candidate that was itself a `FlameSite` entity; a torch whose light is a sibling of its flame, joined by `FlameSite::fire`, kept its light upright beside a bent flame. The site that names the winner now supplies the lean. `docs/research/flame-lean-linked.md`.
