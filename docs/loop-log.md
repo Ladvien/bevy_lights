@@ -4911,3 +4911,13 @@ Work: candidate (3), the luminance-amplitude source. `distill_search` and `paper
 Ranked candidates: (1) publish v0.2.21 after 08:03; (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (waits on bevy_elements#50); (4) overhead flame (waits on a reference image, per #7); (5) pool-to-grid fixture list (a host builds it in five lines; no requester).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 254 — 2026-10-30 — Release v0.2.21 refused with 429
+
+Outcome: no feature work (no open issue but #7, stopped by the iteration-249 assumed decision; no parked branches; all candidates still blocked). Gate green on `main` at d3f9db4 (build, test, test --features serde, examples, clippy, doc, fmt, wasm, wesl-check). `cargo semver-checks`: no update required beyond a patch. Waited out the 6-hour window (v0.2.20 tag 02:03 CDT, so 08:03), committed `release: v0.2.21`, pushed, `cargo publish --dry-run` passed, `cargo publish` answered `429 Too Many Requests: You have published too many versions of this crate in the last 24 hours`. Not retried.
+
+State to know: crates.io still holds 0.2.19 as the newest published version. Tags `v0.2.20` and `v0.2.21` exist (and v0.2.21 is pushed) but neither version is on crates.io: the publish step failed after the `| tail` pipeline hid its exit status and the tag step ran anyway. Tags are not deleted without the owner's word. The next release should publish whatever `Cargo.toml` says (0.2.21) once crates.io accepts it; do not bump again, and publish before tagging, checking the publish exit status directly.
+
+Ranked candidates: (1) publish 0.2.21 when the 24-hour rate limit clears (do not retry before the next pass after ~12 h; the limit counts 24 h of publishes); (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
