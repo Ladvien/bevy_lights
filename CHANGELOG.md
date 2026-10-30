@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **`FireKind::reach()`, `lumens(lux, over)`, `light(lux, over)`.** Each kind now carries the metres of ground it lights to its pool's edge (Candle 1, Lantern 1.5, Torch 2, Brazier 4, Campfire 5, Bonfire 9), so a picker places a fire with no lumen number typed: `lumens` is `fire_lumens` at that reach and `light` a `Flicker` averaging it. Brazier and Torch are the courtyard's own pool constants (which now read them); the rest are design defaults (`docs/research/fire-reach.md`).
+
 ## [0.2.8] - 2026-10-29
 
 ### Added
