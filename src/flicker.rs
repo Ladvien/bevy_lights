@@ -27,6 +27,8 @@ impl Plugin for FlickerPlugin {
             .register_type::<Snuff>()
             .register_type::<crate::FireKind>()
             .add_systems(Update, flicker_lights.in_set(LightsSystems::Flicker));
+        crate::report::watch::<Flicker>(app);
+        crate::report::watch::<Snuff>(app);
     }
 }
 

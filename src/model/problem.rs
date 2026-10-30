@@ -3,7 +3,7 @@
 //! Every settings type (`Flicker`, `Kindle`, `FlameSite`, `FlameLook`, `FlameWind`, `FlameGust`, `LightPool`, `PoolCandidate`) has a `problems()` method
 //! returning these. The crate itself never refuses a value (a negative `base` or a `NaN` phase still
 //! builds and runs); `problems()` is for a host that reads settings from a file or a panel and wants a
-//! useful error before the value reaches a light.
+//! useful error before the value reaches a light. A component of the five that arrives with a problem (`Flicker`, `Snuff`, `FlameSite`, `FlameEmbers`, `PoolCandidate`) is also reported by the crate: one `warn!` per type, for the first bad one, from the plugin that owns it. A value changed after it was added is not re-checked.
 
 use std::fmt;
 

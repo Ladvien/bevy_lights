@@ -84,6 +84,7 @@ mod flame;
 mod flicker;
 mod kind;
 mod pool;
+mod report;
 
 pub use embers::{FlameEmbers, MAX_EMBER_RATE};
 pub use flame::{Flame, FlameGust, FlameLook, FlameMaterial, FlamePlugin, FlameSite, FlameWind};

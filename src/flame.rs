@@ -63,6 +63,8 @@ impl Plugin for FlamePlugin {
                     .in_set(LightsSystems::Flame),
             )
             .add_systems(Startup, build_flame_assets);
+        crate::report::watch::<FlameSite>(app);
+        crate::report::watch::<crate::FlameEmbers>(app);
     }
 }
 
