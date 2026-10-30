@@ -4468,3 +4468,19 @@ Fallbacks, with the concrete reason each yields no slice this pass: (1) editor n
 5. Pool top-K selection if a host reports the pool over 0.5 ms.
 
 Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 216 — 2026-10-30 — Audit pass: nothing shipped (release window closed; fallbacks 1–3 re-examined)
+
+Outcome: no code change. No open issues on bevy_lights, no parked branch newer than iteration 115's. bevy_emerge #103's newest comment is still the bevy_light_grid 0.20 pin (01:43 UTC); no crate-side request. Release: v0.2.20 is tagged (26 minutes before this pass) and its tag is under 6 hours old, so no publish was attempted; the first pass after about 12:45 UTC publishes it as is.
+
+Fallbacks, with the concrete reason each yields no slice: (1) editor needs: none unmet. (2) shipping-game features: the one new candidate, a per-frame wobble of the light's position so shadows dance, is invisible with pool lights' shadows off (the default, `light-pool.md`) and the computed centroid shift is ~6 cm at 15° lean on a 0.5 m flame (iteration 215); the others (heat haze, sparks, smoke) need a screen-texture pass or particles, outside the ownership map. (3) weakest feature: overhead flame tongue structure, taste not defect. Cited flicker amplitude: a fresh `web_search` returned only Mandin & Most (IAFSS FSS 6, p. 1137), which `docs/research/flicker-depth.md` already quotes (25 % of mean temperature, an upper bound); `0.15` stays a design default.
+
+### Top 5 remaining, ranked
+
+1. Publish v0.2.20 (no re-bump, tag exists) at or after 12:45 UTC; crates.io URL here.
+2. Cited flicker amplitude as luminance: needs Maynard 2013 from a host with library access.
+3. Overhead flame: tongue structure from straight above.
+4. Light-position dance for shadow-casting pool lights, if a host turns shadows on and asks.
+5. Pool top-K selection if a host reports the pool over 0.5 ms.
+
+Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
