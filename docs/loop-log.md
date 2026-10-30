@@ -4407,3 +4407,9 @@ Release: v0.2.20 prepared (`release: v0.2.20`, changelog moved, semver-checks: n
 Outcome: no code change. `cargo publish` of v0.2.20 retried from the clean `main` (`75b619c`, equal to origin) and refused again: `429 Too Many Requests: You have published too many versions of this crate in the last 24 hours`. Not tagged. No open issues on bevy_lights, no parked branch. The backlog's remaining items are not workable with sources in hand: flicker amplitude was already searched without a citable result (`docs/research/fire-light.md`, "The amplitude is still uncited"), and the overhead flame is at round 15 with the last verdict NOT YET; any further code would need another release that the rate limit blocks anyway. The next pass publishes 0.2.20 as is (no re-bump), tags `v0.2.20`, and puts the crates.io URL here.
 
 Top 5 unchanged from iteration 210.
+
+## Iteration 212 — 2026-10-30 — Release retry only
+
+Outcome: no code change. `cargo publish` of v0.2.20 retried from clean `main` (`ee32797`, equal to origin) and refused a third time: `429 Too Many Requests: You have published too many versions of this crate in the last 24 hours`. crates.io `max_version` is still 0.2.19. The tag `v0.2.20` already exists on origin (annotated, on `e47b014`, the release commit), so the next pass only publishes; do not re-bump, do not re-tag. No open issues on bevy_lights (list read), no parked branch. Backlog unchanged from iteration 210; no new code was started because each item needs a release the rate limit blocks, and the overhead-flame item is a multi-round visual job better started with a publish window open.
+
+Top 5 unchanged from iteration 210. The next pass: `cargo publish`, then `cargo info bevy_lights@0.2.20` and the crates.io URL here.
