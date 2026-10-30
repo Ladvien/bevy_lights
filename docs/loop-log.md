@@ -4202,3 +4202,19 @@ Why: no open issues, no parked branch; the editor-needs rule (bevy_emerge #103, 
 5. Bearers are placeholder capsules; GIF banding.
 
 Release: v0.2.10 published, https://crates.io/crates/bevy_lights/0.2.10 (tag `v0.2.10`; semver-checks: no update required). Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm, wesl-check). No worktrees or /tmp scratch made. Earlier baselines listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 201 — 2026-10-29 — `fire_lux` and `fire_reach`
+
+Outcome: `model::fire_lux(lumens, reach, over)` and `model::fire_reach(lumens, lux, over)` (re-exported flat), `fire_lumens` read back: the ground lux a placed fire gives and the radius of its iso-lux circle. Test `a_fires_lit_circle_is_the_reach_it_was_sized_for` in `tests/settings.rs` (every `FireKind` round-trips lumens to lux 12 and to its reach) plus doctests.
+
+Why: no open issues, no parked branch. Editor-needs rule (bevy_emerge #103: show a placed fire's light, the light-map overlay; bevy_light_grid is on Bevy 0.20 now): the editor had a size-to-lumens path but no way to ask the crate how far a budget reaches. Runner-up: overhead flame at EV 9 (no researched construction). Skipped issues: none filed.
+
+Sources: technical `book_real_time_rendering_4th_akenine` (inverse square, photometry), craft/production as in `docs/research/fire-reach.md`; no new constant, note section "Read back" added. No render path changed: no capture, no bench.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
+4. Spatial gust coherence if a host reports it.
+5. Bearers are placeholder capsules; GIF banding.
