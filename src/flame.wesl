@@ -75,6 +75,9 @@ const OVERHEAD_HEIGHT: f32 = 1.0;
 // How much of the tongue's brightness is gone when the camera is straight overhead: design default, judged in captures.
 const OVERHEAD_TONGUE: f32 = 0.6;
 const OVERHEAD_COS_FLOOR: f32 = 0.05;
+// From above the fire is seen against ground it has lit itself, so its core must out-shine that ground: extra emission in the hot core as the
+// camera rises (`docs/research/flame-overhead.md`, round 13).
+const OVERHEAD_CORE: f32 = 0.9;
 // The squash floor of the cross-section's ellipse: sin(10 degrees), so a camera nearly level does not flatten it to a line.
 const OVERHEAD_SQUASH: f32 = 0.18;
 
@@ -352,6 +355,7 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     }
     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));
+    colour *= 1.0 + OVERHEAD_CORE * in.overhead.x * smoothstep(0.30, 0.80, heat);
     // A fire that is still catching is redder, and each flame knows its own progress (`in.took`): the steady ramp
     // is pulled towards the ember at the start and released as the fuel catches. Per flame, not per scene, so a
     // host lighting one torch does not tint every other fire in the world. The whole flame goes, not only its core:

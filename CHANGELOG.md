@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Changed
+
+- **The flame's core burns hotter as the camera rises.** From about 50° of elevation the hot core's emission is raised by up to 90 % (`OVERHEAD_CORE`, `src/flame.wesl`), so a fire seen from above out-shines the ground it lit and the core reads cream-yellow instead of grey-green. Frames at or below 50° are unchanged. `docs/research/flame-overhead.md`, round 13.
+
 ## [0.2.17] - 2026-10-30
 
 ### Changed
