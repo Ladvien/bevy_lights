@@ -83,6 +83,10 @@ const OVERHEAD_COS_FLOOR: f32 = 0.05;
 const OVERHEAD_CORE: f32 = 0.9;
 // The squash floor of the cross-section's ellipse: sin(10 degrees), so a camera nearly level does not flatten it to a line.
 const OVERHEAD_SQUASH: f32 = 0.18;
+// The outward flow of the overhead disc's brightness: cycles a second, and how much each layer's features grow over a cycle.
+// Design defaults, judged in captures (round 18).
+const OVERHEAD_FLOW_RATE: f32 = 1.2;
+const OVERHEAD_FLOW_GROWTH: f32 = 1.0;
 
 // The flame's own stage IO: only the quad's uv and the fire's phase cross to the fragment.
 struct FlameVertexOutput {
@@ -354,8 +358,17 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
         let lobes = fbm(dir * 0.9 + vec2<f32>(t * 0.6, 3.7));
         let radius = FLAME_HALF_WIDTH * (0.85 + 0.8 * (lobes - 0.5));
         let disc = 1.0 - rq / radius;
-        let streak = fbm(q * 8.0 + vec2<f32>(5.1, -t * 1.5));
-        let licks = mix(1.0, clamp(0.5 + 1.1 * streak, 0.0, 1.3), smoothstep(0.1, 0.6, rq / radius));
+        // The brightness flows outward from the axis, the way a flame's billows swell as they rise towards a camera above them: two
+        // layers sampled at a scale that shrinks over a cycle (so their features grow about the centre), half a cycle apart and
+        // cross-faded, each fading as its scale is reset (round 18). A noise dragged one way across the disc read as a wind.
+        let cycle = fract(t * OVERHEAD_FLOW_RATE);
+        let cycle_b = fract(cycle + 0.5);
+        let weight_b = abs(2.0 * cycle - 1.0);
+        let weight_a = 1.0 - weight_b;
+        let layer_a = fbm(q * 8.0 / (1.0 + OVERHEAD_FLOW_GROWTH * cycle) + vec2<f32>(5.1, 1.3));
+        let layer_b = fbm(q * 8.0 / (1.0 + OVERHEAD_FLOW_GROWTH * cycle_b) + vec2<f32>(-2.7, 8.4));
+        let streak = clamp(0.5 + (weight_a * (layer_a - 0.5) + weight_b * (layer_b - 0.5)) * inverseSqrt(weight_a * weight_a + weight_b * weight_b), 0.0, 1.0);
+        let licks = mix(1.0, clamp(0.3 + 1.4 * streak, 0.0, 1.3), smoothstep(0.0, 0.35, rq / radius));
         mask = max(mask, smoothstep(0.0, 0.42, disc) * licks * in.overhead.x);
         // The core is a round heat, only its outline is lobed: a heat that followed the lobes drew rays out of the centre.
         let core_radius = 0.5 * (radius + FLAME_HALF_WIDTH);
