@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.6] - 2026-10-29
+
 ### Added
 
 - **Flames lean in the wind.** A new `FlameWind { velocity }` resource (metres per second on the XZ plane, `problems()` and serde like `FlameLook`) tilts every flame downwind by `flame_tilt(speed, diameter)`: Welker & Sliepcevich's pool-fire tilt law with Pritchard & Binding's constants (`docs/research/flame-wind.md`), using each fire's own `diameter` (`DEFAULT_FIRE_DIAMETER`, 0.2 m, when it has none). The flame turns about its foot, is capped at `FLAME_TILT_LIMIT` (70°, a design default) and is drawn upright from straight overhead. The lean rides on each flame's instance scale (`y`/`z` carry `1 + sin θ · direction`), so the shared material and the one-draw-per-flame cost are unchanged. The `courtyard` example takes `LIGHTS_WIND=x,z`. With no `FlameWind`, or a zero one, every flame is drawn as before (the 1920x1080 captures differ by under 3 pixels, the GPU's own noise).
