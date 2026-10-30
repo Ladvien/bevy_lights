@@ -5038,3 +5038,21 @@ Appended by the owner's session, not a pass. Two things the last fifteen passes 
 - **The GPU.** With olmOCR unloaded, VRAM in use fell from 19.3 to 4.7 GB, so `distill_search` (bge-m3 needs 5 GB) and captures both have room.
 
 So the next pass is not a log-only pass. If candidate (2), the luminance amplitude, still has no source after `distill_search` and `paper_search`, take section 4's third no-idle option instead of stopping: every note in `docs/research/` with a `## Validation targets` section is a list of measurable claims. Capture, measure each note's targets, and fix the feature with the worst gap, with the before and after numbers in the log.
+
+## Iteration 270 — 2026-10-30 — Validation targets measured: no gap found, nothing changed
+
+Outcome: measurement only, no code or default changed. Tree clean on `main` at ef0439f, no `wiggum/parked-*` branches. Open issues: #7 only (stopped by its assumed decision; no owner reference image). Live home-still: distill up (Cuda, 18 070 docs embedded); scribe at 192.168.1.110 down (VLM backend unreachable), bmb scribe up. GPU: 11.3 GB of 24.6 GB in use, `gpu-tenant` idle. 0.2.21 is the last tag and `src/` has not changed since it, so no release is due.
+
+Candidate (2), luminance amplitude: `hs distill search` for candle/flame luminous-intensity modulation depth returned only Chen 2019 (grey-level plots, no depth), already read in `flicker-depth.md`; nothing new, `0.15` stays a design default.
+
+Option 3, the notes' validation targets, measured on a fresh release build (`/tmp/l270/`, removed):
+- `flame-flicker.md` capture target (flame region vs its pool, correlation above 0.8): 0.806 over 95 steady frames at a 6 m overhead camera on the brazier at (5,0,5) (was 0.748 when the note was written). Flame region peak-to-peak 8.7 % against its pool's 9.5 %, 12 mean crossings in 95 frames ≈ 2.4 Hz. Met.
+- `pool-hand-off.md`: 700-frame run with `LIGHTS_FOCUS_WALK=14`, every second frame, ground-level camera. Largest consecutive-frame difference (pair 225, 6.2 DN mean) is the moving figures; its difference image shows the lit ground black, so no pool pop. Met.
+- All note-listed unit and integration targets: `cargo test --release` green (all suites ok).
+- Bench (CPU, same machine): `candidates=5000 lights=2000 pool=16`: `min_us=369 p50_us=746`, `flicker_p50_us=310 pool_p50_us=531`.
+
+Tooling note: the `read` tool caches by path; a PNG rewritten at the same path reads back as the old one. Use a new filename per capture.
+
+Ranked candidates for next pass: (1) a photometric source for flicker amplitude (Maynard 2013, or the Nature Sci. Rep. 2020 supplement); (2) heat haze (bevy_elements#50, host-side); (3) overhead flame, only with a reference image per #7; (4) bearers asset (example-only); (5) pool-to-grid fixture list (no requester). Release when the last tag is more than 6 h old and `src/` has changed.
+
+Removed: `/tmp/l270` (about 0.9 GB of captures). Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
