@@ -4619,3 +4619,19 @@ Gate: `cargo build --release`, `cargo build`, `cargo test`, `cargo test --featur
 Top 5 remaining: (1) publish v0.2.21 once the v0.2.20 tag is 6 h old (after about 08:05 CDT; embers, relight clip, timing, FireKind helpers, this); (2) cited flicker amplitude as luminance; (3) overhead tongue structure; (4) cheaper ember quad if a weaker GPU shows it matters; (5) heat haze (outside the ownership map).
 
 Removed: `/tmp/l224`, `~/tmp-lights/l224_sheet.png`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 225 — 2026-10-30 — A bad setting is reported when it arrives
+
+Outcome: `Flicker`, `Snuff`, `FlameSite`, `FlameEmbers` and `PoolCandidate` call their own `problems()` on `Add` (observers in `src/report.rs`, registered by the owning plugin) and log one `warn!` per type, for the first bad one, naming the entity and each field. Nothing is refused or clamped; no per-frame cost. Until now `problems()` helped only a host that asked, and a `NaN` phase from a scene file or BRP call just went dark with no log line. Note `docs/research/settings-report.md` (committed first). Test `tests/report.rs` captures the log: 50 bad flickers give one line, a sane fire none, a second bad type its own line.
+
+Issues: none open (`gh` worked). Parked: none. bevy_emerge #103: no new unmet need. Release: v0.2.20 tag was 1 h 42 min old, the 6-hour rule blocks a publish (v0.2.21 is due after about 08:05 CDT).
+
+Ranked candidates: (1) silent bad settings (won: a missing-loudness gap the AGENTS non-negotiables name; smallest, no art default); (2) cited flicker amplitude as luminance (no citable source, retried in iterations 210-ish); (3) overhead tongue structure (multi-round visual job); (4) cheaper ember quad; (5) heat haze (outside the ownership map). Resources (`LightPool`, `FlameLook`, wind) are not checked: edited live, no single entry point.
+
+Sources: no lighting number was set. Craft `10.7456_tojdac.1674124` (Doğaner, motivation), technical Bevy 0.20 `examples/ecs/observers.rs`, the crate's own `AGENTS.md` rule; no rendering-literature source applies (recorded in the note).
+
+Evidence and verdict: not a visual change, no capture, no GIF affected (the flame shader and every drawn value are untouched). Verdict: GREAT for what it claims, by the test above. Bench not rerun: nothing on the per-frame path changed. Gate: `cargo build --release`, `cargo build`, `cargo test`, `cargo test --features serde`, examples build, clippy `-D warnings`, rustdoc `-D warnings`, fmt, wasm lib build clean. `tools/wesl-check` not rerun (no shader touched).
+
+Top 5 remaining: (1) publish v0.2.21 once the v0.2.20 tag is 6 h old (embers, relight clip, timing, FireKind helpers, catch size, this); (2) cited flicker amplitude as luminance; (3) overhead tongue structure; (4) cheaper ember quad; (5) heat haze (outside the ownership map).
+
+Removed: nothing made this pass outside the repo. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
