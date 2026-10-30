@@ -240,6 +240,12 @@ fn brazier_bed() -> Option<f32> {
     }
     Some(std::env::var("LIGHTS_BED").ok().and_then(|v| v.parse().ok()).unwrap_or(BRAZIER_BED))
 }
+/// `LIGHTS_KIND=<candle|lantern|torch|brazier|campfire|bonfire>`: dress the braziers' flame and flicker as
+/// that [`FireKind`], to look at a kind's numbers on the real scene (the bed's box is unchanged).
+fn brazier_kind() -> Option<FireKind> {
+    let name = std::env::var("LIGHTS_KIND").ok()?;
+    FireKind::ALL.into_iter().find(|k| k.name().eq_ignore_ascii_case(&name))
+}
 /// How far a brazier's pool reaches, in metres: the ground it lights to [`POOL_LUX`].
 const BRAZIER_POOL: f32 = 4.0;
 /// How far a carried torch's pool reaches. Smaller than a brazier's: a 0.35 m flame lighting a 4 m
@@ -686,7 +692,13 @@ fn spawn_scene(
                             shadow_maps_enabled: true,
                             ..default()
                         },
-                        Flicker { base: lumens, phase, diameter: brazier_bed(), ..default() },
+                        Flicker {
+                            base: lumens,
+                            phase,
+                            diameter: brazier_kind().map_or(brazier_bed(), |k| Some(k.diameter())),
+                            depth: brazier_kind().map_or(FLICKER_DEPTH, FireKind::depth),
+                            ..default()
+                        },
                         Kindle::default(),
                         Transform::from_xyz(0.0, BRAZIER_LIGHT - BRAZIER_TOP * 0.5, 0.0),
                     ))
@@ -697,11 +709,11 @@ fn spawn_scene(
                     // whenever the coals are re-lit (`K`, or `LIGHTS_RELIGHT`), the fire grows rather than
                     // appearing whole.
                     FlameSite {
-                        height: BRAZIER_FLAME_HEIGHT,
+                        height: brazier_kind().map_or(BRAZIER_FLAME_HEIGHT, FireKind::height),
                         phase,
                         kindle: KINDLE_SECONDS,
-                        diameter: brazier_bed(),
-                        depth: FLICKER_DEPTH,
+                        diameter: brazier_kind().map_or(brazier_bed(), |k| Some(k.diameter())),
+                        depth: brazier_kind().map_or(FLICKER_DEPTH, FireKind::depth),
                         depth_fade: depth_fade_on(),
                         fire: Some(coals),
                     },

@@ -20,6 +20,7 @@ impl Plugin for FlickerPlugin {
         app.add_message::<Kindled>()
             .register_type::<Flicker>()
             .register_type::<Kindle>()
+            .register_type::<crate::FireKind>()
             .add_systems(Update, flicker_lights.in_set(LightsSystems::Flicker));
     }
 }

@@ -97,3 +97,34 @@ mod saved_settings {
         assert_eq!(k, Kindle::default());
     }
 }
+
+/// A picker's six entries are all usable fires, and the light and the flame drawn on it agree.
+#[test]
+fn every_fire_kind_is_a_sound_fire_whose_light_and_flame_agree() {
+    for kind in FireKind::ALL {
+        let light = kind.flicker(800.0);
+        let site = kind.site();
+        assert!(light.problems().is_empty(), "{}", kind.name());
+        assert!(site.problems().is_empty(), "{}", kind.name());
+        assert!((light.mean() - 800.0).abs() < 800.0 * 1e-5, "{}", kind.name());
+        assert_eq!((light.diameter, light.depth), (site.diameter, site.depth), "{}", kind.name());
+        assert!(site.height <= FlameLook::default().max_height, "{}", kind.name());
+    }
+}
+
+/// Bigger fires flicker slower, and the list runs smallest first.
+#[test]
+fn fire_kinds_slow_down_as_they_grow() {
+    let rates: Vec<f32> = FireKind::ALL.iter().map(|k| k.rate()).collect();
+    assert!(rates.windows(2).all(|w| w[0] > w[1]), "{rates:?}");
+}
+
+#[cfg(feature = "serde")]
+#[test]
+fn a_fire_kind_round_trips_as_its_name() {
+    for kind in FireKind::ALL {
+        let json = serde_json::to_string(&kind).unwrap();
+        assert_eq!(json, format!("\"{}\"", kind.name()));
+        assert_eq!(serde_json::from_str::<FireKind>(&json).unwrap(), kind);
+    }
+}

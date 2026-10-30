@@ -17,6 +17,7 @@
 //!   the flames; unset is still air.
 //! - `LIGHTS_GUST=I` makes that wind gust with turbulence intensity `I` (0.25 is a lively courtyard);
 //!   `LIGHTS_WIND` is then the mean, and `LIGHTS_SEED` picks the wind.
+//! - `LIGHTS_KIND=<name>` (courtyard): the braziers burn as that `FireKind`.
 //!
 //! Keys: WASD + Q/E move (Shift ×5), hold the right mouse button to look.
 //!

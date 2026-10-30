@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **`FireKind`.** Six named fires (`Candle`, `Lantern`, `Torch`, `Brazier`, `Campfire`, `Bonfire`; `FireKind::ALL`, `Reflect`, serde as the name) that bundle a fuel-bed `diameter()`, a flicker `depth()` and a flame `height()`, with `rate()`, `name()`, `flicker(mean_lumens)` (a `Flicker` via `at_mean`) and `site()` (a `FlameSite`) built from the same numbers so a light and its flame agree. Made for an editor's fire picker; the brazier row is the courtyard's existing numbers, the rest design defaults (`docs/research/fire-kinds.md`). The courtyard takes `LIGHTS_KIND=<name>`.
+
 ## [0.2.7] - 2026-10-29
 
 ### Added

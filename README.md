@@ -165,6 +165,8 @@ puffing rate, `1.5/√D` Hz — a brazier at 2.6 Hz, a pyre at 0.75 — so a lar
 than a small one. `diameter: None` is the crate's inherited un-sized rate, for a fire whose size is not
 modelled.
 
+**Fire kinds.** `FireKind::{Candle, Lantern, Torch, Brazier, Campfire, Bonfire}` (`FireKind::ALL`, serde as the name) bundles a fuel-bed diameter, a flicker depth and a flame height, so a picker or a project file stores one word: `FireKind::Torch.flicker(lumens)` is a `Flicker` averaging `lumens` and `FireKind::Torch.site()` a `FlameSite`, built from the same three numbers so the light and its flame breathe together (spell the rest with `..`: `FlameSite { phase: 1.3, ..FireKind::Torch.site() }`). `rate()` is the puffing law at that size, 13 Hz for a candle to 0.87 Hz for a bonfire. Only the brazier row is a number the crate shipped before; the rest are design defaults (`docs/research/fire-kinds.md`). `LIGHTS_KIND=<name>` dresses the courtyard's braziers as a kind.
+
 A light with `Kindle` flares up over `KINDLE_SECONDS` (0.6 s) instead of switching on, on
 `kindle_gain`'s curve: a smoothstep with a flare running ahead of it, so it is 0.85 of the way at half
 time, tips nine tenths of one percent above its base at about 0.46 s, and settles at exactly 1.
