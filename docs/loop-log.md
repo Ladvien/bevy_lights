@@ -4961,3 +4961,9 @@ Removed: `/tmp/l259` (this pass's captures). Leftover worktrees, listed not remo
 Outcome: log only. Tree clean on `main` at c48b4b2, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. At 08:41 CDT, with iterations 255-259 having waited, `cargo publish` of 0.2.21 was tried once (verify build passed, upload refused): `429 ... published too many versions of this crate in the last 24 hours`. crates.io still lists 0.2.19 newest (01:45 CDT). Not retried again before ~02:03 CDT on 2026-10-31; tags v0.2.20/v0.2.21 already exist, so no tagging step is left. Candidates unchanged from 259: (1) publish 0.2.21 once the limit clears; (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester). Capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 261 — 2026-10-30 — No change: publish rate limit not cleared, no unblocked item
+
+Outcome: log only. Tree clean on `main` at 5eb3a22, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. 0.2.21 is not retried (429 at 08:41 CDT; 24 h window clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 260. Home-still, capture, bench and gate not run (no code changed).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
