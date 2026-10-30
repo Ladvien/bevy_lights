@@ -1,6 +1,6 @@
 //! A setting that cannot work, named: what an editor shows beside a field.
 //!
-//! Every settings type (`Flicker`, `FlameSite`, `FlameLook`, `LightPool`) has a `problems()` method
+//! Every settings type (`Flicker`, `Kindle`, `FlameSite`, `FlameLook`, `FlameWind`, `FlameGust`, `LightPool`, `PoolCandidate`) has a `problems()` method
 //! returning these. The crate itself never refuses a value (a negative `base` or a `NaN` phase still
 //! builds and runs); `problems()` is for a host that reads settings from a file or a panel and wants a
 //! useful error before the value reaches a light.

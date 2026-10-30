@@ -272,6 +272,29 @@ impl PoolCandidate {
         let depth = crate::model::flicker_depth(depth);
         Self { intensity: mean / crate::model::flicker_mean(depth), depth: Some(depth), ..Self::default() }
     }
+
+    /// What is unusable in this candidate, field by field; empty when it is fine. See
+    /// [`Flicker::problems`](crate::Flicker::problems). `offset` is reported per axis
+    /// (`"offset.x"`), `phase`, `diameter` and `depth` only when set, with the ranges the matching
+    /// [`Flicker`](crate::Flicker) fields use.
+    pub fn problems(&self) -> Vec<crate::Problem> {
+        use crate::model::problem::{finite, non_negative, positive, within};
+        let mut out = Vec::new();
+        finite(&mut out, "offset.x", self.offset.x);
+        finite(&mut out, "offset.y", self.offset.y);
+        finite(&mut out, "offset.z", self.offset.z);
+        non_negative(&mut out, "intensity", self.intensity);
+        if let Some(p) = self.phase {
+            finite(&mut out, "phase", p);
+        }
+        if let Some(d) = self.diameter {
+            positive(&mut out, "diameter", d);
+        }
+        if let Some(d) = self.depth {
+            within(&mut out, "depth", d, 0.0, crate::MAX_FLICKER_DEPTH);
+        }
+        out
+    }
 }
 
 /// One of the crate's spawned real lights. Marks an entity the pool owns and drives.

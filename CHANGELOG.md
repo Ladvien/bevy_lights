@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **`PoolCandidate::problems()` and `Kindle::problems()`**: the same field-by-field report `Flicker` and `LightPool` give, for the two components an editor saves with a scene (`offset.x`, `intensity`, `phase`, `diameter`, `depth`; `elapsed`). The crate still never refuses a value. No numbers changed.
+
 ## [0.2.11] - 2026-10-29
 
 ### Added

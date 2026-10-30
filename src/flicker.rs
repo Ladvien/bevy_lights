@@ -156,6 +156,17 @@ pub struct Kindle {
     pub elapsed: f32,
 }
 
+impl Kindle {
+    /// What is unusable in this state, field by field; empty when it is fine. See
+    /// [`Flicker::problems`](crate::Flicker::problems). A `Kindle` read from a saved scene with a
+    /// negative or `NaN` `elapsed` would write a bad gain.
+    pub fn problems(&self) -> Vec<crate::Problem> {
+        let mut out = Vec::new();
+        crate::model::problem::non_negative(&mut out, "elapsed", self.elapsed);
+        out
+    }
+}
+
 /// A fire took hold this frame: its [`Kindle`] began, so the host can play the sound of it.
 ///
 /// Written once per [`Kindle`], on the frame the component appears (including a re-inserted one).
