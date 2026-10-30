@@ -4939,3 +4939,9 @@ Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `
 Outcome: log only. Tree clean on `main` at ff99d9c, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. crates.io newest version still 0.2.19 (checked 08:12 CDT); 0.2.21 was refused with 429 at 08:03 and is not retried (24 h window from the 01:24-02:03 publishes clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 256. Home-still, capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 258 — 2026-10-30 — No change: publish rate limit not cleared, no unblocked item
+
+Outcome: log only. Tree clean on `main` at 4d4e4f6, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. 0.2.21 was refused with 429 at 08:03 CDT and is not retried (24 h window clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 257 (publish 0.2.21 before tagging; luminance-amplitude source, Maynard 2013 only; heat haze hook on bevy_elements#50; overhead flame awaiting a reference image; pool-to-grid fixture list, no requester). Home-still, capture, bench and gate not run (no code changed).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
