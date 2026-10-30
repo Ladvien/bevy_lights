@@ -4967,3 +4967,9 @@ Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `
 Outcome: log only. Tree clean on `main` at 5eb3a22, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. 0.2.21 is not retried (429 at 08:41 CDT; 24 h window clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 260. Home-still, capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 262 — 2026-10-30 — No change: publish rate limit not cleared, no unblocked item
+
+Outcome: log only. Tree clean on `main` at c839f98, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. crates.io newest is still 0.2.19 (08:49 CDT); 0.2.21 is not retried (429 at 08:41 CDT; 24 h window clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 261. Home-still, capture, bench and gate not run (no code changed).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
