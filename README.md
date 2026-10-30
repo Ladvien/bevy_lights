@@ -27,14 +27,15 @@ one, and the frequencies measured in this file. The same courtyard at 640 × 360
 
 - **Flickering, kindling fires** (`FlickerPlugin`): a point or spot light modulated below its base by a
   summed sine, at a rate its fuel bed sets and a depth the host chooses, plus a `Kindle` that flares a
-  fire up over 0.6 s and a `Kindled` message for the sound of it.
+  fire up over 0.6 s and a `Kindled` message for the sound of it, and a `Snuff` that puts one out over 1.2 s
+  (light and linked flame together) with a `Snuffed` message for the hiss.
 - **A budgeted pool of real lights** (`LightPoolPlugin::<YourFocusMarker>`): a fixed number of real
   point lights handed to the best-ranked candidates around the one entity carrying your focus marker,
   with hysteresis, a cross-fade and a per-frame hand-off budget, so a light that changes owner does not
   pop.
 - **Flames drawn where the fire is** (`FlamePlugin`): one additive billboard material and one draw per
   flame, each breathing on the same curve as the light it motivates — and at that light's own rate,
-  phase and depth when the site is given them, and catching again when its light is re-lit (`FlameSite::fire`).
+  phase and depth when the site is given them, and catching again or going out when its light is re-lit or snuffed (`FlameSite::fire`).
 - **The maths as plain functions** (`bevy_lights::model`): the flicker law and its depth, the kindle,
   the pool's hold-and-fade rules, the cinematographer's key against fill, the blackbody, and the
   temperature field of a fuel bed — no `bevy` in any of them, so a host can reuse them in its own
@@ -59,7 +60,7 @@ bevy_lights = { git = "https://github.com/Ladvien/bevy_lights", branch = "main" 
 ```
 
 The crate is pinned to Bevy 0.20; its MSRV is Rust 1.97.1. `serde` is an optional feature: it derives
-`serde` on the components and resources a host saves — `Flicker`, `Kindle`, `PoolCandidate`, `PoolLight`,
+`serde` on the components and resources a host saves — `Flicker`, `Kindle`, `Snuff`, `PoolCandidate`, `PoolLight`,
 `FlameSite`, `FlameLook`, `Rank`, `LightPool` — and turns on Bevy's own `serialize` for the colours they carry.
 `PointLight` has no serde derive, so `LightPool` saves its slot template as the four fields the pool copies
 (`color`, `range`, `radius`, `shadow_maps_enabled`); every field is optional on the way in.
