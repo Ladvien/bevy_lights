@@ -1382,3 +1382,107 @@ fn a_pooled_light_linked_by_a_site_follows_the_lean() {
     let _ = bare;
     assert!((at(&mut app, -1.0) - Vec3::new(0.0, 2.0, -1.0)).length() < 1e-4, "no site, no lean");
 }
+
+/// A flame site on a torch one metre tall: the light is carried at the flame's middle, half a metre up.
+fn torch_site() -> FlameSite {
+    FlameSite {
+        height: 1.0,
+        phase: 0.0,
+        kindle: 0.0,
+        diameter: None,
+        depth: 0.15,
+        depth_fade: false,
+        fire: None,
+    }
+}
+
+/// A shadow cross-fade of a light that keeps its owner holds the lit ground still — and under wind the
+/// ground the light lights is the leaned flame's, so both ends of the fade stand in the leaned flame. The
+/// departing reserve took last frame's un-leaned position and kept it, half a metre upwind of the flame.
+#[test]
+fn a_shadow_cross_fade_under_wind_keeps_both_ends_in_the_leaned_flame() {
+    let mut app = app(shadowed_pool(2, 1, 2));
+    app.insert_resource(FlameWind { velocity: Vec2::new(3.0, 0.0) });
+    focus_at(&mut app, Vec3::ZERO);
+    let torch = |x: f32| {
+        (
+            torch_site(),
+            PoolCandidate { offset: Vec3::Y * 0.5, intensity: 100.0, ..default() },
+            Transform::from_xyz(x, 0.0, 0.0),
+        )
+    };
+    let near = app.world_mut().spawn(torch(1.0)).id();
+    app.world_mut().spawn(torch(3.0));
+    settle(&mut app);
+    app.world_mut().entity_mut(near).insert(Visibility::Hidden);
+    let lean = Vec3::from(lean_light_shift(1.0, 3.0, DEFAULT_FIRE_DIAMETER, [1.0, 0.0]));
+    let at = Vec3::new(3.0, 0.5, 0.0) + lean;
+    for frame in 0..26 {
+        app.update();
+        let now = lights(&mut app);
+        let total = total_at(&now, at);
+        assert!((total - 100.0).abs() < 1e-3, "frame {frame}: {total} at the leaned flame: {now:?}");
+        if frame == 0 {
+            // The ordinary hand-off under wind: the torch that went out fades out in its own leaned flame,
+            // where its light stood, and does not jump back to the upright axis.
+            let gone = total_at(&now, Vec3::new(1.0, 0.5, 0.0) + lean);
+            assert!(gone > 99.0, "the departing torch left its leaned flame: {gone} ({now:?})");
+        }
+    }
+}
+
+/// The same cross-fade on a torch-bearer who keeps walking: the slot follows the bearer, and so must the
+/// reserve carrying the other end, or a light 2.4 m/s fast is split in two for the whole fade.
+#[test]
+fn a_shadow_cross_fade_of_a_walking_light_keeps_both_ends_on_it() {
+    let mut app = app(shadowed_pool(2, 1, 2));
+    focus_at(&mut app, Vec3::ZERO);
+    let near = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    let walker = candidate(&mut app, Vec3::new(3.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    app.world_mut().entity_mut(near).insert(Visibility::Hidden);
+    for frame in 0..26 {
+        let at = Vec3::new(3.0 + 0.05 * frame as f32, 2.0, 0.0);
+        move_candidate(&mut app, walker, at - Vec3::Y * 2.0);
+        app.update();
+        let now = lights(&mut app);
+        let total = total_at(&now, at);
+        assert!((total - 100.0).abs() < 1e-3, "frame {frame}: {total} at the walker's light {at:?}: {now:?}");
+    }
+}
+
+/// The light a displaced owner leaves fades out where the owner is, not where it was when the hand-off was
+/// made: the pool's own doc says it "keeps moving ... exactly as the one that left did". Once the owner is
+/// gone from the pool (hidden here), the light holds the last place it followed it to.
+#[test]
+fn a_departing_light_follows_its_displaced_owner_and_holds_where_it_left_the_pool() {
+    let mut app = app(LightPool { size: 1, reserve: 1, reach: 100.0, gain: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let walker = candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    // A nearer torch takes the light; the walker is displaced and keeps walking away.
+    candidate(&mut app, Vec3::new(0.5, 0.0, 0.0), 100.0);
+    let departing = |app: &mut App| -> Vec3 {
+        let found = lights(app);
+        let reserve = found.iter().find(|light| light.0 >= 1).copied().expect("a reserve light");
+        assert!(reserve.2 != Visibility::Hidden, "the reserve fades the walker out: {found:?}");
+        reserve.1
+    };
+    for frame in 1..=12 {
+        let at = Vec3::new(2.0 + 0.1 * frame as f32, 0.0, 0.0);
+        move_candidate(&mut app, walker, at);
+        app.update();
+        let at = departing(&mut app);
+        assert!(
+            (at - Vec3::new(2.0 + 0.1 * frame as f32, 2.0, 0.0)).length() < 1e-4,
+            "frame {frame}: {at:?}"
+        );
+    }
+    let last = departing(&mut app);
+    app.world_mut().entity_mut(walker).insert(Visibility::Hidden);
+    for frame in 0..4 {
+        app.update();
+        let at = departing(&mut app);
+        assert!((at - last).length() < 1e-4, "frame {frame} after it left: {at:?} vs {last:?}");
+    }
+}
