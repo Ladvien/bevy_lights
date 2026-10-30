@@ -524,8 +524,13 @@ fn apply_shared(look: &PointLight, light: &mut Mut<PointLight>) {
 type Assignment = (f32, f32, f32, Entity, Vec3, f32);
 
 /// What `assign_pool` reads of a candidate: its entity, its propagated position, its own `Transform`
-/// when it has one (the freshest truth in the frame the host moved it), whether it is hidden, and how
-/// it wants its light.
+/// when it has one (the freshest truth in the frame the host moved it), whether it is hidden, whether its
+/// fire is out, and how it wants its light.
+///
+/// The fire's [`Snuff`] is read here, with the row, and not looked up by entity: a fire that is out keeps
+/// its `Snuff` for as long as the host leaves it out, so a town at dawn has thousands of them, and a
+/// search through the ones that are out for each candidate was quadratic in them (issue #11). An optional
+/// column is matched once per table, so a world that never snuffs a fire pays a boolean a candidate.
 type CandidateRead<'w, 's> = Query<
     'w,
     's,
@@ -535,6 +540,7 @@ type CandidateRead<'w, 's> = Query<
         Option<&'static Transform>,
         Option<&'static ChildOf>,
         Option<&'static Visibility>,
+        Option<&'static Snuff>,
         &'static PoolCandidate,
     ),
     Without<PoolLight>,
@@ -595,9 +601,10 @@ struct HandOffState {
 ///    to the assignment and its shadow flag to the shadow budget.
 /// 2. **Focus.** The one entity carrying `F`. None, or more than one, means no assignment this frame
 ///    (and a warning for the second case): a pool with two cameras has no single near.
-/// 3. **Candidates.** Every [`PoolCandidate`] whose own [`Visibility`] is not `Hidden`, within
-///    [`LightPool::reach`], ranked by [`LightPool::rank`] and then by [`Entity`], so the assignment is the
-///    same on every machine and two props of equal rank never swap between frames.
+/// 3. **Candidates.** Every [`PoolCandidate`] whose own [`Visibility`] is not `Hidden` and whose fire is not
+///    out (a [`Snuff`] that has run its course), within [`LightPool::reach`], ranked by [`LightPool::rank`]
+///    and then by [`Entity`], so the assignment is the same on every machine and two props of equal rank
+///    never swap between frames.
 /// 4. **Assign.** Every slot's owner for the frame is decided **before any slot is written**: a slot keeps
 ///    its candidate unless a candidate no slot holds is better by [`LightPool::hysteresis`], and a
 ///    challenger takes the **worst-ranked** light the pool holds rather than displacing every slot that
@@ -617,7 +624,6 @@ fn assign_pool<F: Component>(
     focus: Query<&GlobalTransform, With<F>>,
     candidates: CandidateRead,
     fires: Query<(Option<&Kindle>, Option<&Snuff>), With<PoolCandidate>>,
-    snuffs: Query<(Entity, &Snuff), With<PoolCandidate>>,
     sites: Query<&FlameSite>,
     wind: Option<Res<FlameWind>>,
     mut slots: Query<(Entity, &PoolLight, &mut Transform, &mut Visibility, &mut Flicker, &mut PointLight)>,
@@ -681,18 +687,16 @@ fn assign_pool<F: Component>(
 
     // 3. Candidates: visible, in reach, and ranked by the pool's rule — highest illuminance on the subject
     //    first (or nearest first), ties by entity.
-    // Fires that are out: a candidate whose `Snuff` has run its course wants no light. Empty (no allocation) for a
-    // pool whose candidates never go out.
-    let out: Vec<Entity> =
-        snuffs.iter().filter(|(_, snuff)| snuff.elapsed >= SNUFF_SECONDS).map(|(entity, _)| entity).collect();
     let mut lit: Vec<Assignment> = match focus_at {
         Some(focus_at) if pool.gain > 0.0 => candidates
             .iter()
-            // Not `Visibility::Hidden`: a candidate with no `Visibility` at all is not hidden.
-            .filter(|(entity, .., visibility, _)| {
-                !visibility.is_some_and(|v| *v == Visibility::Hidden) && !out.contains(entity)
+            // Not `Visibility::Hidden`: a candidate with no `Visibility` at all is not hidden. And not out: a
+            // candidate whose `Snuff` has run its course wants no light, and a `Snuff` in progress still does.
+            .filter(|(.., visibility, snuff, _)| {
+                !visibility.is_some_and(|v| *v == Visibility::Hidden)
+                    && !snuff.is_some_and(|snuff| snuff.elapsed >= SNUFF_SECONDS)
             })
-            .map(|(entity, at, transform, parent, _, candidate)| {
+            .map(|(entity, at, transform, parent, _, _, candidate)| {
                 // The freshest position the frame has. A **root** prop with its own `Transform` has just
                 // been moved by the host, and its `GlobalTransform` will not catch up until `PostUpdate`,
                 // so its local translation is the freshest truth. A **child** (a torch in a hand) is
