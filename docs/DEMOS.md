@@ -223,7 +223,7 @@ its look, and do not try to line the two up by index.
 LIGHTS_FRAMES=600 LIGHTS_SHOT=docs/media/courtyard.png cargo run --release --example courtyard
 ```
 
-`LIGHTS_EYE` and `LIGHTS_LOOK` move the camera (`x,y,z`). The default eye is `(0, 9, 16)` looking at
+`LIGHTS_EMBERS=r` gives every flame `r` sparks a second (`FlameEmbers`; unset, none). `LIGHTS_EYE` and `LIGHTS_LOOK` move the camera (`x,y,z`). The default eye is `(0, 9, 16)` looking at
 the origin; the GIF's angle is the default.
 
 ## The GIF
