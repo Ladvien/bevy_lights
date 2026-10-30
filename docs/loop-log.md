@@ -4295,3 +4295,21 @@ Hero GIF: not re-encoded; nothing it shows changed (no existing look or default 
 5. Bearers are placeholder capsules; GIF banding.
 
 Release: v0.2.15 published, https://crates.io/crates/bevy_lights/0.2.15 (tag `v0.2.15`; semver-checks: no update required). Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm, wesl-check). Removed this pass: `~/l205_base`, `~/l205_base-target`, `/tmp/l205`. Earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 206 — 2026-10-30 — `Kindle` and `Snuff` on a `PoolCandidate`
+
+Outcome: a pool candidate (no `Flicker` of its own) may carry `Kindle` / `Snuff`. `advance_candidate_fires` (chained before `assign_pool`) advances them and writes `Kindled` / `Snuffed` for the candidate; the pool lends `intensity · kindle_gain · snuff_gain`, the product a `Flicker` light uses; `FlameSite::fire` naming the candidate follows through the existing link (no flame change). A finished snuff leaves the candidate list (slot freed, `PoolBudget::wanting` drops); ranking keeps the plain intensity, so a dying fire keeps its slot until out. Tests (tests/pool.rs): `a_pooled_fire_that_is_snuffed_dims_its_light_to_nothing_and_frees_the_slot`, `a_pooled_fire_that_is_kindled_lends_a_light_that_flares_up_and_is_heard_once`. Courtyard `O`/`K`/`LIGHTS_SNUFF`/`LIGHTS_RELIGHT` now reach the 48 torches.
+
+Why: no open issues, no parked branch; backlog #3 of iteration 205 (a doused bearer's torch could only be removed from the pool, so its light cross-faded while its flame stayed full). Runner-up: overhead flame at EV 9 (no new construction). Skipped issues: none filed; bevy_emerge #103 unchanged. Sources (note `docs/research/pool-fire-state.md`): craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technical `10.1038_s41598-020-78229-x`; craft `pool-hand-off.md`. home-still not consulted this pass (sources reused from flame-snuff, already read).
+
+Critique and verdict (`/tmp/l206/critique.md`, frames `/tmp/l206/a`, control `/tmp/l206/c`): GREAT. Mean frame luminance 56.4 -> 27.0 DN monotone, flat after; control flat 55.6-57.0; torch flames shrink with their lights (zoom). Flaws: brazier ember rim stays lit; minor flame/light size skew mid-fade.
+
+Bench (3 alternating runs, same machine): `p50_us` base 549-564, after 553-589; `pool_p50_us` base 354-376, after 363-388; `min_us` 301-315 vs 292-337: within run-to-run noise. Hero GIF not re-encoded (nothing it shows moved).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
+4. Spatial gust coherence if a host reports it.
+5. Bearers are placeholder capsules; GIF banding.

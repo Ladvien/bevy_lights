@@ -16,9 +16,9 @@ use std::marker::PhantomData;
 use bevy::light::PointLight;
 use bevy::prelude::*;
 
-use crate::flicker::{Flicker, FlickerPlugin};
-use crate::model::FLICKER_DEPTH;
+use crate::flicker::{Flicker, FlickerPlugin, Kindle, Kindled, Snuff, Snuffed, advance_candidate_fires};
 use crate::model::pool::{fade_factor, fade_out_factor, preferred};
+use crate::model::{FLICKER_DEPTH, SNUFF_SECONDS, kindle_gain, snuff_gain};
 use crate::{FADE_SECONDS, HYSTERESIS, LightsSystems, chain_sets};
 
 /// [`LightPoolPlugin`]: keeps [`LightPool::size`] real lights and hands them to the nearest
@@ -54,7 +54,14 @@ impl<F: Component> Plugin for LightPoolPlugin<F> {
             .register_type::<PoolLight>()
             .init_resource::<PoolBudget>()
             .register_type::<PoolBudget>()
-            .add_systems(Update, assign_pool::<F>.in_set(LightsSystems::Pool));
+            // The messages are registered by `FlickerPlugin` too; `add_message` twice is harmless, and the
+            // candidate fires write them even when that plugin is missing (which `finish` reports).
+            .add_message::<Kindled>()
+            .add_message::<Snuffed>()
+            .add_systems(
+                Update,
+                (advance_candidate_fires, assign_pool::<F>).chain().in_set(LightsSystems::Pool),
+            );
     }
 
     fn finish(&self, app: &mut App) {
@@ -216,8 +223,16 @@ pub enum Rank {
 /// A prop that would like one of the pool's real lights: how bright it burns, and where its light
 /// sits relative to the prop's origin.
 ///
-/// Remove the component to take the prop out of the pool (a torch that has been doused, a lamp that
-/// has a real light of its own). Re-insert it to put it back.
+/// A candidate may carry a [`Kindle`] or a [`Snuff`] (and no [`Flicker`], which would make it a light of its
+/// own): the crate advances them, writes [`Kindled`] and [`Snuffed`] for the candidate, and the light the pool
+/// lends is `intensity` times [`kindle_gain`](crate::kindle_gain) times [`snuff_gain`](crate::snuff_gain), the
+/// product [`Flicker`] lights use. A [`FlameSite`](crate::FlameSite) whose `fire` names the candidate follows the
+/// same state, so a torch that is put out dims its light and shrinks its flame together. A candidate whose
+/// `Snuff` has finished no longer wants a light: its slot is freed. Ranking uses the plain `intensity`, so a
+/// fire that is going out keeps its slot until it is out.
+///
+/// Remove the component to take the prop out of the pool at once (a torch that has been taken away, a lamp
+/// that has a real light of its own). Re-insert it to put it back.
 ///
 /// A candidate whose own [`Visibility`] is [`Visibility::Hidden`] is skipped — a torch put away for
 /// the day is not a light — and so is one further from the focus than [`LightPool::reach`]. A
@@ -495,6 +510,8 @@ fn assign_pool<F: Component>(
     mut schedule: ResMut<PoolBudget>,
     focus: Query<&GlobalTransform, With<F>>,
     candidates: CandidateRead,
+    fires: Query<(Option<&Kindle>, Option<&Snuff>), With<PoolCandidate>>,
+    snuffs: Query<(Entity, &Snuff), With<PoolCandidate>>,
     mut slots: Query<(Entity, &PoolLight, &mut Transform, &mut Visibility, &mut Flicker, &mut PointLight)>,
     mut state: Local<HandOffState>,
     time: Res<Time>,
@@ -555,11 +572,17 @@ fn assign_pool<F: Component>(
 
     // 3. Candidates: visible, in reach, and ranked by the pool's rule — highest illuminance on the subject
     //    first (or nearest first), ties by entity.
+    // Fires that are out: a candidate whose `Snuff` has run its course wants no light. Empty (no allocation) for a
+    // pool whose candidates never go out.
+    let out: Vec<Entity> =
+        snuffs.iter().filter(|(_, snuff)| snuff.elapsed >= SNUFF_SECONDS).map(|(entity, _)| entity).collect();
     let mut lit: Vec<Assignment> = match focus_at {
         Some(focus_at) if pool.gain > 0.0 => candidates
             .iter()
             // Not `Visibility::Hidden`: a candidate with no `Visibility` at all is not hidden.
-            .filter(|(.., visibility, _)| !visibility.is_some_and(|v| *v == Visibility::Hidden))
+            .filter(|(entity, .., visibility, _)| {
+                !visibility.is_some_and(|v| *v == Visibility::Hidden) && !out.contains(entity)
+            })
             .map(|(entity, at, transform, parent, _, candidate)| {
                 // The freshest position the frame has. A **root** prop with its own `Transform` has just
                 // been moved by the host, and its `GlobalTransform` will not catch up until `PostUpdate`,
@@ -802,9 +825,14 @@ fn assign_pool<F: Component>(
             if holding.is_none() && chosen.is_some() { 1.0 } else { fade_factor(*age, pool.fade_seconds) };
 
         let assigned = chosen.and_then(|entity| {
-            lit.iter()
-                .find(|(_, _, _, candidate, ..)| *candidate == entity)
-                .map(|(.., at, i)| (*at, *i, entity))
+            lit.iter().find(|(_, _, _, candidate, ..)| *candidate == entity).map(|(.., at, i)| {
+                // A fire taking hold or going out lends a light at its own state's factor.
+                let state = fires.get(entity).map_or(1.0, |(kindle, snuff)| {
+                    kindle.map_or(1.0, |k| kindle_gain(k.elapsed))
+                        * snuff.map_or(1.0, |s| snuff_gain(s.elapsed))
+                });
+                (*at, *i * state, entity)
+            })
         });
         match assigned {
             Some((at, intensity, entity)) => {
