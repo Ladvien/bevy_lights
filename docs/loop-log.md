@@ -4569,3 +4569,17 @@ Gate: fmt, clippy `--all-targets --all-features -D warnings`, rustdoc `-D warnin
 Top 5 remaining: (1) publish v0.2.21 (embers, relight clip, timing) once the v0.2.20 tag is 6 h old (after about 08:05 CDT); (2) cheaper ember quad if a weaker GPU shows it matters (fill-bound? measure with a smaller `rate`); (3) cited flicker amplitude as luminance (Maynard 2013 not in corpus); (4) overhead flame tongue structure; (5) heat haze (outside the ownership map).
 
 Removed: `/tmp/l221`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 222 — 2026-10-30 — `FireKind::embers()`: a picker's fire kinds now say what sparks they shed
+
+Outcome: `FireKind::embers() -> Option<FlameEmbers>` (Candle and Lantern `None`; Torch 2, Brazier the default 3, Campfire 5, Bonfire `MAX_EMBER_RATE` sparks a second), so an editor or a game that stores a kind gets the sparks with the flame and light it already derives from the kind. Design defaults rising with fuel burned (Scintilla Sec. 5.7); recorded in `docs/research/fire-kinds.md` ("Embers by kind", committed first). Test `fire_kinds_shed_embers_by_size` in `tests/settings.rs`. Data only: no shader or visual change, so no captures or bench were run (no code on a hot path).
+
+Issues: none open (`gh` worked). Parked: only the old iteration-115 occlusion WIPs (stale). bevy_emerge #103: no unmet crate-side need. Release: v0.2.20 tag was 84 minutes old, the 6-hour rule blocks a publish.
+
+Ranked candidates: (1) FireKind did not know about embers, the one fire preset gap an editor picker hits (won: smallest finished, consumer-facing); (2) cheaper ember quad (measure on a weaker GPU first); (3) cited flicker amplitude as luminance (no source in corpus); (4) overhead tongue structure; (5) heat haze (outside the map).
+
+Gate: `cargo test`, `cargo test --features serde`, clippy `-D warnings`, rustdoc `-D warnings`, fmt, wasm lib build all clean.
+
+Top 5 remaining: (1) publish v0.2.21 (embers, relight clip, timing, `FireKind::embers`) once the v0.2.20 tag is 6 h old (after about 08:05 CDT); (2) cheaper ember quad if a weaker GPU shows it matters; (3) cited flicker amplitude as luminance; (4) overhead flame tongue structure; (5) heat haze (outside the ownership map).
+
+Removed: nothing made this pass. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
