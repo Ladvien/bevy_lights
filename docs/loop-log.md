@@ -4379,3 +4379,4 @@ Bench not run (shader only). Hero GIF not re-encoded (showcase camera at 0Â°-45Â
 5. Bearers placeholder capsules; GIF banding.
 
 Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`. Removed this pass: worktree `~/l209_base` (made, never built) and scratch `/tmp/l209`.
+Release: v0.2.19 published, https://crates.io/crates/bevy_lights/0.2.19 (tag v0.2.19; semver-checks: no update required).
