@@ -4116,3 +4116,5 @@ Gate: build (release and dev), test, test --features serde, build --examples --a
 3. A cited, luminance-measured flicker amplitude.
 4. Bearers are placeholder capsules.
 5. GIF banding in the pool gradients.
+
+Release: v0.2.6 published, https://crates.io/crates/bevy_lights/0.2.6 (tag `v0.2.6`, commit `6a80913`; `cargo semver-checks` found no breaking change). Cleanup: removed `/tmp/l196` (captures, binaries, gate logs); this pass made no worktree. Leftover baseline worktrees from earlier passes, listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13` (all detached heads, sizes and cleanliness in the pass transcript; none touched).
