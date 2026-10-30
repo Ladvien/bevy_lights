@@ -356,7 +356,7 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
         let rq = length(q);
         let dir = q / max(rq, 1e-4);
         let lobes = fbm(dir * 0.9 + vec2<f32>(t * 0.6, 3.7));
-        let radius = FLAME_HALF_WIDTH * (0.85 + 0.8 * (lobes - 0.5));
+        let radius = FLAME_HALF_WIDTH * (1.2 + 0.8 * (lobes - 0.5));
         let disc = 1.0 - rq / radius;
         // The brightness flows outward from the axis, the way a flame's billows swell as they rise towards a camera above them: two
         // layers sampled at a scale that shrinks over a cycle (so their features grow about the centre), half a cycle apart and

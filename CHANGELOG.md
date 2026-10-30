@@ -34,6 +34,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Changed
 
+- **The flame from straight above is as wide as its bowl's fire.** The overhead cross-section's mean radius is `1.2` of the flame's half-width (was `0.85`): from above the fire fills about two thirds of a brazier bowl instead of a third, and the spiky burst is a round billow. Cameras at or below 50° are unchanged. `docs/research/flame-overhead.md`, round 20.
+
 - **The flame from above flows outward instead of drifting.** Over a brazier seen from above, the disc's brightness was one noise dragged in a single direction (a measured 0.21 px a frame, which reads as wind or a conveyor); it is now two layers whose features swell about the flame's axis, cross-faded half a cycle apart (`OVERHEAD_FLOW_RATE`, `OVERHEAD_FLOW_GROWTH` in `src/flame.wesl`), and the disc is mottled from its middle instead of only its rim. Frames at and below 50 degrees are unchanged. `docs/research/flame-overhead.md`, round 18.
 
 - **A catching or dying flame is taller for its share of the light.** The flame's (and its sparks') drawn size was its catch, `took`, in a straight line, so its area was `took²` against a light that goes with `took`: a third of the way through a catch the light was a third up and the flame a sliver. The size is now `took^(2/3)`, the intermediate-regime law for flame height against heat release rate (Delichatsios 2007), so a settled flame (`took` 1) and a put-out one (0) are exactly as before and the middle moves up (0.3 draws 0.45, 0.5 draws 0.63). On the courtyard's relight the flame shows about one saved frame (33 ms) earlier. `docs/research/flame-catch-size.md`.
