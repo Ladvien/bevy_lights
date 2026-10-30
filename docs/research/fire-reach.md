@@ -62,6 +62,14 @@ The same inverse-square law (`E = Φ / 4π / slant²`, `book_real_time_rendering
 
 A light at or below the ground (`over <= 0`) puts no light on it: both functions answer 0, there is no clamp to a minimum height (a fire's height is the host's).
 
+## A linear-ramp footprint: `ground_footprint`
+
+A host that already keeps a coarse illuminance grid (a stealth or AI tile map, `bevy_light_grid`'s `bake` takes `(cell, intensity, range)` and adds `intensity * (1 - dist/range)` to every visible cell inside `range`) has no way to say "this fire" in those terms, so it guesses a pair per fire and the guess drifts from what the renderer draws. `ground_footprint(lumens, over, floor_lux) -> (peak, reach)` is that pair taken from the same law as the painted ground: `peak = ground_lux(lumens, 0, over)` (the spot under the light) and `reach = ground_reach(lumens, floor_lux, over)` (the iso-lux circle where the ground drops to the grid's floor, the dimmest value it should call lit). Both are world units and lux; the host divides `reach` by its cell size and scales `peak` to its own units, so the crate converts nothing and names no grid.
+
+Craft principle, `10.23856_6105` Table 1 (quoted in `lighting-look.md`): a flame is "soft with smooth transitions" at 1:3-1:6, i.e. the pool of light has no edge a creature could tell from the dark; the footprint's ramp therefore reaches zero at the floor circle, not at the light's `range`. Production, `s2011-advances-pdf-slides`: the fire's emission belongs to the fire, so the footprint is derived from the fire's own lumens, not authored separately. Technical, `book_real_time_rendering_4th_akenine`: the inverse-square and cosine laws behind `ground_lux`.
+
+Deviation, flagged: a linear ramp from the peak to zero lies *above* the true curve between (it falls faster near the light than a ramp does), so a grid built on it over-reads mid-range ground by up to about the peak's fraction; the footprint is for a coarse "lit or not" tile map, and a host wanting the real number calls `ground_lux` per cell. No default is chosen: `floor_lux` is the host's. A light at or below the ground, or a non-positive `floor_lux`, gives `(0.0, 0.0)`; a `floor_lux` above the peak gives `(peak, 0.0)`.
+
 ## Deviations
 
 None: Brazier and Torch are the shipped constants. The other four are design defaults, flagged above.
