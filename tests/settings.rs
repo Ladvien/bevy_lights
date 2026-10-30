@@ -229,6 +229,30 @@ fn the_ground_gets_the_cosine_of_what_a_square_on_surface_does() {
     assert_eq!(ground_reach(lumens, 1.0e6, 0.9), 0.0, "brighter than the spot under the light");
 }
 
+/// A grid's linear ramp must draw the same lit and bright circles the ground shows, for every kind of
+/// fire; and a ramp fitted from the spike's peak (the obvious pair) does not.
+#[test]
+fn the_ramp_crosses_the_dim_and_bright_circles_of_the_ground() {
+    for kind in FireKind::ALL {
+        let lumens = kind.lumens(12.0, 0.9);
+        let (peak, reach) = ground_ramp(lumens, 0.9, 2.0, 6.0);
+        assert!(peak > 6.0 && reach > 0.0, "{}", kind.name());
+        let at = |d: f32| peak * (1.0 - d / reach);
+        for lux in [2.0, 6.0] {
+            let circle = ground_reach(lumens, lux, 0.9);
+            assert!((at(circle) - lux).abs() < lux * 1e-2, "{} at {lux} lx", kind.name());
+        }
+        assert!(reach > ground_reach(lumens, 2.0, 0.9), "{}: falls to zero past the dim circle", kind.name());
+    }
+    let lumens = fire_lumens(12.0, 4.0, 0.9);
+    assert_eq!(ground_ramp(lumens, 0.9, 6.0, 2.0), (0.0, 0.0), "bright must exceed dim");
+    assert_eq!(ground_ramp(lumens, 0.9, 2.0, 2.0), (0.0, 0.0));
+    assert_eq!(ground_ramp(lumens, 0.0, 2.0, 6.0), (0.0, 0.0), "light on the ground");
+    assert_eq!(ground_ramp(lumens, 0.9, 0.0, 6.0), (0.0, 0.0), "no dim threshold");
+    assert_eq!(ground_ramp(lumens, 0.9, 2.0, 1.0e6), (0.0, 0.0), "brighter than the spot under the light");
+    assert_eq!(ground_ramp(lumens, 0.9, f32::NAN, 6.0), (0.0, 0.0));
+}
+
 /// A torch's pooled light and the torch's own light are the same fire: same mean, rate and depth.
 #[test]
 fn a_kinds_pool_candidate_is_the_same_fire_as_its_light() {

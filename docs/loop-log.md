@@ -4761,3 +4761,13 @@ Outcome: the backlog's "cheaper ember quad (GPU cost unmeasured)" was blocked on
 Issues: none open. Parked: none. bevy_emerge #103: no new need. Release: v0.2.20 is 3 h old, the 6-hour rule blocks v0.2.21 until ~08:03 CDT; changes ride in it. Ranked candidates: (1) publish v0.2.21 after 08:03; (2) overhead flame construction (twelve NOT YET rounds); (3) heat haze (outside the map); (4) luminance-amplitude source (none citable); (5) ember quad closed.
 
 Removed: `/tmp/l235` (empty). Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 236 — 2026-10-30 — `ground_ramp`: a fire as a linear ramp a coarse grid can bake
+
+Outcome: new `ground_ramp(lumens, over, dim_lux, bright_lux) -> (peak, reach)` (model, flat re-export). bevy_emerge #103 wants a light-map overlay on `bevy_light_grid`, whose `bake` takes `(cell, intensity, range)` and ramps linearly; the crate had no way to say "this fire" in those terms. The obvious pair (peak under the light, `ground_reach` of a floor) was measured first and rejected: it over-reads mid-pool 4.8x, and a flux-preserving ramp 3.8-6.6x, because the ground curve is an inverse-square spike. The ramp is instead fitted through the two true points a grid is read at (dim and bright thresholds), so it draws exactly the circles the ground shows. Test `the_ramp_crosses_the_dim_and_bright_circles_of_the_ground` (tests/settings.rs, every `FireKind`, degenerate inputs) plus a doctest. Note: `docs/research/fire-reach.md` ("A linear-ramp footprint", committed first, then corrected). Pure maths: no shader, capture or bench (no frame-path code). Not visual, so no GREAT/NOT YET verdict applies.
+
+Assumed decision: the threshold pair is the host's (no default), and nothing in the API names a grid; recommended over a `LightGridFixture` type (would couple to a sibling) and over a single floor lux (inaccurate, above).
+
+Issues: none open. Parked: none. Release: v0.2.20 is ~3 h old, 6-hour rule blocks v0.2.21 until ~08:03 CDT; rides in it. Gate: fmt, build, clippy, doc, wasm, test --features serde green. Ranked candidates: (1) publish v0.2.21 after 08:03; (2) overhead flame construction; (3) heat haze (outside the map); (4) luminance-amplitude source; (5) a `bevy_light_grid` fixture list from the pool (host glue, needs the grid's cell size).
+
+Removed: nothing made outside the clone (`/tmp/lg` clone of bevy_light_grid, removed). Leftover worktrees listed, not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.

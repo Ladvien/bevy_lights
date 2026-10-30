@@ -6,6 +6,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Added
 
+- **`ground_ramp(lumens, over, dim_lux, bright_lux)`**: the `(peak, reach)` of a linear ramp `peak * (1 - d/reach)` that crosses the true ground illuminance exactly at the `dim_lux` and `bright_lux` circles (`ground_reach`). For a host's coarse illuminance grid (a stealth or AI tile map baking each fire as a disc that fades linearly): a ramp fitted from the spike's peak over-reads the pool's middle several-fold, one fitted at the two thresholds a grid is read at draws the circles the ground shows. Plain data in world units and lux; no grid is named. `docs/research/fire-reach.md`.
+
 - **The pool's light follows a flame's lean.** With a `FlameWind`, the pool moves the light of a candidate on a `FlameSite` entity to the leaning flame's middle (downwind and slightly lower) by the new `lean_light_shift(height, speed, diameter, toward)`; still air, no wind resource or no `FlameSite` change nothing. `docs/research/flame-lean-light.md`.
 
 - **`FlameEmbers`: sparks that leave a flame.** Add the component (`rate`, sparks a second, `0..=MAX_EMBER_RATE`, default 3) to a `FlameSite` and its flame gets one more child, a camera-facing additive quad (`src/embers.wesl`) on which sixteen hashed slots each emit a spark per cycle: a capsule along its own velocity that climbs under drag, weaves, drifts downwind with the flame's lean and cools yellow to orange to red (Newton cooling). No particle state, no buffers; the quad inherits the flame's catch and lean, honours `depth_fade`, and sites without the component are unchanged. `FlameEmbers::problems()`, serde under the `serde` feature, `LIGHTS_EMBERS=r` in the courtyard. `docs/research/flame-embers.md`.

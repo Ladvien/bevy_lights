@@ -216,6 +216,49 @@ pub fn ground_reach(lumens: f32, lux: f32, over: f32) -> f32 {
     (slant_sq - over * over).max(0.0).sqrt()
 }
 
+/// A linear ramp `peak * (1 - d / reach)` that crosses the true ground illuminance of a point light
+/// at exactly two circles: the `dim_lux` one and the `bright_lux` one. Returns `(peak, reach)`, the
+/// lux under the ramp's apex and the world-unit distance where it falls to zero.
+///
+/// A coarse illuminance grid (a stealth or AI tile map) bakes each fire as a disc that fades
+/// linearly to nothing, and a linear ramp cannot follow the inverse-square spike of [`ground_lux`]:
+/// fitted from its peak it over-reads the middle of the pool several-fold. The fit is therefore made
+/// where a grid is read, at the lux a tile counts as lit (`dim_lux`) and as bright (`bright_lux`):
+/// the ramp passes through `(`[`ground_reach`]`(dim_lux), dim_lux)` and
+/// `(`[`ground_reach`]`(bright_lux), bright_lux)`, so a grid thresholding at either value draws the
+/// same circle the renderer's ground shows. Nearer the light than the bright circle it under-reads
+/// the spike; past the dim circle it keeps falling to zero at `reach`.
+///
+/// Units stay the host's: divide `reach` by a cell size, scale `peak` to a grid's own units.
+/// `(0.0, 0.0)` where the light is not above the ground, a threshold is not positive or is `NaN`,
+/// `bright_lux <= dim_lux`, or the bright circle does not exist (`bright_lux` above the spot under
+/// the light).
+///
+/// ```
+/// # use bevy_lights::model::cinematography::*;
+/// let lumens = fire_lumens(12.0, 4.0, 0.9);
+/// let (peak, reach) = ground_ramp(lumens, 0.9, 3.0, 8.0);
+/// let at = |d: f32| peak * (1.0 - d / reach);
+/// let (dim, bright) = (ground_reach(lumens, 3.0, 0.9), ground_reach(lumens, 8.0, 0.9));
+/// assert!((at(dim) - 3.0).abs() < 1e-2 && (at(bright) - 8.0).abs() < 1e-2);
+/// assert!(reach > dim);
+/// ```
+pub fn ground_ramp(lumens: f32, over: f32, dim_lux: f32, bright_lux: f32) -> (f32, f32) {
+    if dim_lux.is_nan() || bright_lux.is_nan() || bright_lux <= dim_lux {
+        return (0.0, 0.0);
+    }
+    let r_dim = ground_reach(lumens, dim_lux, over);
+    let r_bright = ground_reach(lumens, bright_lux, over);
+    // A bright circle of radius 0 is the spot under the light; one that does not exist is also 0
+    // but with `ground_lux` at the spot below the threshold.
+    if r_dim <= r_bright || ground_lux(lumens, 0.0, over) < bright_lux {
+        return (0.0, 0.0);
+    }
+    let slope = (bright_lux - dim_lux) / (r_dim - r_bright);
+    let peak = bright_lux + slope * r_bright;
+    (peak, peak / slope)
+}
+
 /// The linear RGB colour of a blackbody at `kelvin`, scaled by `strength`.
 ///
 /// The colour a light source burns at, from its temperature: Planck's law sampled across the visible
