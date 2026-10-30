@@ -4092,3 +4092,27 @@ Outcome: nothing shipped; tree unchanged since v0.2.5, so no captures, bench or 
 3. Bearers are placeholder capsules.
 4. Banding in the GIF's pool gradients.
 5. Editor: a flame preview if bevy_emerge asks.
+
+## Iteration 196 — 2026-10-29 — flames lean in the wind (`FlameWind`, `flame_tilt`)
+
+Outcome: a new `FlameWind { velocity }` resource tilts every flame downwind by `flame_tilt(speed, diameter)`, Welker & Sliepcevich's pool-fire tilt with Pritchard & Binding's constants (`0.666 · Fr^0.333 · Re^0.117`), using each fire's own `diameter`. The flame turns rigidly about its foot (a first, sheared version collapsed to a streak at 57° and was rejected), capped at 70°, and fades back to upright from straight overhead. The lean rides on each flame's instance scale (`y`/`z` = `1 + sin θ · direction`), so the shared material and one-draw-per-flame cost are unchanged; no `FlameWind` or a zero one is the old picture (calm captures differ from the pre-change binary by 2–4 pixels of 921,600, GPU noise). `courtyard` takes `LIGHTS_WIND=x,z`.
+
+Why first: open issues none; no parked branch. The three earlier fallbacks (overhead flame, cited flicker amplitude, bearers) are still blocked, but the standing rule is that "not researched" is work, so this pass researched a feature a shipping game expects (every exterior fire bending the same way) and built it. Runner-up: temperature-following flame colour (rejected: the `T⁴` inversion of the existing ±15 % flicker gives about ±4 % in kelvin, under what the eye separates, and the corpus has no colour-vs-intensity measurement).
+
+Sources: craft `10.7456_tojdac.1674124` (Doğaner 2025); technical DGMR *Technische methode voor het modelleren van plasbranden* eq. 7–9 (Welker & Sliepcevich 1966, Pritchard & Binding constants; fetched from the web, not in the corpus) and Wen et al. 2019 (Warwick WRAP, §3.1: tilt rises and height falls with wind). Raj 2009 and Jiang & Lu 2016 are paywalled (`paper_download` returned HTML). No production/shipping-game source on wind-bent flames in the corpus: recorded under `Pending index` in `docs/research/flame-wind.md`. Home-still live: `hs status` distill up (Cuda), scribe up on two hosts.
+
+Critique and verdict (`/tmp/l196/critique.md`): ground, elevated, top-down, toward-camera, an 8-azimuth orbit with the wind fixed (no flip, foreshortened when the wind runs along the view), 2 and 6 m/s: lean at 1–3 m/s GREAT; the 70° gale cap reads as a horizontal jet, acceptable and a design default; the fire's light does not move with the lean (Deviations).
+
+Craft numbers: unchanged (key-to-fill, falloff, flicker rate, hand-off are untouched by a flame-shape change; calm frames identical). Bench `bench_lights` (CPU, pool 16, 5000 candidates), before vs after, two runs each, noisy at load ~40–80: p50 512/597 µs before, 604/552 µs after, min 254/291 vs 292/287; the bench has no flames, so no change is expected and none is outside the noise. Shader cost: a handful of ALU ops in the vertex stage and a 2x2 rotation in the fragment stage; not timed on the GPU.
+
+Decisions assumed (owner may override): the host owns the wind and writes `FlameWind` (weather belongs to `bevy_elements`); the 70° cap and the 0.2 m default diameter are design defaults; the lean encoding on the instance scale rather than a second tag word (the `MeshTag` is full).
+
+Gate: build (release and dev), test, test --features serde, build --examples --all-features, clippy -D warnings (after moving `wind` into the `Sites` param), doc -D warnings, fmt --check, wasm, wesl-check all green. Commits: `a209c5d` Research: flame wind, `e8ba09a` implementation, `c82f9ca` docs, plus the clippy fix and this log.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. Wind gusts: a host drives `FlameWind` per frame today; a gust helper (smooth noise on speed and heading, deterministic) would make weather one line. Needs a source on gust spectra.
+3. A cited, luminance-measured flicker amplitude.
+4. Bearers are placeholder capsules.
+5. GIF banding in the pool gradients.
