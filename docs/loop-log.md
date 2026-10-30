@@ -4293,3 +4293,5 @@ Hero GIF: not re-encoded; nothing it shows changed (no existing look or default 
 3. `Snuff`/`Kindle` for pool candidates (a candidate's pooled light has neither; needs a hand-off design).
 4. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
 5. Bearers are placeholder capsules; GIF banding.
+
+Release: v0.2.15 published, https://crates.io/crates/bevy_lights/0.2.15 (tag `v0.2.15`; semver-checks: no update required). Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm, wesl-check). Removed this pass: `~/l205_base`, `~/l205_base-target`, `/tmp/l205`. Earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
