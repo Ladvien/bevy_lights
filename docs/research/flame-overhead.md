@@ -305,3 +305,11 @@ At `LIGHTS_EV100=9`, straight down (eye 5.3,9,5), the flame reads as a ragged bu
 
 **Result.** Seed 7, EV 9, brazier at 4 m: the rays are gone at 76° and 90°, the core is a mottled warm ball inside a billowy lobed cloud. 66° differs from before only inside the cloud (the tongue still carries it). Verdict: the rays slice GREAT; the overhead flame as a whole is still NOT YET (small against the bowl, no tongue structure from straight above).
 
+
+### Round 16 — ridged veins in the disc (iteration 240) — NOT YET, not shipped
+
+**Defect aimed at.** Straight down (`/tmp/l240/before/z.png`, EV 9, seed 7, frame 90, brazier at 4 m, 4x of a 200x200 window) the disc is a soft orange blob with a round cream core and no internal layering: an orange body to its very edge, where fire from above reds at its rim and shows hot ridges between darker gaps.
+
+**Tried (patch in `docs/attempts/overhead-veins-round16.patch`).** A ridged fbm of the position (`1 - |2·fbm - 1|`) multiplying the brightness (`mix(1, 0.6..1.2, ridge)` away from the centre) and adding its own heat. (a) Ridge squared at 5 cycles per flame height: the veins are hairlines, which read as cracks or lightning in the cloud — FAIL, removed. (b) Smoothstepped ridge at 3.2 cycles, heat 0.55: the hairlines are gone but the change is within what the eye reads as the same blob, a little paler and yellower, no gain in layering — NOT YET. Reverted; `src/flame.wesl` is as at iteration 210.
+
+**Found while judging (the next round's target).** At 76° (right of the same sheet) the cloud floats up and left of the bed and the bed's lit ellipse shows below it, with crisp coals under a soft flame: the disc is placed at the plume's centre (half a flame up) and nothing draws the flame's foot on the bed, so the fire reads as hovering over its coals between 66° and 80°. A construction that grows the disc from the bed's footprint at the foot to the plume's centre (two ellipses blended by height, not rounds 8-9's equal stack of discs) is the untried slice.
