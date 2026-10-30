@@ -320,16 +320,15 @@ fn a_light_that_earns_a_shadow_gains_it_by_a_cross_fade() {
         .collect();
     assert_eq!(here.len(), 2, "the torch's light and a reserve carrying it as it was: {first:?}");
     assert!(
-        here.iter().any(|light| light.0 < 2 && light.4 && light.3 < 1.0),
+        here.iter().any(|light| light.0 < 2 && light.4 && light.3 < 1e-3),
         "its own light fades in, shadowed: {here:?}"
     );
     assert!(here.iter().any(|light| light.0 >= 2 && !light.4), "the reserve carries it unshadowed: {here:?}");
+    // The two ends run on one clock, so the sum is the light itself on every frame, not a dip: with the
+    // departing light's fade read one frame ahead of the arriving one's, it sagged to 93 mid-fade.
     for (frame, lights) in frames.iter().enumerate() {
         let total = total_at(lights, at);
-        assert!(
-            (90.0..=100.0 + 1e-3).contains(&total),
-            "frame {frame}: the lit ground moved, {total} ({lights:?})"
-        );
+        assert!((total - 100.0).abs() < 1e-3, "frame {frame}: the lit ground moved, {total} ({lights:?})");
     }
     let last = &frames[25];
     assert_eq!(shadowed_at(&mut app), [at], "settled with the shadow: {last:?}");
