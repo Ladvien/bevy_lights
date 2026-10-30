@@ -4220,3 +4220,19 @@ Sources: technical `book_real_time_rendering_4th_akenine` (inverse square, photo
 5. Bearers are placeholder capsules; GIF banding.
 
 Release: v0.2.11 published, https://crates.io/crates/bevy_lights/0.2.11 (tag `v0.2.11`; semver-checks: no update required). Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). No worktrees or /tmp scratch made. Earlier baselines listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 202 — 2026-10-29 — `PoolCandidate::problems` and `Kindle::problems`
+
+Outcome: the two serialisable components that had no validation now report their bad fields like `Flicker` and `LightPool` (`offset.x/y/z`, `intensity`, `phase`, `diameter`, `depth`; `elapsed`). Test `a_pool_candidate_and_a_kindle_report_their_bad_fields` in `tests/settings.rs`.
+
+Why: no open issues, no parked branch. Editor-needs rule (bevy_emerge #103, a placed torch saved with its pool candidate): the validation surface had a hole on exactly the components a scene file holds. Runner-up: overhead flame at EV 9 (still no construction beyond disc stacks). Skipped issues: none filed. No lighting default, render path or shader changed: no capture, no bench; no new research note (reuses the ranges of `Flicker`).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
+4. Spatial gust coherence if a host reports it.
+5. Bearers are placeholder capsules; GIF banding.
+
+Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). No worktrees or scratch made; earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
