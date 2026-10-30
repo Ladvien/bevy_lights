@@ -110,6 +110,53 @@ pub fn fire_lumens(lux: f32, reach: f32, over: f32) -> f32 {
     lux * 4.0 * core::f32::consts::PI * slant * slant
 }
 
+/// The illuminance, in lux, a point light of `lumens` puts on ground `reach` world units out and
+/// `over` below it: [`fire_lumens`] read the other way.
+///
+/// `reach` and `over` are clamped exactly as [`fire_lumens`] clamps them (a reach under 1 reads as 1),
+/// so `fire_lux(fire_lumens(lux, r, h), r, h) == lux` for any `r >= 1`. This is the number an overlay
+/// paints: the brightness a placed fire gives each spot of ground, from the light's own budget.
+///
+/// ```
+/// # use bevy_lights::model::cinematography::*;
+/// let lumens = fire_lumens(12.0, 4.0, 0.9);
+/// assert!((fire_lux(lumens, 4.0, 0.9) - 12.0).abs() < 1e-3);
+/// // Twice as far is a quarter of the light (on flat ground, ignoring the raise).
+/// let near = fire_lux(lumens, 4.0, 0.0);
+/// assert!((near / fire_lux(lumens, 8.0, 0.0) - 4.0).abs() < 1e-3);
+/// ```
+pub fn fire_lux(lumens: f32, reach: f32, over: f32) -> f32 {
+    let reach = reach.max(1.0);
+    let slant = reach.hypot(over.max(0.0));
+    let lumens = if lumens.is_nan() { 0.0 } else { lumens.max(0.0) };
+    lumens / (4.0 * core::f32::consts::PI * slant * slant)
+}
+
+/// How far out along the ground, in world units, a point light of `lumens` and `over` world units
+/// above it still lights the ground to `lux`: the radius of an iso-illuminance circle, and the
+/// reach an editor draws round a placed fire.
+///
+/// `0.0` where even the ground square under the light is dimmer than `lux`, or where `lux` is not
+/// positive (no finite circle). Never under 1 where it answers at all, because [`fire_lumens`] and
+/// [`fire_lux`] read a reach under 1 as 1.
+///
+/// ```
+/// # use bevy_lights::model::cinematography::*;
+/// let lumens = fire_lumens(12.0, 4.0, 0.9);
+/// assert!((fire_reach(lumens, 12.0, 0.9) - 4.0).abs() < 1e-3);
+/// // A dimmer threshold lies further out.
+/// assert!(fire_reach(lumens, 3.0, 0.9) > 4.0);
+/// ```
+pub fn fire_reach(lumens: f32, lux: f32, over: f32) -> f32 {
+    if lumens.is_nan() || lux.is_nan() || lux <= 0.0 || lumens <= 0.0 {
+        return 0.0;
+    }
+    let over = over.max(0.0);
+    let slant_sq = lumens / (4.0 * core::f32::consts::PI * lux);
+    let reach = (slant_sq - over * over).max(0.0).sqrt();
+    if reach < 1.0 { 0.0 } else { reach }
+}
+
 /// The linear RGB colour of a blackbody at `kelvin`, scaled by `strength`.
 ///
 /// The colour a light source burns at, from its temperature: Planck's law sampled across the visible

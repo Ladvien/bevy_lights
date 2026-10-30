@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **`fire_lux(lumens, reach, over)` and `fire_reach(lumens, lux, over)`**: `fire_lumens` read back, the ground illuminance a placed fire gives and the radius of its iso-lux circle, for an editor overlay or a gizmo. No numbers changed.
+
 ## [0.2.10] - 2026-10-29
 
 ### Added

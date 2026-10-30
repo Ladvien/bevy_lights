@@ -134,6 +134,22 @@ fn fire_kinds_light_more_ground_as_they_grow() {
     assert!((ratio - 81.0).abs() < 1e-2, "9 m against 1 m at equal lux is 81x: {ratio}");
 }
 
+/// An editor draws the lit circle round a placed fire and paints the ground's lux from the same
+/// budget the kind's lumens came from: the reach it shows is the reach the kind was sized for.
+#[test]
+fn a_fires_lit_circle_is_the_reach_it_was_sized_for() {
+    for kind in FireKind::ALL {
+        let lumens = kind.lumens(12.0, 0.9);
+        let lux = fire_lux(lumens, kind.reach(), 0.9);
+        assert!((lux - 12.0).abs() < 12.0 * 1e-4, "{}: {lux}", kind.name());
+        let reach = fire_reach(lumens, 12.0, 0.9);
+        assert!((reach - kind.reach()).abs() < kind.reach() * 1e-3, "{}: {reach}", kind.name());
+    }
+    // A threshold brighter than the ground under the light has no circle.
+    assert_eq!(fire_reach(fire_lumens(12.0, 4.0, 0.9), 1.0e6, 0.9), 0.0);
+    assert_eq!(fire_reach(1000.0, 0.0, 0.0), 0.0, "no lux threshold, no finite circle");
+}
+
 #[cfg(feature = "serde")]
 #[test]
 #[allow(clippy::unwrap_used)]
