@@ -4695,3 +4695,19 @@ Bench (`bench_lights`, pool 16, 5000 candidates, after only; no flames in it): p
 Top 5 remaining: (1) publish v0.2.21 after ~08:05 CDT; (2) overhead flame construction; (3) cheaper ember quad; (4) heat haze; (5) a candidate linked by `FlameSite::fire` (not on the site entity) does not lean its light.
 
 Removed: nothing outside the repo besides `/tmp/l229` scratch (to remove). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 230 — 2026-10-30 — A light linked by `FlameSite::fire` leans with its flame
+
+Outcome: the pool's lean light (iteration 229) now also applies when the winning candidate is named by a `FlameSite::fire` (a sibling-light torch), not only when it is itself the site entity. In `assign_pool`, the winner's own site is tried first, else the first site whose `fire` is the winner (scan only while a non-zero `FlameWind` exists, once per winner). No new maths or constant. Note `docs/research/flame-lean-linked.md` (committed first). Test `a_pooled_light_linked_by_a_site_follows_the_lean` (tests/pool.rs).
+
+Issues: none open. Parked: only `WIP(iteration 115, parked)` flame occlusion for #2, a stale iteration from 2026-10-27; not adopted. Release: v0.2.20 tagged 02:03 CDT, so the 6-hour rule blocks a release until 08:03; changes ride in the next one. Ranked candidates: (1) linked lean (won: closes the one Deviation of 229); (2) overhead flame at EV 9; (3) cheaper ember quad; (4) heat haze; (5) luminance-amplitude source.
+
+Sources: craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technical `flame-wind.md` (Wen 2019 / DGMR).
+
+Evidence: courtyard `LIGHTS_WIND=4,0`, ground eye 0,1.7,9 and elevated 0,9,6, frame 120, before (main) vs after: 0 and 0.005 px differ. Expected: the courtyard's torch is one entity that is both candidate and site (already leaned), and its braziers are real lights outside the pool, so no courtyard scene exercises a sibling-linked pooled light; the capture proves no regression, the test proves the new path. Verdict: GREAT as a consistency fix, no showcase change, hero GIF not re-encoded. Critique: the shift is under half a flame height; the scan is O(sites) per non-site winner under wind.
+
+Craft checklist: unchanged by construction (pixel-identical captures). Bench (`bench_lights`, pool 16, 5000 candidates, no wind or flames in it): p50 575 µs, min 317, pool_p50 363 (229: 548 / 315 / 345; run-to-run noise, the changed branch is not entered without a wind).
+
+Top 5 remaining: (1) publish v0.2.21 after 08:03 CDT; (2) overhead flame construction; (3) cheaper ember quad; (4) heat haze; (5) a light-grid/emerge-facing preview or query for pool state.
+
+Removed: `~/l230_base` worktree and `~/l230_base-target` (baseline, built this pass). `~/l230` captures left for the next look (small). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.

@@ -40,7 +40,7 @@ A brazier in a crosswind throws its pool a hand's breadth downwind with the flam
 
 ## Deviations
 
-Design default: the light leans by the full flame tilt although the flame fades its lean toward straight overhead (`flame-wind.md`, lean from above); the shift is under half a flame height. A candidate that is not on the `FlameSite` entity (a site linked by `FlameSite::fire`) does not lean.
+Design default: the light leans by the full flame tilt although the flame fades its lean toward straight overhead (`flame-wind.md`, lean from above); the shift is under half a flame height. A candidate linked from a `FlameSite::fire` leans too (`flame-lean-linked.md`).
 
 ## Pending index
 
