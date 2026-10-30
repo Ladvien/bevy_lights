@@ -4841,3 +4841,11 @@ Outcome: worked issue #7 (only open issue; no parked branches; home-still not ne
 Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: capture a brazier from 2-3 m up, then the outer ring's mask and layered tongues; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
 
 Removed: scratch `/tmp/l244`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 245 — 2026-10-30 — Overhead flame round 22: the outer ring fills in
+
+Outcome: worked issue #7 (only open issue; no parked branches). Round 21's untried lever: the disc mask's ramp `smoothstep(0, 0.42, disc)` is now `smoothstep(0, 0.18, disc)` (`src/flame.wesl`). From 2.3 m above the brazier the outer ring changes from a dim smooth annulus to a lobed, billowy orange cloud round the yellow core; at 9 m it is below resolution; 66° unchanged. Captures `/tmp/l245`. Verdict: slice GREAT close up; overhead flame as a whole still NOT YET (no layered tongues). Shader constant only: bench not run. Gate (build, test, serde test, clippy, doc, fmt, wasm, wesl-check) green. Release: v0.2.20 tagged 02:03 CDT, 4 h old at 06:03, 6-hour rule blocks v0.2.21 until ~08:03 CDT; carries 231-245.
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: layered tongues; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
+
+Removed: scratch `/tmp/l245`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
