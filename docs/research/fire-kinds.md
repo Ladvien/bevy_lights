@@ -56,6 +56,14 @@ Every number not marked cited is a design default. All heights are at most `Flam
 
 A picker whose six entries read as six different fires on screen without any further tuning: the candle a fast fine shimmer, the bonfire a slow heave.
 
+## Embers by kind
+
+A `FireKind` was a light and a flame; since `FlameEmbers` (`flame-embers.md`) it can also say whether the fire throws sparks. `FireKind::embers() -> Option<FlameEmbers>`.
+
+Basis: Scintilla (`sig2024_Scintilla_Simulating_Combustible_Vegetation_for_Wildfires`, Sec. 5.7) — "the particles released per kilogram of fuel consumed are around 10³": sparks scale with the fuel burned, so a bigger fire sheds more. A candle and an enclosed lantern wick burn paraffin or oil vapour with no solid fuel to spit, so they shed none (`None`, not a rate of 0, so a picker can leave the component off). Rates, sparks a second, are design defaults rising with the bed's size: Torch 2, Brazier 3 (the crate's default and the courtyard's), Campfire 5, Bonfire 8 (`MAX_EMBER_RATE`, the rate at which all sixteen slots stay busy). The sparks' size and climb are in flame heights, so a bonfire's are larger without a second knob.
+
+Validation: every returned value passes `problems()`; rate never falls from one kind to the next; `Candle` and `Lantern` are `None`; the courtyard's Brazier is the `FlameEmbers` default.
+
 ## Deviations
 
 None: the Brazier row is the existing behaviour. Candle, Lantern, Campfire and Bonfire are new design defaults, flagged above.
