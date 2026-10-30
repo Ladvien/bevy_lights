@@ -4597,3 +4597,25 @@ Gate: `cargo test`, `cargo test --features serde`, doctests, clippy `-D warnings
 Top 5 remaining: (1) publish v0.2.21 once the v0.2.20 tag is 6 h old (after about 08:05 CDT); (2) cheaper ember quad if a weaker GPU shows it matters; (3) cited flicker amplitude as luminance; (4) overhead flame tongue structure; (5) heat haze (outside the ownership map).
 
 Removed: nothing made this pass. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 224 — 2026-10-30 — A catching flame keeps up with its light: drawn size follows the burn's 2/3 power
+
+Outcome: the flame's and its ember quad's drawn size went from `took` to `took^(2/3)` (`src/flame.wesl`, `src/embers.wesl`, `CATCH_SIZE_EXPONENT`). Iterations 205 and 220 each noted "the flame is a sliver ahead/behind its light" and left it: the light follows the burn (`took`) while a straight-line size gives the flame an area of `took²`. The exponent is the intermediate-regime height law quoted from Delichatsios 2007 (`10.3210_fst.26.1`, downloaded this pass; "the slope of a line through the data is 2/3"). Settled (1) and out (0) are unchanged; 0.3 now draws 0.45, 0.5 draws 0.63. Note `docs/research/flame-catch-size.md` (committed first).
+
+Issues: none open (`gh` worked). Parked: only the old iteration-115 occlusion WIPs (stale). bevy_emerge #103: no new unmet need. Release: v0.2.20 tag was 2 h old at the start, the 6-hour rule blocks a publish (v0.2.21 is due after about 08:05 CDT).
+
+Ranked candidates: (1) flame lags its light on a catch (a visible, measured motivation gap; won, one cited exponent, no new API); (2) colour of the light following the flicker: physics says no, a 15 % brightness swing of a ~1500 K emitter is about 13 K (d ln B / d ln T is about 17 at 550 nm), invisible, so not built; (3) cited flicker amplitude as luminance (no source); (4) overhead tongue structure; (5) heat haze (outside the map).
+
+Sources: craft `10.7456_tojdac.1674124` (Doğaner); production `s2011-advances-pdf-slides` (Fire/Flamethrowers/Thrusters); technical `10.3210_fst.26.1` (Delichatsios 2007), Heskestad's SFPE chapter via `fire-kinds.md` (not in corpus), `10.1017_jfm.2018.707`. `scribe_convert` of `10.3210_fst.26.1` timed out (30 s MCP limit); I read the J-STAGE PDF directly, formulas did not extract, so only the prose 2/3 slope is quoted. Distill and scribe were up (`hs status`: 18068 docs embedded).
+
+Evidence (`/tmp/l224`, courtyard relight sequence `LIGHTS_SNUFF=1.0 LIGHTS_RELIGHT=2.3`, 72 saved frames each; crops of the right-hand brazier, 2x): flame pixels above the coals (rows, bright-yellow pixel count) before -> after at saved frames 44: 0 rows (36 px) -> 3 rows (42); 45: 3 (42) -> 6 (54); 46: 7 (57) -> 12 (81); 47: 17 (111) -> 20 (160); 48: 23 (205) -> 27 (264); 50: 33 (367) -> 35 (390); 52 and 60 equal. The still at frame 600 is pixel-identical (difference maximum 0). Frame mean luminance is within 0.04 DN at every frame (the flame is a few hundred pixels). No `failed to process shader` in either run's log; `tools/wesl-check` ok for flame and embers, both prepass variants.
+
+Critique (`/tmp/l224/row_before.png`, `row_after.png`): the flame shows about one saved frame (33 ms) earlier and is about 40 % larger by area through the middle of the catch; the tongue at frame 46 reads as a flame rather than a nick in the coals. Flaws: at frame 42-44 the ground is already warm orange while the flame is still 0-3 px, because the eye reads light logarithmically and a flame's size linearly, so a gap remains; going further would need an exponent no source gives. The relight GIF (`docs/media/relight.gif`) was not re-encoded: its caption (flame growing out of the coals as the light flares) is still true. Verdict: GREAT for what it claims (the flame keeps up with its light by the cited law, no regression at rest, no artifacts), NOT a showcase change on its own.
+
+Craft checklist: motivated light: flame appears about 33 ms earlier on a catch (was a late sliver); the rest (key-to-fill, falloff, warm/cool, silhouette, specular, flicker, hand-off) untouched, the still is pixel-identical. Bench: `bench_lights` (CPU-only, no code on its path changed) before `mean_us=828 p50_us=679 min_us=342`, `flicker_p50_us=254 pool_p50_us=488`; not rerun (shader-only). GPU: one `pow` per vertex of the flame and ember quads, not measured separately (the ember quad's whole cost is 0.1 ms, iteration 221).
+
+Gate: `cargo build --release`, `cargo build`, `cargo test`, `cargo test --features serde`, clippy `-D warnings`, rustdoc `-D warnings`, fmt, wasm lib build, wesl-check all clean.
+
+Top 5 remaining: (1) publish v0.2.21 once the v0.2.20 tag is 6 h old (after about 08:05 CDT; embers, relight clip, timing, FireKind helpers, this); (2) cited flicker amplitude as luminance; (3) overhead tongue structure; (4) cheaper ember quad if a weaker GPU shows it matters; (5) heat haze (outside the ownership map).
+
+Removed: `/tmp/l224`, `~/tmp-lights/l224_sheet.png`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
