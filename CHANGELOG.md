@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-30
+
+The first release on crates.io since 0.2.19: 0.2.20 and 0.2.21 were tagged but crates.io refused both (too many versions in 24 hours), so their entries below ship here too. Breaking: `LightPool` gained a public field (`max_shadowed`), so a struct literal that names every field needs `..default()` or the new field.
+
 ### Added
 
 - **The pool's shadow budget: `LightPool::max_shadowed`.** With the template's `shadow_maps_enabled` on, `Some(n)` gives a shadow to the `n` best-ranked lights the pool holds (the closest and brightest, RTR4's rule for many lights) and lets the rest light without one; `None`, the default, is every light, as before. Every shadowed point light renders six shadow views a frame, about 0.6 ms a light on an RTX 3090 in the courtyard, so the cap is what lets a sixteen-light pool afford shadows at all. A shadow is held with the pool's own `hysteresis`, and a light that earns or loses one because the ranking moved is cross-faded to itself through a free reserve: in a still scene the arriving shadow deepens over 21 frames (largest step 0.35 DN against a 4.8 DN pop) while the lit ground around it does not move. A change to the cap or the flag applies at once. A pool with shadows wants `reserve: 2`. Saved by serde. `docs/research/pool-shadows.md`.

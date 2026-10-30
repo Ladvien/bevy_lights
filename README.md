@@ -50,16 +50,15 @@ then re-lit (`Kindle`), and each flame grows out of its coals as its light flare
 
 ## Install
 
-`0.1.0` is on crates.io:
+`0.3` is on crates.io:
 
 ```toml
 [dependencies]
-bevy_lights = "0.1"
+bevy_lights = "0.3"
 ```
 
-That release was cut at `b6e734c` and predates the flicker depth, the pool's rank, hysteresis, fade and
-reserve, the lighting look and the fuel bed. Everything this README describes is on `main`, so depend on
-the branch if you want it, and read `CHANGELOG.md` for the list:
+Everything this README describes is in that release. `main` may be ahead of it (`CHANGELOG.md`'s
+`Unreleased`); depend on the branch if you want that:
 
 ```toml
 [dependencies]
