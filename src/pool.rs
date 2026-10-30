@@ -901,11 +901,17 @@ fn assign_pool<F: Component>(
             old_look.insert(chosen.unwrap_or(Entity::PLACEHOLDER), (at, intensity, flicker.phase));
         }
     }
-    // Publish the frame's answer: who holds each real slot, and how many candidates asked. Rewritten in
-    // place, so a steady pool allocates nothing here.
-    schedule.holders.clear();
-    schedule.holders.extend((0..pool.size).map(|slot| held.get(&slot).copied()));
-    schedule.wanting = lit.len();
+    // Publish the frame's answer: who holds each real slot, and how many candidates asked. Written only
+    // when it differs, so `PoolBudget` is flagged changed on a hand-off and not on every frame, and a
+    // steady pool allocates nothing here.
+    let unchanged = schedule.wanting == lit.len()
+        && schedule.holders.len() == pool.size
+        && schedule.holders.iter().enumerate().all(|(slot, holder)| *holder == held.get(&slot).copied());
+    if !unchanged {
+        schedule.holders.clear();
+        schedule.holders.extend((0..pool.size).map(|slot| held.get(&slot).copied()));
+        schedule.wanting = lit.len();
+    }
     // Prune the remembered positions to what the pool can still need: the candidates in this frame's
     // list and the ones a slot holds. Keyed by `Entity`, this map would otherwise grow by one entry for
     // every candidate ever pooled, which is a leak in a library that runs for hours.

@@ -4711,3 +4711,15 @@ Craft checklist: unchanged by construction (pixel-identical captures). Bench (`b
 Top 5 remaining: (1) publish v0.2.21 after 08:03 CDT; (2) overhead flame construction; (3) cheaper ember quad; (4) heat haze; (5) a light-grid/emerge-facing preview or query for pool state.
 
 Removed: `~/l230_base` worktree and `~/l230_base-target` (baseline, built this pass). `~/l230` captures left for the next look (small). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 231 — 2026-10-30 — `PoolBudget` change detection is true
+
+Outcome: `assign_pool` wrote `PoolBudget` through `ResMut` every frame, so `resource_changed::<PoolBudget>` and `Changed` fired on every frame and an editor panel or a "pool too small" warning could not react to a hand-off alone. It now compares holders and `wanting` and writes only on a difference. Test `the_budget_is_flagged_changed_only_when_the_schedule_changes` (tests/pool.rs): failed before (stashed `src/pool.rs`), passes after. Not visual and no art default touched: no research note, capture or wesl-check.
+
+Issues: none open (`gh` worked). Parked: none for `wiggum/parked-*`. bevy_emerge #103: newest comment is the `bevy_light_grid` pin; no unmet need here. Release: v0.2.20 tag about 2.5 h old at the start, the 6-hour rule blocks v0.2.21; it rides in it. Ranked candidates: (1) PoolBudget change detection (won: a true-signal gap the editor integration hits, smallest, testable); (2) overhead flame construction; (3) cheaper ember quad; (4) heat haze (outside the map); (5) luminance-amplitude source (none citable).
+
+Bench (`bench_lights`, same machine, back to back): with the change p50 755/760 µs, min 338/343, pool_p50 536/543; without it p50 753, min 340, pool_p50 542. No difference. Gate: build release and debug, test, test --features serde, examples, clippy, doc, fmt, wasm all green.
+
+Top 5 remaining: (1) publish v0.2.21 after ~08:03 CDT; (2) overhead flame construction; (3) cheaper ember quad; (4) heat haze; (5) a luminance-amplitude source.
+
+Removed: nothing made this pass (no worktree, no capture). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
