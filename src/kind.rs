@@ -2,7 +2,9 @@
 
 use bevy::prelude::*;
 
-use crate::model::{CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, fire_lumens, flicker_rate};
+use crate::model::{
+    CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, fire_lumens, flame_light_offset, flicker_rate,
+};
 use crate::{FlameEmbers, FlameSite, Flicker, MAX_EMBER_RATE, PoolCandidate};
 
 /// A named kind of fire: its fuel-bed diameter, flicker depth and flame height together, so a
@@ -113,12 +115,15 @@ impl FireKind {
     }
 
     /// The pool candidate for this fire, sized like [`light`](Self::light): its mean lights
-    /// [`reach`](Self::reach) to `lux` with the light `over` metres above the ground. `offset` is
-    /// zero (put the candidate on the [`FlameSite`] entity, whose origin is the flame's foot), `phase`
-    /// is `None`, and `diameter` and `depth` are this kind's, so the light a torch is handed breathes
-    /// at the flame's own rate and depth.
+    /// [`reach`](Self::reach) to `lux` with the light `over` metres above the ground. `over` is the height
+    /// of the light, which stands at the middle of the flame: `offset` is
+    /// [`flame_light_offset`]`(`[`height`](Self::height)`)`, so a candidate on the [`FlameSite`] entity (whose
+    /// origin is the flame's foot) is handed a light inside its flame, and in a [`FlameWind`](crate::FlameWind)
+    /// the pool moves it with the leaned flame's middle. `phase` is `None`, and `diameter` and `depth` are this
+    /// kind's, so the light a torch is handed breathes at the flame's own rate and depth.
     pub fn candidate(self, lux: f32, over: f32) -> PoolCandidate {
         PoolCandidate {
+            offset: Vec3::from(flame_light_offset(self.height())),
             diameter: Some(self.diameter()),
             ..PoolCandidate::at_mean(self.lumens(lux, over), self.depth())
         }
@@ -146,9 +151,10 @@ impl FireKind {
 
     /// The flame and its light in one bundle: [`site`](Self::site) and [`candidate`](Self::candidate),
     /// so a flame never goes without the light the pool hands it and both come from the same kind.
-    /// Spawn it on the entity at the flame's foot; `lux` and `over` are [`lumens`](Self::lumens)'
-    /// arguments. The sparks stay separate because a candle or a lantern has none and a bundle
-    /// cannot hold an absent component: `if let Some(e) = kind.embers() { entity.insert(e); }`.
+    /// Spawn it on the entity at the flame's foot, and the light is handed to the flame's middle (see
+    /// [`candidate`](Self::candidate)); `lux` and `over` are [`lumens`](Self::lumens)' arguments, `over`
+    /// being that middle's height above the ground. The sparks stay separate because a candle or a lantern has
+    /// none and a bundle cannot hold an absent component: `if let Some(e) = kind.embers() { entity.insert(e); }`.
     ///
     /// ```
     /// # use bevy_lights::*;

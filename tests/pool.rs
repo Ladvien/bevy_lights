@@ -1486,3 +1486,36 @@ fn a_departing_light_follows_its_displaced_owner_and_holds_where_it_left_the_poo
         assert!((at - last).length() < 1e-4, "frame {frame} after it left: {at:?} vs {last:?}");
     }
 }
+
+/// A `FireKind`'s bundle is a flame and the light that motivates it, spawned on one entity at the flame's
+/// foot. The light belongs in the flame, at `flame_light_offset(height)`: upright in still air, and where
+/// the leaned flame's middle is in a wind. With `offset` at zero the pool put it at the foot, and the lean
+/// (the move of the flame's *middle*) then sank it `height / 2` straight below the flame, under the coal bed.
+#[test]
+fn a_fire_kinds_pooled_light_stands_in_its_flame_and_leans_with_it() {
+    for kind in FireKind::ALL {
+        let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, ..default() });
+        app.insert_resource(FlameWind::default());
+        let foot = Vec3::new(2.0, 0.0, -3.0);
+        app.world_mut().spawn((kind.fire(40.0, 1.0), Transform::from_translation(foot)));
+        focus_at(&mut app, Vec3::ZERO);
+        settle(&mut app);
+        let half = kind.height() * 0.5;
+        let still = assigned(&mut app, 1)[0].1;
+        assert!(
+            (still - (foot + Vec3::Y * half)).length() < 1e-4,
+            "{kind}: still air, the light is in the flame's middle: {still:?}"
+        );
+
+        app.insert_resource(FlameWind { velocity: Vec2::new(3.0, 0.0) });
+        settle(&mut app);
+        let tilt = flame_tilt(3.0, kind.diameter());
+        let middle = foot + Vec3::new(half * tilt.sin(), half * tilt.cos(), 0.0);
+        let light = assigned(&mut app, 1)[0].1;
+        assert!(light.y > foot.y, "{kind}: the light sank under the flame's foot: {light:?}");
+        assert!(
+            (light - middle).length() < 1e-4,
+            "{kind}: {light:?} vs the leaned flame's middle {middle:?}"
+        );
+    }
+}
