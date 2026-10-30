@@ -50,6 +50,7 @@ impl Plugin for FlamePlugin {
             .register_type::<FlameWind>()
             .register_type::<FlameGust>()
             .register_type::<FlameSite>()
+            .register_type::<Flame>()
             .add_systems(
                 Update,
                 (
@@ -237,7 +238,8 @@ impl FlameSite {
 /// instead of holding still while the light moves.
 ///
 /// Public so a host can find, count or recolour the flames it has; a host never spawns one itself.
-#[derive(Component, Clone, Copy, Debug, Default, PartialEq)]
+#[derive(Component, Clone, Copy, Debug, Default, PartialEq, Reflect)]
+#[reflect(Component)]
 pub struct Flame {
     /// Seconds since this flame's fire was lit, when the site asked for a catch. Counted on
     /// `Time<Real>`, like the flame's own clock, so a paused world's flames still move — the catch is

@@ -4651,3 +4651,17 @@ Gate: build (release, debug), `cargo test`, `--features serde`, examples, clippy
 Top 5 remaining: (1) publish v0.2.21 once the v0.2.20 tag is 6 h old; (2) cited flicker amplitude as luminance; (3) overhead tongue structure; (4) cheaper ember quad; (5) heat haze.
 
 Removed: nothing made outside the repo. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 227 — 2026-10-30 — `Flame` is `Reflect`
+
+Outcome: `Flame`, the drawn flame's component, derives `Reflect`, carries `#[reflect(Component)]` and is registered by `FlamePlugin`. It was the one public component the `AGENTS.md` rule "everything public is `Reflect`" missed, so a BRP client or editor panel (bevy_emerge #103 wants fires previewed and the pool shown) could not read a flame's catch or its torch. Test `tests/reflect.rs` reads a `Flame` back through `ReflectComponent`; it does not compile without the derive.
+
+Issues: none open (`gh` worked). Parked: only the stale iteration-115 occlusion WIPs. bevy_emerge #103: no unmet need. Release: v0.2.20 tag is 1 h 54 min old at the start, the 6-hour rule blocks a publish (v0.2.21 due after about 08:04 CDT).
+
+Ranked candidates: (1) the Reflect gap (won: a rule violation a consumer hits, one derive); (2) cited flicker amplitude as luminance (no source); (3) overhead tongue structure; (4) cheaper ember quad; (5) heat haze (outside the map). No research note: no lighting number or default touched. Not visual: no capture, no bench, no wesl-check.
+
+Gate: build (release, debug), `cargo test`, `--features serde`, examples, clippy `-D warnings`, rustdoc `-D warnings`, fmt, wasm lib build clean. `Kindled`/`Snuffed` are messages, not components, and stay non-reflect.
+
+Top 5 remaining: (1) publish v0.2.21 after ~08:04 CDT; (2) cited flicker amplitude as luminance; (3) overhead tongue structure; (4) cheaper ember quad; (5) heat haze.
+
+Removed: nothing made outside the repo. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
