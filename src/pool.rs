@@ -18,8 +18,11 @@ use bevy::prelude::*;
 
 use crate::flicker::{Flicker, FlickerPlugin, Kindle, Kindled, Snuff, Snuffed, advance_candidate_fires};
 use crate::model::pool::{fade_factor, fade_out_factor, preferred};
-use crate::model::{FLICKER_DEPTH, SNUFF_SECONDS, kindle_gain, snuff_gain};
+use crate::model::{
+    DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, SNUFF_SECONDS, kindle_gain, lean_light_shift, snuff_gain,
+};
 use crate::{FADE_SECONDS, HYSTERESIS, LightsSystems, chain_sets};
+use crate::{FlameSite, FlameWind};
 
 /// [`LightPoolPlugin`]: keeps [`LightPool::size`] real lights and hands them to the nearest
 /// [`PoolCandidate`]s.
@@ -514,6 +517,8 @@ fn assign_pool<F: Component>(
     candidates: CandidateRead,
     fires: Query<(Option<&Kindle>, Option<&Snuff>), With<PoolCandidate>>,
     snuffs: Query<(Entity, &Snuff), With<PoolCandidate>>,
+    sites: Query<&FlameSite>,
+    wind: Option<Res<FlameWind>>,
     mut slots: Query<(Entity, &PoolLight, &mut Transform, &mut Visibility, &mut Flicker, &mut PointLight)>,
     mut state: Local<HandOffState>,
     time: Res<Time>,
@@ -838,7 +843,21 @@ fn assign_pool<F: Component>(
         });
         match assigned {
             Some((at, intensity, entity)) => {
-                transform.translation = at;
+                // A flame leaning in the wind has its middle, and so its light, off the upright axis.
+                let lean = match (&wind, sites.get(entity)) {
+                    (Some(wind), Ok(site)) if wind.velocity != Vec2::ZERO => {
+                        let speed = wind.velocity.length();
+                        let diameter = winners
+                            .get(&entity)
+                            .and_then(|(_, diameter, _)| *diameter)
+                            .or(site.diameter)
+                            .unwrap_or(DEFAULT_FIRE_DIAMETER);
+                        let toward = wind.velocity / speed;
+                        Vec3::from(lean_light_shift(site.height, speed, diameter, [toward.x, toward.y]))
+                    }
+                    _ => Vec3::ZERO,
+                };
+                transform.translation = at + lean;
                 // The slot keeps its own phase until a candidate says otherwise: the light handed to a
                 // prop must breathe on that prop's clock, or it beats against the flame drawn on it.
                 if let Some((phase, diameter, depth)) = winners.get(&entity).copied() {

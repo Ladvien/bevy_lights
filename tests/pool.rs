@@ -974,3 +974,49 @@ fn a_pooled_fire_that_is_kindled_lends_a_light_that_flares_up_and_is_heard_once(
     assert!((previous - 1000.0).abs() < 0.01, "settled at the candidate's own intensity: {previous}");
     assert_eq!(app.world().resource::<Heard>().lit, 1);
 }
+
+/// A torch flame's light follows the flame when the wind lays it over: downwind of the upright axis and a
+/// little lower, by the same tilt the flame is drawn at. Still air, a candidate with no flame, and a
+/// candidate off the `FlameSite` entity are untouched.
+#[test]
+fn a_pooled_light_follows_its_flames_lean() {
+    let mut app = app(LightPool { size: 3, ..default() });
+    app.insert_resource(FlameWind { velocity: Vec2::ZERO });
+    let leaning = app
+        .world_mut()
+        .spawn((
+            FlameSite {
+                height: 1.0,
+                phase: 0.0,
+                kindle: 0.0,
+                diameter: None,
+                depth: 0.15,
+                depth_fade: false,
+                fire: None,
+            },
+            PoolCandidate { offset: Vec3::Y * 0.5, intensity: 1000.0, ..default() },
+            Transform::from_xyz(0.0, 0.0, 1.0),
+        ))
+        .id();
+    let bare = candidate(&mut app, Vec3::new(0.0, 0.0, -1.0), 1000.0);
+    focus_at(&mut app, Vec3::ZERO);
+    settle(&mut app);
+    let by = |app: &mut App, entity: Entity| -> Vec3 {
+        let at = app.world().get::<Transform>(entity).expect("candidate").translation;
+        slots(app)
+            .into_iter()
+            .map(|(_, t, ..)| t)
+            .find(|t| (t.z - at.z).abs() < 0.01)
+            .expect("a light by the candidate")
+    };
+    let still = by(&mut app, leaning);
+    assert!((still - Vec3::new(0.0, 0.5, 1.0)).length() < 1e-4, "still air: {still:?}");
+
+    app.insert_resource(FlameWind { velocity: Vec2::new(3.0, 0.0) });
+    settle(&mut app);
+    let moved = by(&mut app, leaning);
+    let want = Vec3::from(lean_light_shift(1.0, 3.0, DEFAULT_FIRE_DIAMETER, [1.0, 0.0]));
+    assert!(moved.x > 0.2 && moved.y < 0.5, "downwind and lower: {moved:?}");
+    assert!((moved - (still + want)).length() < 1e-4, "{moved:?} vs {still:?} + {want:?}");
+    assert!((by(&mut app, bare) - Vec3::new(0.0, 2.0, -1.0)).length() < 1e-4, "no flame, no lean");
+}
