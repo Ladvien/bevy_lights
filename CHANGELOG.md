@@ -10,6 +10,7 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Documentation
 
+- The courtyard example's `LIGHTS_GPU_TIMING=1` prints mean GPU time per render pass; with it the ember quad measures about 0.1 ms a frame (transparent pass 11 µs without embers, 107 to 137 µs with, RTX 3090, 52 flames).
 - `docs/media/relight.gif`: the courtyard put out and lit again (`LIGHTS_SNUFF`, `LIGHTS_RELIGHT`), the first README media that shows a flame catching with its light. The README's note that a flame's catch cannot be shown is narrowed to the opening clip.
 
 ## [0.2.20] - 2026-10-30
