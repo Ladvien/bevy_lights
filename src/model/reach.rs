@@ -34,6 +34,29 @@ pub fn flame_light_offset(height: f32) -> [f32; 3] {
     [0.0, height * 0.5, 0.0]
 }
 
+/// How far a flame's light moves when the flame leans: from the upright middle [`flame_light_offset`]
+/// to where the rotated flame's middle is, in world axes. The flame turns rigidly about its foot by
+/// [`flame_tilt`](crate::model::fire::flame_tilt)`(speed, diameter)` towards `toward` (the unit
+/// direction the wind blows on the ground plane, `x` and `z`), so the shift is
+/// `(h/2) · (sin θ · toward.x, cos θ − 1, sin θ · toward.y)`. Zero wind, a zero `toward` or a
+/// non-finite input is no shift (`docs/research/flame-lean-light.md`).
+///
+/// ```
+/// # use bevy_lights::model::reach::*;
+/// assert_eq!(lean_light_shift(0.35, 0.0, 0.2, [1.0, 0.0]), [0.0, 0.0, 0.0]);
+/// let shift = lean_light_shift(0.35, 3.0, 0.2, [1.0, 0.0]);
+/// assert!(shift[0] > 0.0 && shift[1] < 0.0 && shift[2] == 0.0, "downwind and lower: {shift:?}");
+/// ```
+pub fn lean_light_shift(height: f32, speed: f32, diameter: f32, toward: [f32; 2]) -> [f32; 3] {
+    let half = if height.is_finite() { height.max(0.0) * 0.5 } else { 0.0 };
+    if !speed.is_finite() || !toward.iter().all(|v| v.is_finite()) {
+        return [0.0; 3];
+    }
+    let tilt = crate::model::fire::flame_tilt(speed, diameter);
+    let (sin, cos) = tilt.sin_cos();
+    [half * sin * toward[0], half * (cos - 1.0), half * sin * toward[1]]
+}
+
 /// A fire light `over` world units above the ground that must light the ground `reach` units out,
 /// measured flat: its intensity multiplier and its range.
 ///
