@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.7] - 2026-10-29
+
 ### Added
 
 - **Gusts.** A new `FlameGust { mean, intensity, timescale, seed }` resource (`problems()` and serde like `FlameWind`) makes `FlamePlugin` write `FlameWind` each frame from `model::gust_velocity`: the mean wind times `1 + intensity · x(t)` with the heading turned by `intensity · y(t)` radians, `x` and `y` independent zero-mean unit-variance stationary processes (`model::gust_unit`, a stateless sum of 12 sinusoids under a one-pole spectrum, deterministic, computed in `f64` so it stays smooth after hours). Defaults `GUST_INTENSITY` 0.25 and `GUST_TIMESCALE` 2 s are design defaults; the Gaussian model and the meaning of intensity come from Hannesdóttir et al. 2019 (`docs/research/flame-gust.md`). Without a `FlameGust` the plugin leaves `FlameWind` alone. `courtyard` takes `LIGHTS_GUST=I`.
