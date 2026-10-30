@@ -4973,3 +4973,13 @@ Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `
 Outcome: log only. Tree clean on `main` at c839f98, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. crates.io newest is still 0.2.19 (08:49 CDT); 0.2.21 is not retried (429 at 08:41 CDT; 24 h window clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 261. Home-still, capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 263 — 2026-10-30 — No change: main verified healthy, nothing unblocked
+
+Outcome: log only. Tree clean on `main` at 43fc9ce, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner comment since. bevy_emerge #103: newest comment is the `bevy_light_grid` 0.20 pin, no unmet crate-side need. 0.2.21 still unpublished (429 at 08:41 CDT; 24 h window clears ~02:03 CDT on 2026-10-31; publish before tagging, tags already exist).
+
+Work: re-verified `main` rather than assume it: `cargo build --release`, `cargo build`, `cargo test` (all suites ok, 67+15+3+35+1+1+5+17+34 tests), clippy `-D warnings` and `cargo fmt --check` clean. Bench (CPU only): `bench_lights candidates=5000 lights=2000 pool=16 mean_us=694 p50_us=629 min_us=338`; systems `flicker_p50_us=256 pool_p50_us=418`. Doc, wasm, wesl-check and capture not run (no code changed). Cold test build took ~25 min on this machine.
+
+Ranked candidates: (1) publish 0.2.21 after ~02:03 CDT 2026-10-31; (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
