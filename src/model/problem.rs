@@ -23,6 +23,11 @@ pub enum ProblemKind {
         /// The highest value used.
         max: f32,
     },
+    /// Set, but never read: another field decides what this one looks as if it would.
+    Ignored {
+        /// The field that does.
+        instead: &'static str,
+    },
 }
 
 /// One unusable field: its name as written in the struct, and why.
@@ -42,6 +47,9 @@ impl fmt::Display for Problem {
             ProblemKind::NotPositive => write!(f, "`{}` must be greater than zero", self.field),
             ProblemKind::OutOfRange { min, max } => {
                 write!(f, "`{}` must be between {min} and {max}", self.field)
+            }
+            ProblemKind::Ignored { instead } => {
+                write!(f, "`{}` is ignored; set `{instead}` instead", self.field)
             }
         }
     }

@@ -17,7 +17,7 @@ use bevy::light::PointLight;
 use bevy::prelude::*;
 
 use crate::flicker::{Flicker, FlickerPlugin, Kindle, Kindled, Snuff, Snuffed, advance_candidate_fires};
-use crate::model::pool::{fade_factor, fade_out_factor, preferred};
+use crate::model::pool::{fade_factor, fade_out_factor, preferred, shadow_set};
 use crate::model::{
     DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, SNUFF_SECONDS, kindle_gain, lean_light_shift, snuff_gain,
 };
@@ -88,9 +88,9 @@ impl<F: Component> Plugin for LightPoolPlugin<F> {
 ///
 /// With the `serde` feature it is `Serialize` and `Deserialize`, so an editor can save it with a
 /// project and edit it live. `PointLight` itself has no serde derive, so [`LightPool::light`] is
-/// written as the four fields the pool copies onto its slots (`color`, `range`, `radius`,
-/// `shadow_maps_enabled`); its `intensity` is not saved (the pool ignores it) and reads back as 0.
-/// Every field is optional on the way in: a missing one takes its [`Default`].
+/// written as the three fields the pool copies onto its slots (`color`, `range`, `radius`); its
+/// `intensity` and `shadow_maps_enabled` are not saved (the pool sets both per slot) and read back as
+/// 0 and `false`. Every field is optional on the way in: a missing one takes its [`Default`].
 #[derive(Resource, Clone, Debug, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 #[reflect(Resource)]
@@ -103,9 +103,11 @@ pub struct LightPool {
     /// A dimmer shared by the whole pool, usually how lit the night is (0 puts every pool light
     /// out). Applied on top of each candidate's own intensity.
     pub gain: f32,
-    /// The light every slot is made from: its `color`, `range`, `radius` and `shadow_maps_enabled`
-    /// are copied onto every pool light when one of them **changes**, and its `intensity` is ignored
-    /// (each slot's is its candidate's, times [`LightPool::gain`]).
+    /// The light every slot is made from: its `color`, `range` and `radius` are copied onto every pool
+    /// light when one of them **changes**. Its `intensity` and `shadow_maps_enabled` are ignored: each
+    /// slot's intensity is its candidate's, times [`LightPool::gain`], and which slots cast shadows is
+    /// [`LightPool::shadowed`] (a template with `shadow_maps_enabled` set is named by
+    /// [`LightPool::problems`]).
     ///
     /// Changing `gain`, `size` or `reach` does not touch the slots' looks, so a host that tints its own
     /// fire lights (a palette recolouring every light that carries its fire marker) keeps its tint
@@ -137,6 +139,21 @@ pub struct LightPool {
     /// rather than cross-fading, and every light that needs moving moves at once (iteration 2's
     /// behaviour).
     pub reserve: usize,
+    /// How many of the pool's lights cast shadows: the best-ranked holders by [`LightPool::rank`] — the
+    /// closest and brightest fires, where a missing shadow shows — while the rest light without one.
+    /// `0` (the default) shadows none, and a value past [`LightPool::size`] shadows them all.
+    ///
+    /// Every shadowed point light renders a six-sided shadow map every frame, so this is the pool's
+    /// **shadow budget**, kept apart from its light budget: sixteen lights can afford three shadows.
+    ///
+    /// A light gains or loses its shadow the way it changes owner: a reserve light takes the light as it
+    /// was and fades it out while the slot fades back in with the new setting, so a shadow deepens over
+    /// [`LightPool::fade_seconds`] instead of appearing. That shares the hand-off budget
+    /// ([`LightPool::reserve`]): a shadow change waits for a free reserve, after the frame's owner changes,
+    /// and for the light's own fade to finish. With `reserve: 0` it dips and returns, as a hand-off does.
+    /// A shadow keeps its light until a shadowless one is better by [`LightPool::hysteresis`]
+    /// ([`shadow_set`](crate::shadow_set)). During a fade up to `shadowed + reserve` lights cast shadows.
+    pub shadowed: usize,
 }
 
 impl Default for LightPool {
@@ -150,6 +167,7 @@ impl Default for LightPool {
             hysteresis: HYSTERESIS,
             fade_seconds: FADE_SECONDS,
             reserve: 1,
+            shadowed: 0,
         }
     }
 }
@@ -167,41 +185,22 @@ mod template_serde {
         color: Color,
         range: f32,
         radius: f32,
-        shadow_maps_enabled: bool,
     }
 
     impl Default for Template {
         fn default() -> Self {
             let light = super::LightPool::default().light;
-            Self {
-                color: light.color,
-                range: light.range,
-                radius: light.radius,
-                shadow_maps_enabled: light.shadow_maps_enabled,
-            }
+            Self { color: light.color, range: light.range, radius: light.radius }
         }
     }
 
     pub fn serialize<S: Serializer>(light: &PointLight, serializer: S) -> Result<S::Ok, S::Error> {
-        Template {
-            color: light.color,
-            range: light.range,
-            radius: light.radius,
-            shadow_maps_enabled: light.shadow_maps_enabled,
-        }
-        .serialize(serializer)
+        Template { color: light.color, range: light.range, radius: light.radius }.serialize(serializer)
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PointLight, D::Error> {
         let t = Template::deserialize(deserializer)?;
-        Ok(PointLight {
-            color: t.color,
-            intensity: 0.0,
-            range: t.range,
-            radius: t.radius,
-            shadow_maps_enabled: t.shadow_maps_enabled,
-            ..Default::default()
-        })
+        Ok(PointLight { color: t.color, intensity: 0.0, range: t.range, radius: t.radius, ..Default::default() })
     }
 }
 
@@ -338,9 +337,12 @@ pub struct PoolLight {
 impl LightPool {
     /// What is unusable in these settings, field by field; empty when they are fine. See
     /// [`Flicker::problems`](crate::Flicker::problems). A `size` of 0 is a dark pool, not a problem; the
-    /// template light's `intensity` is ignored by the pool and not checked.
+    /// template light's `intensity` is ignored by the pool and not checked, and its `shadow_maps_enabled`,
+    /// when set, is named as [`ProblemKind::Ignored`](crate::ProblemKind::Ignored): the pool decides each
+    /// slot's shadow from [`LightPool::shadowed`], so a template flag would otherwise be a silent no-op.
     pub fn problems(&self) -> Vec<crate::Problem> {
         use crate::model::problem::{non_negative, positive, within};
+        use crate::{Problem, ProblemKind};
         let mut out = Vec::new();
         positive(&mut out, "reach", self.reach);
         non_negative(&mut out, "gain", self.gain);
@@ -348,11 +350,18 @@ impl LightPool {
         non_negative(&mut out, "fade_seconds", self.fade_seconds);
         positive(&mut out, "light.range", self.light.range);
         non_negative(&mut out, "light.radius", self.light.radius);
+        if self.light.shadow_maps_enabled {
+            out.push(Problem {
+                field: "light.shadow_maps_enabled",
+                kind: ProblemKind::Ignored { instead: "shadowed" },
+            });
+        }
         out
     }
 }
 
-/// Which candidates hold a real light right now, and how many wanted one: the pool's lamp schedule.
+/// Which candidates hold a real light right now, which of those lights cast shadows, and how many
+/// wanted one: the pool's lamp schedule.
 ///
 /// [`LightPoolPlugin`] `init_resource`s it and rewrites it every frame, after the assignment; it is
 /// read-only for a host (a write is overwritten next frame). A level editor shows it to say which
@@ -369,6 +378,10 @@ pub struct PoolBudget {
     pub holders: Vec<Option<Entity>>,
     /// How many candidates asked for a light this frame, held or not.
     pub wanting: usize,
+    /// The candidates whose light casts a shadow this frame, in slot order: at most
+    /// [`LightPool::shadowed`] of the [`holders`](Self::holders). A reserve light fading a shadowed light
+    /// out is not listed.
+    pub shadowed: Vec<Entity>,
 }
 
 impl PoolBudget {
@@ -391,39 +404,33 @@ impl PoolBudget {
     pub fn holds(&self, candidate: Entity) -> bool {
         self.holders.contains(&Some(candidate))
     }
+
+    /// Whether `candidate`'s light casts a shadow this frame.
+    pub fn casts_shadow(&self, candidate: Entity) -> bool {
+        self.shadowed.contains(&candidate)
+    }
 }
 
-/// The four fields of [`LightPool::light`] that every pool light shares, as they were last written
-/// onto the slots.
+/// The three fields of [`LightPool::light`] that every pool light shares, as they were last written
+/// onto the slots. The shadow flag is not one of them: the pool sets it per slot.
 #[derive(Clone, Copy, PartialEq)]
 struct SlotLook {
     color: Color,
     range: f32,
     radius: f32,
-    shadow_maps_enabled: bool,
 }
 
 impl SlotLook {
     fn of(light: &PointLight) -> Self {
-        Self {
-            color: light.color,
-            range: light.range,
-            radius: light.radius,
-            shadow_maps_enabled: light.shadow_maps_enabled,
-        }
+        Self { color: light.color, range: light.range, radius: light.radius }
     }
 
     /// Writes the look onto a slot, touching it (and so its change detection) only if it differs.
     fn apply(self, light: &mut PointLight) {
-        if light.color != self.color
-            || light.range != self.range
-            || light.radius != self.radius
-            || light.shadow_maps_enabled != self.shadow_maps_enabled
-        {
+        if light.color != self.color || light.range != self.range || light.radius != self.radius {
             light.color = self.color;
             light.range = self.range;
             light.radius = self.radius;
-            light.shadow_maps_enabled = self.shadow_maps_enabled;
         }
     }
 }
@@ -461,6 +468,20 @@ type CandidateRead<'w, 's> = Query<
     Without<PoolLight>,
 >;
 
+/// A pool light as it last stood: where, how bright (its candidate's intensity, before the pool's gain
+/// and fade), its flicker, and whether it cast a shadow. A reserve light fading a light out takes all of
+/// it, so the light that leaves keeps moving, and shadowing, exactly as the one that left did —
+/// otherwise the departing and arriving lights swing out of step and their sum wobbles.
+#[derive(Clone, Copy)]
+struct LastLight {
+    at: Vec3,
+    intensity: f32,
+    phase: f32,
+    diameter: Option<f32>,
+    depth: f32,
+    shadow: bool,
+}
+
 /// The pool's memory between frames: what each slot holds, how long since each slot last changed
 /// owner, and the look last copied onto the slots.
 ///
@@ -473,19 +494,16 @@ type CandidateRead<'w, 's> = Query<
 struct HandOffState {
     /// The candidate each slot holds, by slot index.
     held: std::collections::HashMap<usize, Entity>,
-    /// Seconds since each slot last changed owner. A slot that has never changed owner holds
+    /// Seconds since each slot last changed owner (or shadow). A slot that has never changed owner holds
     /// [`f32::MAX`], so its fade is finished.
     fade_at: std::collections::HashMap<usize, f32>,
     /// The template's shared fields as they were last written onto the slots.
     applied: Option<SlotLook>,
-    /// Where each candidate's light last stood, how bright, and with what flicker: a departing owner's
-    /// position for a cross-fade, which by the frame of the hand-off is no longer in the candidate
-    /// list. The phase is kept so the light that fades out keeps moving exactly as the one that left
-    /// did — otherwise the departing and arriving lights swing out of step and their sum wobbles.
-    old_look: std::collections::HashMap<Entity, (Vec3, f32, f32)>,
-    /// Which reserve light is fading out which departure, by slot index: its position, its intensity
-    /// and the phase of the light that left.
-    departure_release: std::collections::HashMap<usize, (Vec3, f32, f32)>,
+    /// Each candidate's light as it last stood: a departing owner's, for a cross-fade, which by the
+    /// frame of the hand-off is no longer in the candidate list.
+    old_look: std::collections::HashMap<Entity, LastLight>,
+    /// Which reserve light is fading out which light, by slot index.
+    departure_release: std::collections::HashMap<usize, LastLight>,
 }
 
 /// Spawns, resizes and assigns the pool's real lights.
@@ -508,6 +526,8 @@ struct HandOffState {
 ///    then takes its candidate's position plus its [`PoolCandidate::offset`], with
 ///    `Flicker::base = intensity · gain · fade`. Every slot with no candidate is hidden, and the whole pool
 ///    is hidden when there is no focus or the gain is zero.
+/// 5. **Shadow.** The best-ranked [`LightPool::shadowed`] holders cast shadows ([`shadow_set`]); a light
+///    that keeps its owner and gains or loses its shadow is cross-faded to itself through a free reserve.
 #[allow(clippy::too_many_arguments)]
 fn assign_pool<F: Component>(
     mut commands: Commands,
@@ -535,7 +555,7 @@ fn assign_pool<F: Component>(
             commands.spawn((
                 Name::new(format!("Pool light {slot}")),
                 PoolLight { slot },
-                PointLight { intensity: 0.0, ..pool.light },
+                PointLight { intensity: 0.0, shadow_maps_enabled: false, ..pool.light },
                 Flicker { base: 0.0, phase: 1.3 * slot as f32, ..default() },
                 Transform::default(),
                 Visibility::Hidden,
@@ -549,10 +569,10 @@ fn assign_pool<F: Component>(
     }
 
     // The shared light settings follow the template, so a host can recolour or re-range the whole pool
-    // in one write. They are applied when the *template's* four shared fields change, not whenever the
+    // in one write. They are applied when the *template's* three shared fields change, not whenever the
     // resource does: a host that writes `gain` every frame (the night's glide) would otherwise reset
     // every slot to the template's colour on every frame, undoing a palette that tints its own lights.
-    // A slot's own intensity is the assignment's, never the template's.
+    // A slot's own intensity and shadow are the assignment's, never the template's.
     let look = SlotLook::of(&pool.light);
     if *applied != Some(look) {
         for (_, _, _, _, _, mut light) in &mut slots {
@@ -754,6 +774,10 @@ fn assign_pool<F: Component>(
     // the old one is still a candidate — it has simply been displaced by a nearer prop — and cross-fading
     // only a *departed* owner left that case with the dip. So a departure here is "this slot's owner is
     // about to change", which is known before the slots are written.
+    //
+    // The free reserves are taken in order: owner changes first, and a change of shadow (step 5) takes
+    // what is left.
+    let mut spare = free_reserves.iter().copied();
     {
         // A slot whose owner is about to change, whether it has a replacement or not. A slot whose owner
         // was despawned or went out of reach has no new owner, and that is still a departure — the light
@@ -770,11 +794,89 @@ fn assign_pool<F: Component>(
             }
         }
         departures.sort_unstable();
-        for (index, (_, holding)) in departures.iter().enumerate() {
-            let Some((at, intensity, phase)) = old_look.get(holding).copied() else { continue };
-            let Some(reserve) = free_reserves.get(index).copied() else { break };
-            departure_release.insert(reserve, (at, intensity, phase));
+        for (_, holding) in &departures {
+            let Some(last) = old_look.get(holding).copied() else { continue };
+            let Some(reserve) = spare.next() else { break };
+            departure_release.insert(reserve, last);
             fade_at.insert(reserve, 0.0);
+        }
+    }
+
+    // 5. Shadows: which held lights cast one this frame, decided before any slot is written, like the
+    //    owners. `shadow_set` names the best-ranked holders; this applies its answer within the budget.
+    //
+    //    A light that changes owner (or is a slot's first light) takes its new owner's shadow at once: it
+    //    is fading in from nothing anyway, and the reserve fading the old owner out carries the old flag.
+    //    A light that **keeps** its owner and gains or loses its shadow is cross-faded to itself: a free
+    //    reserve takes it as it stood and fades it out while the slot fades back in with the new flag, so
+    //    the shadow deepens (or lifts) over the fade and the lit ground around it does not move. That
+    //    waits for a free reserve and for the slot's own fade to finish; with no reserves at all it dips.
+    //    Losses are applied before gains, so a gain that has to wait never puts the pool over budget.
+    let mut shadow_of: std::collections::HashMap<usize, bool> = std::collections::HashMap::new();
+    let mut restart: Vec<usize> = Vec::new();
+    {
+        let casting: std::collections::HashMap<usize, bool> = slots
+            .iter()
+            .map(|(_, slot, .., light)| (slot.slot, light.shadow_maps_enabled))
+            .collect();
+        // The held lights, best-ranked first: (slot, candidate, rank, value, kept its owner, shadowed now).
+        let mut holders: Vec<(usize, Entity, usize, f32, bool, bool)> = chosen_by_slot
+            .iter()
+            .filter(|(slot, _)| **slot < pool.size)
+            .filter_map(|(slot, entity)| {
+                let rank = lit.iter().position(|(_, _, _, candidate, ..)| candidate == entity)?;
+                let kept = held.get(slot) == Some(entity);
+                let now = kept && casting.get(slot).copied().unwrap_or(false);
+                Some((*slot, *entity, rank, lit[rank].2, kept, now))
+            })
+            .collect();
+        holders.sort_unstable_by_key(|(_, _, rank, ..)| *rank);
+        let want = shadow_set(
+            &holders.iter().map(|(.., value, _, now)| (*value, *now)).collect::<Vec<_>>(),
+            pool.shadowed,
+            pool.hysteresis,
+        );
+        // A kept light's change of shadow, cross-faded through a reserve when one is free.
+        let mut cross_fade = |slot: usize, entity: Entity| -> bool {
+            if fade_at.get(&slot).is_some_and(|age| *age < pool.fade_seconds) {
+                return false;
+            }
+            if pool.reserve == 0 {
+                return true;
+            }
+            let Some(last) = old_look.get(&entity).copied() else { return false };
+            let Some(reserve) = spare.next() else { return false };
+            departure_release.insert(reserve, last);
+            fade_at.insert(reserve, 0.0);
+            true
+        };
+        let mut count = 0usize;
+        // Shadows that stay, and losses: a loss that cannot be cross-faded yet keeps its shadow this frame.
+        for ((slot, entity, .., now), want) in holders.iter().zip(&want) {
+            if !*now {
+                continue;
+            }
+            let shadow = *want || !cross_fade(*slot, *entity);
+            if shadow {
+                count += 1;
+            } else {
+                restart.push(*slot);
+            }
+            shadow_of.insert(*slot, shadow);
+        }
+        // Gains, best-ranked first, while the budget has room.
+        for ((slot, entity, _, _, kept, now), want) in holders.iter().zip(&want) {
+            if *now {
+                continue;
+            }
+            let gain = *want && count < pool.shadowed && (!*kept || cross_fade(*slot, *entity));
+            if gain {
+                count += 1;
+                if *kept {
+                    restart.push(*slot);
+                }
+            }
+            shadow_of.insert(*slot, gain);
         }
     }
 
@@ -792,24 +894,35 @@ fn assign_pool<F: Component>(
         })
         .collect();
 
-    for (_, slot, mut transform, mut visibility, mut flicker, _) in &mut slots {
+    for (_, slot, mut transform, mut visibility, mut flicker, mut light) in &mut slots {
         // A reserve light: it is not assigned a candidate, only used to fade a departure out.
         if slot.slot >= pool.size {
             let age = fade_at.entry(slot.slot).or_insert(f32::MAX);
             *age += delta;
             let out = fade_out_factor(*age, pool.fade_seconds);
             let live = departure_release.get(&slot.slot).copied();
-            if out < 1.0
-                && let Some((at, intensity, phase)) = live
+            // On while there is light left to fade; the frame the fade ends it is hidden and freed, so a
+            // finished reserve is never a dark light (or a dark shadow map) the renderer still draws.
+            if out > 0.0
+                && let Some(last) = live
             {
-                transform.translation = at;
-                // The departing light keeps the flicker it had: the same phase as the light that left,
-                // so the two ends of the cross-fade move together instead of beating against each other.
-                flicker.phase = phase;
-                flicker.base = intensity * pool.gain * out;
+                transform.translation = last.at;
+                // The departing light keeps the flicker it had (the phase, rate and depth of the light that
+                // left), so the two ends of the cross-fade move together instead of beating against each
+                // other, and its shadow, so a shadow leaves with its light.
+                flicker.phase = last.phase;
+                flicker.diameter = last.diameter;
+                flicker.depth = last.depth;
+                flicker.base = last.intensity * pool.gain * out;
+                if light.shadow_maps_enabled != last.shadow {
+                    light.shadow_maps_enabled = last.shadow;
+                }
                 visibility.set_if_neq(Visibility::Inherited);
             } else {
                 flicker.base = 0.0;
+                if light.shadow_maps_enabled {
+                    light.shadow_maps_enabled = false;
+                }
                 visibility.set_if_neq(Visibility::Hidden);
                 departure_release.remove(&slot.slot);
             }
@@ -819,11 +932,12 @@ fn assign_pool<F: Component>(
         // This frame's owner for the slot, decided in one pass above: the same map for every slot, so no
         // slot's answer can depend on the order the slots are written in.
         let chosen = chosen_by_slot.get(&slot.slot).copied();
-        // A slot's first light is not a hand-off; only a change from one owner to another fades.
+        // A slot's first light is not a hand-off; only a change from one owner to another fades, and a
+        // light cross-faded to itself for a change of shadow.
         let changed = holding.is_some() && chosen != holding;
 
         let age = fade_at.entry(slot.slot).or_insert(f32::MAX);
-        if changed {
+        if changed || restart.contains(&slot.slot) {
             *age = 0.0;
         } else if holding.is_some() && chosen.is_some() {
             *age += delta;
@@ -841,6 +955,10 @@ fn assign_pool<F: Component>(
                 (*at, *i * state, entity)
             })
         });
+        let shadow = assigned.is_some() && shadow_of.get(&slot.slot).copied().unwrap_or(false);
+        if light.shadow_maps_enabled != shadow {
+            light.shadow_maps_enabled = shadow;
+        }
         match assigned {
             Some((at, intensity, entity)) => {
                 // A flame leaning in the wind has its middle, and so its light, off the upright axis. The
@@ -896,21 +1014,37 @@ fn assign_pool<F: Component>(
                 held.remove(&slot.slot);
             }
         }
-        // Remember where this slot's light now is, so a departure next frame knows where to fade out.
+        // Remember how this slot's light now stands, so a departure next frame fades out exactly this.
         if let Some((at, intensity, ..)) = assigned {
-            old_look.insert(chosen.unwrap_or(Entity::PLACEHOLDER), (at, intensity, flicker.phase));
+            old_look.insert(
+                chosen.unwrap_or(Entity::PLACEHOLDER),
+                LastLight {
+                    at,
+                    intensity,
+                    phase: flicker.phase,
+                    diameter: flicker.diameter,
+                    depth: flicker.depth,
+                    shadow,
+                },
+            );
         }
     }
-    // Publish the frame's answer: who holds each real slot, and how many candidates asked. Written only
-    // when it differs, so `PoolBudget` is flagged changed on a hand-off and not on every frame, and a
-    // steady pool allocates nothing here.
+    // Publish the frame's answer: who holds each real slot, whose light casts a shadow, and how many
+    // candidates asked. Written only when it differs, so `PoolBudget` is flagged changed on a hand-off and
+    // not on every frame, and a steady pool allocates nothing here.
+    let casts = |slot: usize| {
+        shadow_of.get(&slot).copied().unwrap_or(false).then(|| held.get(&slot).copied()).flatten()
+    };
     let unchanged = schedule.wanting == lit.len()
         && schedule.holders.len() == pool.size
-        && schedule.holders.iter().enumerate().all(|(slot, holder)| *holder == held.get(&slot).copied());
+        && schedule.holders.iter().enumerate().all(|(slot, holder)| *holder == held.get(&slot).copied())
+        && schedule.shadowed.iter().copied().eq((0..pool.size).filter_map(casts));
     if !unchanged {
         schedule.holders.clear();
         schedule.holders.extend((0..pool.size).map(|slot| held.get(&slot).copied()));
         schedule.wanting = lit.len();
+        schedule.shadowed.clear();
+        schedule.shadowed.extend((0..pool.size).filter_map(casts));
     }
     // Prune the remembered positions to what the pool can still need: the candidates in this frame's
     // list and the ones a slot holds. Keyed by `Entity`, this map would otherwise grow by one entry for

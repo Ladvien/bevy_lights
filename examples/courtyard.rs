@@ -394,8 +394,8 @@ fn main() {
         .add_plugins((ExampleHarness, FlickerPlugin, LightPoolPlugin::<Focus>::default(), FlamePlugin))
         .insert_resource(CameraPlacement(eye, look))
         // The pool is inserted before the plugin's `init_resource`, so these numbers win: eight real
-        // lights over a 20 m reach, each an 8 m point light with no shadow (the braziers are the
-        // shadow casters).
+        // lights over a 20 m reach, each an 8 m point light, the best-ranked `LIGHTS_SHADOWED` of them
+        // casting shadows (the braziers cast their own).
         .insert_resource(LightPool {
             size: std::env::var("LIGHTS_POOL").ok().and_then(|v| v.parse().ok()).unwrap_or(8),
             // `LIGHTS_RANK=distance` ranks by distance alone, the rule before the pool weighed a light's
@@ -406,6 +406,8 @@ fn main() {
             },
             // `LIGHTS_RESERVE=0` makes a hand-off dip rather than cross-fade, which is the comparison.
             reserve: std::env::var("LIGHTS_RESERVE").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
+            // The pool's shadow budget: the nearest, brightest fires throw shadows and the rest only light.
+            shadowed: std::env::var("LIGHTS_SHADOWED").ok().and_then(|v| v.parse().ok()).unwrap_or(0),
             hysteresis: std::env::var("LIGHTS_HYSTERESIS")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -823,17 +825,15 @@ fn spawn_scene(
                 Visibility::default(),
             ))
             .with_children(|bearer| {
-                bearer.spawn((
-                    Mesh3d(body.clone()),
-                    MeshMaterial3d(cloth.clone()),
-                    NotShadowCaster,
-                    NotShadowReceiver,
-                ));
+                // The figure throws a shadow, from the braziers and from the pool's shadowed lights (its
+                // own torch among them): a figure standing in firelight with no shadow under it reads
+                // as pasted on. It receives none: beside its own torch, a capsule would gain only shadow
+                // acne on the side the light already misses.
+                bearer.spawn((Mesh3d(body.clone()), MeshMaterial3d(cloth.clone()), NotShadowReceiver));
                 bearer.spawn((
                     Mesh3d(head.clone()),
                     MeshMaterial3d(skin.clone()),
                     Transform::from_xyz(0.0, 1.05, 0.0),
-                    NotShadowCaster,
                     NotShadowReceiver,
                 ));
                 // The carried fire: one entity, so the flame and the real light it is handed can never

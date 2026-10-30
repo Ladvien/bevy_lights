@@ -135,6 +135,64 @@ pub fn fade_factor(since: f32, fade_seconds: f32) -> f32 {
     s * s * (3.0 - 2.0 * s)
 }
 
+/// Which of the pool's held lights cast shadows: the best-ranked, up to `budget`, held with the pool's
+/// own overlap rule so two lights at nearly the same rank never trade a shadow frame after frame.
+///
+/// `holders` are the lights the pool holds, **best-ranked first**, each as its rank value ("smaller is
+/// better", the quantity [`preferred`] compares) and whether it casts a shadow now. The answer is, in the
+/// same order, whether each should:
+///
+/// 1. more shadows than `budget` (the budget was lowered) drops the worst-ranked ones;
+/// 2. a place left in the budget goes to the best-ranked light without one, at once;
+/// 3. a light without a shadow takes the worst-ranked shadow only when it is better by `hysteresis`.
+///
+/// The rule is Real-Time Rendering's for many lights (§20.4): shadow "the closest and brightest lights"
+/// and let the lesser ones leak. `docs/research/pool-shadows.md` has the craft.
+///
+/// ```
+/// # use bevy_lights::model::pool::*;
+/// // Three lights, one shadow, nobody shadowed yet: the best one takes it.
+/// assert_eq!(shadow_set(&[(1.0, false), (2.0, false), (3.0, false)], 1, HYSTERESIS), [true, false, false]);
+/// // The second is now only 10 % better than the shadowed third: the shadow stays where it is.
+/// assert_eq!(shadow_set(&[(1.0, true), (2.0, false), (2.2, true)], 2, HYSTERESIS), [true, false, true]);
+/// ```
+pub fn shadow_set(holders: &[(f32, bool)], budget: usize, hysteresis: f32) -> Vec<bool> {
+    let mut out: Vec<bool> = holders.iter().map(|(_, shadowed)| *shadowed).collect();
+    // 1. Over budget: the worst-ranked shadows go first.
+    let mut count = out.iter().filter(|s| **s).count();
+    for shadowed in out.iter_mut().rev() {
+        if count <= budget {
+            break;
+        }
+        if *shadowed {
+            *shadowed = false;
+            count -= 1;
+        }
+    }
+    // 2. Free places: the best-ranked light without a shadow takes one, no margin needed.
+    for shadowed in out.iter_mut() {
+        if count >= budget {
+            break;
+        }
+        if !*shadowed {
+            *shadowed = true;
+            count += 1;
+        }
+    }
+    // 3. The overlap rule: the best light without a shadow against the worst light with one.
+    loop {
+        let best_without = out.iter().position(|s| !*s);
+        let worst_with = out.iter().rposition(|s| *s);
+        let (Some(challenger), Some(held)) = (best_without, worst_with) else { break };
+        if challenger > held || !preferred(holders[held].0, holders[challenger].0, hysteresis) {
+            break;
+        }
+        out[challenger] = true;
+        out[held] = false;
+    }
+    out
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
@@ -201,5 +259,25 @@ mod tests {
         }
         assert!(fade_factor(0.001, FADE_SECONDS) < 1e-4, "the start has no step");
         assert!(fade_factor(FADE_SECONDS - 0.001, FADE_SECONDS) > 1.0 - 1e-4, "nor the end");
+    }
+
+    #[test]
+    fn the_shadow_budget_goes_to_the_best_ranked_and_holds_against_a_near_tie() {
+        let unshadowed = [(1.0, false), (2.0, false), (3.0, false), (4.0, false)];
+        assert_eq!(shadow_set(&unshadowed, 2, HYSTERESIS), [true, true, false, false], "fill best first");
+        assert_eq!(shadow_set(&unshadowed, 0, HYSTERESIS), [false; 4], "a zero budget shadows nothing");
+        assert_eq!(shadow_set(&unshadowed, 9, HYSTERESIS), [true; 4], "a budget past the pool shadows all");
+        // Held shadows on the 2nd and 4th; the 3rd is 10 % better than the 4th (not enough), the 1st is
+        // four times better (enough).
+        let held = [(1.0, false), (2.0, true), (3.6, false), (4.0, true)];
+        assert_eq!(shadow_set(&held, 2, HYSTERESIS), [true, true, false, false]);
+        let near_tie = [(2.0, true), (3.6, false), (4.0, true)];
+        assert_eq!(shadow_set(&near_tie, 2, HYSTERESIS), [true, false, true], "a 10 % challenger waits");
+        let clear = [(2.0, true), (3.3, false), (4.0, true)];
+        assert_eq!(shadow_set(&clear, 2, HYSTERESIS), [true, true, false], "a 21 % challenger wins");
+        // A lowered budget drops the worst-ranked shadows.
+        assert_eq!(shadow_set(&[(1.0, true), (2.0, true), (3.0, true)], 1, HYSTERESIS), [true, false, false]);
+        // A worse light never takes a better light's shadow.
+        assert_eq!(shadow_set(&[(1.0, true), (5.0, false)], 1, 1.0), [true, false]);
     }
 }
