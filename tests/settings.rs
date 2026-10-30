@@ -167,6 +167,21 @@ fn a_fires_lit_circle_is_the_reach_it_was_sized_for() {
     assert_eq!(fire_reach(1000.0, 0.0, 0.0), 0.0, "no lux threshold, no finite circle");
 }
 
+/// A torch's pooled light and the torch's own light are the same fire: same mean, rate and depth.
+#[test]
+fn a_kinds_pool_candidate_is_the_same_fire_as_its_light() {
+    for kind in FireKind::ALL {
+        let candidate = kind.candidate(12.0, 0.9);
+        let light = kind.light(12.0, 0.9);
+        assert!(candidate.problems().is_empty(), "{}", kind.name());
+        assert_eq!(candidate.diameter, light.diameter);
+        assert_eq!(candidate.depth, Some(light.depth));
+        let mean = candidate.intensity * flicker_mean(kind.depth());
+        assert!((mean - light.mean()).abs() < light.mean() * 1e-4, "{}: {mean}", kind.name());
+        assert_eq!(candidate.phase, None);
+    }
+}
+
 #[cfg(feature = "serde")]
 #[test]
 #[allow(clippy::unwrap_used)]
