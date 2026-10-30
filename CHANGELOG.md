@@ -22,6 +22,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Fixed
 
+- **The flame seen from above stands on its coals.** Between about 66 and 85 degrees of camera elevation the overhead cloud hovered half a flame above a bed that was lit and crisp below it. The cloud now has a second, smaller billow at the flame's foot, placed by the same screen offset the tongue's seat uses and faded in with the overhead blend; at or below 50 degrees every pixel is as before (AE 0.003 over 1280x720 at 30 and 45 degrees). Design defaults, judged in captures; `docs/research/flame-overhead.md`, round 17.
+
 - **A bad `Kindle` is reported when it arrives.** `Kindle` had `problems()` but was the one settings component the add-time warning (`Flicker`, `Snuff`, `FlameSite`, `FlameEmbers`, `PoolCandidate`) did not cover, so a saved scene's `NaN` or negative `elapsed` wrote a bad gain in silence. `FlickerPlugin` now checks it like the rest. Test `a_kindle_with_a_bad_elapsed_is_named_and_a_fresh_one_is_not`.
 
 - **`PoolBudget` is flagged changed only when the schedule changes.** The pool wrote it through `ResMut` every frame, so `resource_changed::<PoolBudget>` (an editor's panel, a game's "pool too small" warning) fired every frame. It now compares and writes only when a slot changes owner or the count of wanting candidates moves. Test `the_budget_is_flagged_changed_only_when_the_schedule_changes`.
