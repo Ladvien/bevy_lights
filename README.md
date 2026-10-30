@@ -15,7 +15,7 @@ lights placed over thousands of virtual ones, and billboard shader flames.
 
 *Two seconds of `examples/courtyard`, 400 × 225 at 30 fps: four braziers — real lights, each with a
 `Kindle` and a 0.34 m coal bed, which the puffing law sizes to `1.5/√0.34 ≈ 2.57 Hz` — and 48
-torch-bearers, each a `PoolCandidate`, sharing the example's eight pooled real lights; each brazier also throws `FlameEmbers` (`LIGHTS_EMBERS=4` in the capture, the example's default is off). The clip opens
+torch-bearers, each a `PoolCandidate`, sharing the example's eight pooled real lights, of which the three best-ranked cast shadows (`LightPool::max_shadowed`); every figure throws a shadow from the braziers and from those three. Each brazier also throws `FlameEmbers` (`LIGHTS_EMBERS=4` in the capture, the example's default is off). The clip opens
 while the courtyard is still lighting up and the fires breathe from there; the coals are the
 `char_field` texture the example builds at startup. The opening cannot show a **flame** catching: a
 flame's catch runs on `Time<Real>`, and on a headless capture the material's first pipeline compile

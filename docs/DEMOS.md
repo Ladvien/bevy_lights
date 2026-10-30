@@ -52,7 +52,7 @@ captures the same thing twice.
 
 ## The README showcase
 
-`docs/media/showcase.gif` is the README's hero: two seconds, 30 fps, 400 px, 1.8 MB. `TMPDIR` and
+`docs/media/showcase.gif` is the README's hero: two seconds, 30 fps, 400 px, 1.9 MB. `TMPDIR` and
 `LIGHTS_SHOT_DIR` both go to disk, not `/tmp` (see the top of this file). Its recipe, and the two
 things that made the first attempts look wrong:
 
@@ -255,8 +255,10 @@ FPS=30 WIDTH=640 \
 
 `docs/media/courtyard.gif` is the showcase's capture at 640 px: the showcase recipe's step 1, then frames 1 to 48 of the
 sequence (frame 0 is black: the pipelines are still compiling), renumbered from 0 and encoded with `WIDTH=640`. 48 frames,
-3.1 MB. `docs/media/courtyard.png` is the still above. Both were re-taken on 2026-10-28 with the bowl braziers and the
-ember bed; the earlier files showed box braziers and a pink bed.
+3.2 MB. `docs/media/courtyard.png` is the still above. Both were re-taken on 2026-10-28 with the bowl braziers and the
+ember bed (the earlier files showed box braziers and a pink bed), and on 2026-10-30 with every figure casting a shadow,
+the pool's three shadowed lights and the 20 cd/m² sky fill; that capture, and the showcase and relight clips, used
+`LIGHTS_EMBERS=4`.
 
 **No default font path, deliberately.** `/System/Library/Fonts/...` exists on exactly one of the
 machines this repo is built on and fails on the others — and it fails in `magick`, after ffmpeg has
