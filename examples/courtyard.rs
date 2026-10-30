@@ -513,10 +513,12 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
     let CameraPlacement(eye, look) = *placement;
     let mut camera = commands.spawn((
         camera(eye, look, 8.0),
-        // A cool fill the moon does not have to provide: without it the courtyard's pillars are
-        // black silhouettes and the fire has nothing to read against. Its colour is the sky's
-        // temperature, not a hand-picked blue.
-        AmbientLight { color: sky_colour(), brightness: 2.0, ..default() },
+        // A cool fill the moon does not have to provide: the sky dome under it, which lights the faces
+        // the moon's direction misses. Without it a figure's shadow thrown by a fire onto a wall the moon
+        // does not reach is a black hole (`srgb(1,1,5)` at 2 cd/m²); at 20 (about 63 lx, an eighth of the
+        // moon) it is a navy shadow (`lighting-look.md`). Its colour is the sky's temperature, not a
+        // hand-picked blue.
+        AmbientLight { color: sky_colour(), brightness: 20.0, ..default() },
         Exposure { ev100: exposure_ev100() },
     ));
     // The depth fade reads the depth prepass, so a camera that asks for it carries one.

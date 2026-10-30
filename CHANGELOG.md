@@ -13,6 +13,7 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 ### Changed
 
 - **The courtyard's figures cast shadows**, from the braziers and from the pool's three shadowed lights (`LIGHTS_SHADOWED`, default 3; the example's `LIGHTS_RESERVE` default is now 2). `LIGHTS_POOL_LOG` marks a shadowed light with `*`.
+- **The courtyard's sky fill (its camera's `AmbientLight`) is 20 cd/m², from 2**, so a figure's shadow thrown by a fire onto a wall the moon misses reads navy (`srgb(4,9,32)`) instead of black (`srgb(1,1,5)`); other shadows rise 2-3 DN. `docs/research/lighting-look.md`.
 
 ### Fixed
 
