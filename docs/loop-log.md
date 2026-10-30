@@ -4901,3 +4901,13 @@ Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `
 Outcome: log only. Tree clean on `main` at 709574a, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner reply since. Release: v0.2.20 tagged 02:03 CDT, 4.7 h old at 06:45, so v0.2.21 waits until ~08:03 CDT; it carries 231-249. Candidates unchanged from iteration 251. Home-still, capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 253 — 2026-10-30 — Research only: Gergely 2020 read for a luminance amplitude, none stated
+
+Outcome: no code change. Tree clean on `main` at 3ccc3ec, no `wiggum/parked-*` branches. Open issues: #7 only (stopped by the iteration-249 assumed decision, no owner reply). bevy_emerge #103: newest comment is the `bevy_light_grid` 0.20 pin, no unmet crate-side need. bevy_elements#50 (heat haze) open, zero comments. Home-still live: distill idle on cuda, qdrant up, scribe at 192.168.1.110 up (bmb scribe unreachable). Release: v0.2.20 tagged 02:03 CDT, 297 min old at 07:01, so v0.2.21 waits until ~08:03 CDT; it carries 231-249.
+
+Work: candidate (3), the luminance-amplitude source. `distill_search` and `paper_search` for a photometer-measured flame modulation depth found Gergely 2020 (now in the corpus) and Chen 2019, both already known. Gergely was read in full: intensity is a pixel-count ratio plotted over time, no depth stated. Recorded in `docs/research/flicker-depth.md` ("Second luminance check"), commit "Research: flicker amplitude". No default moves; capture, bench and gate not run (no code changed). The blocker is the source, not the work: Maynard 2013 is the only known paper and is unobtainable.
+
+Ranked candidates: (1) publish v0.2.21 after 08:03; (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (waits on bevy_elements#50); (4) overhead flame (waits on a reference image, per #7); (5) pool-to-grid fixture list (a host builds it in five lines; no requester).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
