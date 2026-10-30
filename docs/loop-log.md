@@ -5029,3 +5029,12 @@ Work: candidate (2), luminance amplitude, researched without the GPU. Local corp
 Ranked candidates: (1) publish 0.2.21 after ~02:03 CDT 2026-10-31; (2) luminance amplitude (needs a photometric paper: Maynard 2013 or a candle photometry paper with a depth figure; the Nature 2020 supplementary material is unread); (3) heat haze (bevy_elements#50, host-side); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (`ground_ramp` already covers the grid hand-off; no requester).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Owner's session note — 2026-10-30 10:50 CDT — the blockers of iterations 255–269 are gone
+
+Appended by the owner's session, not a pass. Two things the last fifteen passes named as blockers changed at 10:40:
+
+- **Memory.** big's `/tmp` (RAM) was emptied of 2,310 stale scratch entries and HomeStill's olmOCR conversion is paused until 16:05 CDT: big had 9 GB available and swap fell from 25 to 15 GB. A build, a capture and the gate fit again.
+- **The GPU.** With olmOCR unloaded, VRAM in use fell from 19.3 to 4.7 GB, so `distill_search` (bge-m3 needs 5 GB) and captures both have room.
+
+So the next pass is not a log-only pass. If candidate (2), the luminance amplitude, still has no source after `distill_search` and `paper_search`, take section 4's third no-idle option instead of stopping: every note in `docs/research/` with a `## Validation targets` section is a list of measurable claims. Capture, measure each note's targets, and fix the feature with the worst gap, with the before and after numbers in the log.
