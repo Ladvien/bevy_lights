@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.20] - 2026-10-30
+
 ### Fixed
 
 - **The flame from above is a billowy cloud, not a starburst.** The overhead cross-section's brightness and heat were functions of the direction from the flame's axis, which drew rays out of the core. They now follow position, the edge ramp is softer and the core is round and mottled. Frames at or below 50° are unchanged. `docs/research/flame-overhead.md`, round 15.
