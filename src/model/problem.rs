@@ -1,9 +1,9 @@
 //! A setting that cannot work, named: what an editor shows beside a field.
 //!
-//! Every settings type (`Flicker`, `Kindle`, `FlameSite`, `FlameLook`, `FlameWind`, `FlameGust`, `LightPool`, `PoolCandidate`) has a `problems()` method
+//! Every settings type (`Flicker`, `Kindle`, `Snuff`, `FlameSite`, `FlameEmbers`, `FlameLook`, `FlameWind`, `FlameGust`, `LightPool`, `PoolCandidate`) has a `problems()` method
 //! returning these. The crate itself never refuses a value (a negative `base` or a `NaN` phase still
 //! builds and runs); `problems()` is for a host that reads settings from a file or a panel and wants a
-//! useful error before the value reaches a light. A component of the five that arrives with a problem (`Flicker`, `Snuff`, `FlameSite`, `FlameEmbers`, `PoolCandidate`) is also reported by the crate: one `warn!` per type, for the first bad one, from the plugin that owns it. A value changed after it was added is not re-checked.
+//! useful error before the value reaches a light. A component of those types (`Flicker`, `Kindle`, `Snuff`, `FlameSite`, `FlameEmbers`, `PoolCandidate`) that arrives with a problem is also reported by the crate: one `warn!` per type, for the first bad one, from the plugin that owns it. A value changed after it was added is not re-checked. The resources (`FlameLook`, `FlameWind`, `FlameGust`, `LightPool`) are checked on every frame they change instead.
 
 use std::fmt;
 
