@@ -62,6 +62,23 @@ fn a_pool_reports_reach_hysteresis_and_the_template_light() {
     assert!(LightPool { size: 0, ..Default::default() }.problems().is_empty());
 }
 
+#[test]
+fn a_pool_candidate_and_a_kindle_report_their_bad_fields() {
+    assert!(PoolCandidate::default().problems().is_empty());
+    assert!(PoolCandidate::at_mean(900.0, 0.3).problems().is_empty());
+    let bad = PoolCandidate {
+        offset: bevy::math::Vec3::new(0.0, f32::NAN, f32::INFINITY),
+        intensity: -1.0,
+        phase: Some(f32::NAN),
+        diameter: Some(0.0),
+        depth: Some(MAX_FLICKER_DEPTH + 0.1),
+    };
+    assert_eq!(fields(bad.problems()), ["offset.y", "offset.z", "intensity", "phase", "diameter", "depth"]);
+    assert!(Kindle::default().problems().is_empty());
+    assert_eq!(fields(Kindle { elapsed: -0.5 }.problems()), ["elapsed"]);
+    assert_eq!(fields(Kindle { elapsed: f32::NAN }.problems()), ["elapsed"]);
+}
+
 /// The preview curve is the same function the system writes: a fire flares up while kindling and
 /// matches an already-burning one once the kindle has run its course.
 #[test]
