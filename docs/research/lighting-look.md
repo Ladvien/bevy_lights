@@ -162,6 +162,7 @@ Nothing here lights anything on its own. The crate does not own the moon and nev
 | brazier's pool | 12 lx at 4 m, from a coal bed 0.9 m over the ground | design default for `ev100` 3.0 (Bevy's exposure: 12.5 lx at `ev100` 3 is mid-grey). It sizes the lumens through `fire_lumens`, replacing the baseline's 60 000 lm |
 | torch's pool | 12 lx at 2 m, from a flame 1.8 m over the feet | the same, and `10.23856_6105` Table 1: a 0.35 m flame at 2 m is 1:6, "sufficiently contrasty … with fuzzy shadow contours" |
 | brazier softness | 0.66 m source at 3 m (1:4.5) | `10.23856_6105` Table 1: 1:3–1:6 is "soft with smooth transitions" |
+| courtyard sky fill (the camera's `AmbientLight`) | 20 cd/m² (π·20 ≈ 63 lx, about an eighth of the moon's 500 lx) | design default, iteration 271: the moon is a direction, and a sky dome under it lights the faces it misses. Once figures cast shadows, a figure's shadow thrown by a brazier onto the pillar face beside it read `srgb(1,1,5)` at the old 2 — a hole, not a shadow — and `srgb(4,9,32)` at 20, while the ground's moonlit shadows rose 2-3 DN and a brazier's pool 0.7 DN |
 
 ## Deviations
 
