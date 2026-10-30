@@ -4164,3 +4164,5 @@ Bench: no runtime path changed (a data enum), not re-run. Gate: build (release, 
 3. Fetch Heskestad's flame-height paper into the corpus and replace the preset heights' design defaults.
 4. Spatial gust coherence if a host reports wind-in-step looking wrong.
 5. Bearers are placeholder capsules; GIF banding in the pool gradients.
+
+Release: v0.2.8 published, https://crates.io/crates/bevy_lights/0.2.8 (tag `v0.2.8`; semver-checks: no breaking change). Cleanup: removed `/tmp/l198`; no worktree made this pass. Earlier-pass baselines listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
