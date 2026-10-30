@@ -4825,3 +4825,11 @@ Outcome: worked issue #7 (only open issue). Round 19 added a finer direction-key
 Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: tongue tips by position noise on a ring, or layered tongues; lower the mask's gain; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
 
 Removed: scratch `/tmp/l242`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 243 — 2026-10-30 — Overhead flame round 20: the disc fills the bowl
+
+Outcome: worked issue #7 (only open issue; no parked branches). Straight down the cloud covered about a third of the brazier bowl as a spiky burst; the cross-section's mean radius is now `1.2` of the flame half-width (was `0.85`, `src/flame.wesl`): it fills about two thirds of the bowl as a round billow, core unchanged. 45° AE 106 px (GPU noise), 66° differs inside the cloud only. Captures `/tmp/l243/{b,a}` (td, a76, e45, e66). Verdict: the slice ships; overhead flame as a whole still NOT YET (outer ring a flat orange mottle, no layered tongues). Shader constant only: bench not run. Gate (build, test, serde test, examples, clippy, doc, fmt, wasm, wesl-check) green. Release: v0.2.20 tagged 02:03 CDT, blocked by the 6-hour rule until ~08:03 CDT; carries 231-243.
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: layered tongues / tongue tips by position noise on a ring, outer ring colour (red rim); (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
+
+Removed: scratch `/tmp/l243`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
