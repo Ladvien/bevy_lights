@@ -4795,3 +4795,15 @@ Outcome: log only. Tree clean on `main` at 06e106c, no open issues (`gh` worked)
 Ranked candidates: (1) publish v0.2.21 after 08:03; (2) overhead flame construction; (3) heat haze (outside the map); (4) luminance-amplitude source; (5) a pool-to-grid fixture list (host glue, needs the grid's cell size).
 
 Removed: nothing created. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 240 — 2026-10-30 — Overhead flame rounds 16-17: the cloud stands on its coals
+
+Outcome: worked issue #7 (owner: run the capture rounds, don't list them as a blocker). Baseline captured at 0/30/45/60/66/76/90° (seed 7, seed 3 straight down, EV 9, 1280x720, frame 90) under `/tmp/l240/before`. Round 16 (ridged veins in the disc) NOT YET and reverted, patch kept in `docs/attempts/overhead-veins-round16.patch`; it found the real defect: at 66-80° the cloud hovered above a lit, crisp bed. Round 17 adds a foot billow at the bed (`src/flame.wesl`): at 76° the fire is a column on the bed; sweep 60-90° turns smoothly; 30° and 45° identical (AE 0.003/0.004). Verdict: hovering slice GREAT, overhead flame as a whole still NOT YET (lobed billow, no layered tongues). Shader only: no bench. Gate: build, test, test --features serde, examples, clippy, doc, fmt, wasm, wesl-check green.
+
+Heat haze (issue #7's other note): outside this crate; belongs to `bevy_elements` (atmosphere/post) or the game. Filing there is the next pass's first step if gh access allows; not filed this pass.
+
+Release: v0.2.20 is ~3.5 h old, the 6-hour rule blocks v0.2.21 until ~08:03 CDT; it carries 231-240.
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: layered tongues from straight above (the cloud is still one billow), then 60-66° tongue-over-bare-coals; (3) file heat haze on bevy_elements; (4) luminance-amplitude source; (5) pool-to-grid fixture list.
+
+Removed: nothing outside the clone; scratch `/tmp/l240` removed. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
