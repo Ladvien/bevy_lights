@@ -456,6 +456,7 @@ fn main() {
         .add_systems(Update, (report_kindled, report_snuffed))
         .add_systems(Update, report_look)
         .add_systems(Update, report_flicker)
+        .add_systems(Update, zz_split_log.after(LightsSystems::Pool).before(LightsSystems::Flicker))
         .add_plugins(GpuTiming)
         .run();
 }
@@ -1103,4 +1104,63 @@ fn report_snuffed(mut snuffed: MessageReader<Snuffed>, names: Query<&Name>) {
             Err(_) => println!("snuffed {}", message.entity),
         }
     }
+}
+
+/// THROWAWAY (iteration 273): every visible pool light's distance from the nearest candidate's light point
+/// (its position plus offset plus lean), per frame, under `LIGHTS_SPLIT_LOG=1`.
+#[allow(clippy::type_complexity)]
+fn zz_split_log(
+    lights: Query<(&PoolLight, &Transform, &Visibility, &Flicker)>,
+    candidates: Query<(Entity, &GlobalTransform, Option<&Transform>, Option<&ChildOf>, &PoolCandidate), Without<PoolLight>>,
+    sites: Query<&FlameSite>,
+    wind: Res<FlameWind>,
+    mut frame: Local<u32>,
+) {
+    *frame += 1;
+    if std::env::var_os("LIGHTS_SPLIT_LOG").is_none() {
+        return;
+    }
+    let speed = wind.velocity.length();
+    let points: Vec<Vec3> = candidates
+        .iter()
+        .map(|(entity, global, transform, parent, candidate)| {
+            let position = match (parent, transform) {
+                (None, Some(t)) => t.translation,
+                _ => global.translation(),
+            };
+            let lean = if speed > 0.0 {
+                match sites.get(entity).ok().or_else(|| sites.iter().find(|s| s.fire == Some(entity))) {
+                    Some(site) => {
+                        let d = candidate.diameter.or(site.diameter).unwrap_or(DEFAULT_FIRE_DIAMETER);
+                        let toward = wind.velocity / speed;
+                        Vec3::from(lean_light_shift(site.height, speed, d, [toward.x, toward.y]))
+                    }
+                    None => Vec3::ZERO,
+                }
+            } else {
+                Vec3::ZERO
+            };
+            position + candidate.offset + lean
+        })
+        .collect();
+    let mut worst = 0.0f32;
+    let mut worst_base = 0.0f32;
+    let mut split = 0usize;
+    let mut visible = 0usize;
+    for (slot, transform, visibility, flicker) in &lights {
+        if *visibility == Visibility::Hidden || flicker.base <= 1.0 {
+            continue;
+        }
+        visible += 1;
+        let d = points.iter().map(|p| p.distance(transform.translation)).fold(f32::MAX, f32::min);
+        if d > 0.01 {
+            split += 1;
+        }
+        if d > worst {
+            worst = d;
+            worst_base = flicker.base;
+        }
+        let _ = slot;
+    }
+    println!("split {} {visible} {split} {worst:.3} {worst_base:.0}", *frame);
 }
