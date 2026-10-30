@@ -5019,3 +5019,13 @@ Outcome: log only. Tree clean on `main` at 9136f98, no `wiggum/parked-*` branche
 Ranked candidates: (1) publish 0.2.21 after ~02:03 CDT 2026-10-31; (2) luminance-amplitude source (retry `distill_search` when the GPU frees 5 GB); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 269 — 2026-10-30 — No change: amplitude source searched locally and on the web, big near memory wedge
+
+Outcome: log only. Tree clean on `main` at cdf1fa2, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision (reopen needs a reference image); no owner comment since. bevy_emerge #103: no unmet crate-side need (newest comment is the `bevy_light_grid` 0.20 pin). bevy_elements#50 (heat haze) asks for no change here. 0.2.21 is not retried (429 at 08:41 CDT; window clears ~02:03 CDT on 2026-10-31).
+
+Work: candidate (2), luminance amplitude, researched without the GPU. Local corpus (362 documents): `rg` for flicker/fluctuation of flame, luminance or radiation finds only a fire-activity palaeoecology paper and a literary essay. `web_search` for candle photodiode percent modulation found Durox et al. style frequency data only: Nature Sci. Rep. 2020 (s41598-020-78229-x, arXiv 2207.02019) reports flicker frequencies (single candle ~11.5 Hz at 70 % O2, bundles 8 Hz, thin/thick candle 20.4/24.5 Hz in the ResearchGate characterisation) and the IES percent-flicker definition (Max-Min)/(Max+Min), but the arXiv text carries no luminance modulation depth. So `0.15` stays a design default under `flicker-depth.md`; no note or default changed. `gpu-tenant` log: MemAvailable 1.6-2.2 GiB ("close to wedging"), so a build/capture/gate was not started.
+
+Ranked candidates: (1) publish 0.2.21 after ~02:03 CDT 2026-10-31; (2) luminance amplitude (needs a photometric paper: Maynard 2013 or a candle photometry paper with a depth figure; the Nature 2020 supplementary material is unread); (3) heat haze (bevy_elements#50, host-side); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (`ground_ramp` already covers the grid hand-off; no requester).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
