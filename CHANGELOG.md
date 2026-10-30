@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.14] - 2026-10-29
+
 ### Added
 
 - **`ground_lux(lumens, distance, over)` and `ground_reach(lumens, lux, over)`**: the illuminance on flat ground and the radius of its iso-lux circle, with the cosine term `fire_lux` and `fire_reach` leave out (they are the square-on law a light is sized by). Use these for an overlay or gizmo painting the ground; at 4 m out and 0.9 m up the ground gets 0.22 of the square-on number. No existing number changed; the docs of `fire_lux` and `fire_reach` now say which surface they mean.
