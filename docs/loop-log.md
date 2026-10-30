@@ -4529,3 +4529,15 @@ Verdict: GREAT stands for embers in the three previously unchecked states; no de
 Top 5 remaining: (1) publish the next release (embers) once v0.2.20 is 6 h old; (2) embers in the hero GIF; (3) cited flicker amplitude as luminance (Maynard 2013); (4) overhead flame tongue structure; (5) GPU timestamp measurement of the ember quad.
 
 Removed: scratch `/tmp/l218`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 219 — 2026-10-30 — Hero GIF re-encoded from the current build, with embers
+
+Outcome: `docs/media/showcase.gif` (last encoded 2026-10-28) predated the overhead-flame rounds and `FlameEmbers`; re-encoded from the current build so the README's hero shows today's flames and the sparks. No source change. Issues: none open; no parked branch. Release: v0.2.20 is about 70 minutes old, so the 6-hour rule blocks a publish; embers ride in the next release.
+
+Ranked candidates: (1) hero GIF stale against the shipped look (README truthfulness); (2) cited flicker amplitude as luminance (Maynard 2013); (3) overhead tongue structure; (4) GPU timestamp for the ember quad; (5) heat haze (outside the map). (1) beat (2) because the README's first image was two releases out of date and the AGENTS rule says it must show what the crate has.
+
+Recipe: `docs/DEMOS.md` (`LIGHTS_EMBERS=4 LIGHTS_FRAMES=260 SHOT_FROM=9 EVERY=2 FOCUS_WALK=18`, xvfb `-n 141`, frames 0-59, `tools/gif.sh`, 400 px, 256 colours, `dither=none`). Result 60 frames, 400x225, 30 fps content, 1.79 MB (limit ~2 MB). No shader errors in the run's log. Read the full 1280x720 frame 30 and the encoded GIF's frame 30 at 250 %: sparks over all four braziers and some torches, warm pools on cool blue stone, shadows read, same palette banding as before (by design). Verdict: GREAT as hero media for what it claims. No new flicker Hz figure claimed (the walking camera dominates windows, as at iteration 211). README caption now names the embers and that the example's default is off.
+
+Top 5 remaining: (1) publish the next release (embers) once v0.2.20 is 6 h old (after about 08:05 CDT); (2) cited flicker amplitude as luminance (Maynard 2013); (3) overhead tongue structure; (4) GPU timestamp measurement of the ember quad; (5) catch/snuff clip for the README.
+
+Removed: scratch `~/tmp-lights/show`, `~/tmp-lights/short`, `/tmp/*.png`, `/tmp/new_showcase.gif`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
