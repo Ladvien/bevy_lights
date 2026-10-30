@@ -63,6 +63,13 @@ fn a_pool_reports_reach_hysteresis_and_the_template_light() {
 }
 
 #[test]
+fn a_pool_template_with_no_shadow_near_plane_is_named() {
+    let mut pool = LightPool::default();
+    pool.light.shadow_map_near_z = 0.0;
+    assert_eq!(fields(pool.problems()), ["light.shadow_map_near_z"]);
+}
+
+#[test]
 fn a_pool_candidate_and_a_kindle_report_their_bad_fields() {
     assert!(PoolCandidate::default().problems().is_empty());
     assert!(PoolCandidate::at_mean(900.0, 0.3).problems().is_empty());

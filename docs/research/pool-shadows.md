@@ -169,7 +169,11 @@ distance squared), so the shadowed lights are the best-ranked of the lights the 
   "fuzzy shadow contours". Bevy's point shadows soften only through PCSS (`soft_shadows_enabled` with a
   light `radius`, behind Bevy's `experimental_pbr_pcss` feature), which the pool does not forward. The
   braziers' shadows have the same edge, so the frame is consistent; this is the next item, not part of
-  this one.
+  this one. *Iteration 272 (`pool-template.md`) measured it: a torch's flame against its distance is the
+  table's "clear shadow boundaries", Bevy's point-light PCSS changes nothing at a flame's radius and
+  softens only at a radius of metres that also flattens the specular, and contact shadows dot a lit wall
+  without TAA. So neither is the pool's default; the pool now carries both, and every other template
+  setting, to every light live.*
 
 ## Iteration 271's findings
 

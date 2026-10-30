@@ -9,11 +9,13 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 - **The pool's shadow budget: `LightPool::max_shadowed`.** With the template's `shadow_maps_enabled` on, `Some(n)` gives a shadow to the `n` best-ranked lights the pool holds (the closest and brightest, RTR4's rule for many lights) and lets the rest light without one; `None`, the default, is every light, as before. Every shadowed point light renders six shadow views a frame, about 0.6 ms a light on an RTX 3090 in the courtyard, so the cap is what lets a sixteen-light pool afford shadows at all. A shadow is held with the pool's own `hysteresis`, and a light that earns or loses one because the ranking moved is cross-faded to itself through a free reserve: in a still scene the arriving shadow deepens over 21 frames (largest step 0.35 DN against a 4.8 DN pop) while the lit ground around it does not move. A change to the cap or the flag applies at once. A pool with shadows wants `reserve: 2`. Saved by serde. `docs/research/pool-shadows.md`.
 - **`PoolBudget::shadowed` and `casts_shadow(entity)`**: which held candidates' lights throw a shadow this frame, for an editor to show beside which are real.
 - **`shadow_set(holders, budget, hysteresis)`**: the engine-free rule that picks them.
+- **`LightPool::problems` names a template `light.shadow_map_near_z` that is not positive**: it is the near plane of each shadow cube face, and at 0 the face writes no depth.
 
 ### Changed
 
 - **The courtyard's figures cast shadows**, from the braziers and from the pool's three shadowed lights (`LIGHTS_SHADOWED`, default 3; the example's `LIGHTS_RESERVE` default is now 2). `LIGHTS_POOL_LOG` marks a shadowed light with `*`.
 - **The courtyard's sky fill (its camera's `AmbientLight`) is 20 cd/m², from 2**, so a figure's shadow thrown by a fire onto a wall the moon misses reads navy (`srgb(4,9,32)`) instead of black (`srgb(1,1,5)`); other shadows rise 2-3 DN. `docs/research/lighting-look.md`.
+- **A saved `LightPool` keeps every setting of its template light but `intensity`**: the shadow's biases and near plane, `contact_shadows_enabled`, `affects_lightmapped_mesh_diffuse` and, where Bevy's `experimental_pbr_pcss` feature gives the light one, `soft_shadows_enabled`, besides the colour, range, radius and shadow flag it saved before. A file that names none of them takes Bevy's defaults.
 
 ### Fixed
 
@@ -21,6 +23,7 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 - **A reserve light is put out when its fade ends.** It stayed visible at zero intensity for the rest of the run, a light the renderer still clustered and shaded.
 - **A light shown this frame is written this frame.** `FlickerPlugin` skipped a light whose `ViewVisibility` was false, and on the frame a light is switched on that is still last frame's value, so it rendered one frame at a stale intensity. A pool slot re-lit after standing empty did this; once reserve lights went out at the end of their fade (above), so did every cross-fade, opening with a one-frame 6 % drop of the pool's total (a reserve at 112 lm instead of 70 000) until this fix.
 - **A reserve fading a light out keeps that light's flicker rate and depth**, not just its phase, so the two ends of a cross-fade of a sized fire breathe together.
+- **Every setting of the pool's template light reaches every pool light live.** A change to `LightPool::light` copied only its colour, range and radius onto the lights already burning, while a light spawned later took the whole template, so a host that changed the shadow bias, the near plane or `contact_shadows_enabled` at runtime saw nothing until the pool grew, and then two kinds of light side by side. Now every field but `intensity` and `shadow_maps_enabled` (the pool's own, per light) is copied onto every light, reserves included, on the next frame (`docs/research/pool-template.md`).
 
 ## [0.2.21] - 2026-10-30
 

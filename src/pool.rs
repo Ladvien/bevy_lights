@@ -88,8 +88,9 @@ impl<F: Component> Plugin for LightPoolPlugin<F> {
 ///
 /// With the `serde` feature it is `Serialize` and `Deserialize`, so an editor can save it with a
 /// project and edit it live. `PointLight` itself has no serde derive, so [`LightPool::light`] is
-/// written as the four fields the pool copies onto its slots (`color`, `range`, `radius`,
-/// `shadow_maps_enabled`); its `intensity` is not saved (the pool ignores it) and reads back as 0.
+/// written as the fields the pool copies onto its lights: all of them but `intensity`, which the pool
+/// ignores and which reads back as 0. Bevy's `soft_shadows_enabled` is among them where Bevy's
+/// `experimental_pbr_pcss` feature gives the light one; in a build without it, it is saved as `false`.
 /// Every field is optional on the way in: a missing one takes its [`Default`].
 #[derive(Resource, Clone, Debug, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
@@ -103,14 +104,23 @@ pub struct LightPool {
     /// A dimmer shared by the whole pool, usually how lit the night is (0 puts every pool light
     /// out). Applied on top of each candidate's own intensity.
     pub gain: f32,
-    /// The light every slot is made from: its `color`, `range` and `radius` are copied onto every pool
-    /// light when one of them **changes**, its `shadow_maps_enabled` turns the pool's shadows on (on as
-    /// many lights as [`LightPool::max_shadowed`] allows), and its `intensity` is ignored (each slot's is
-    /// its candidate's, times [`LightPool::gain`]).
+    /// The light every slot is made from. Every field of it but two is every pool light's, copied onto
+    /// each light when the template **changes** — its `color`, `range`, `radius`, the shadow's quality
+    /// (`shadow_depth_bias`, `shadow_normal_bias`, `shadow_map_near_z`), `contact_shadows_enabled`,
+    /// `affects_lightmapped_mesh_diffuse`, and `soft_shadows_enabled` where Bevy has it — so a light the
+    /// pool spawns later matches the ones already burning. The two that are not: `shadow_maps_enabled`
+    /// turns the pool's shadows on (on as many lights as [`LightPool::max_shadowed`] allows), and
+    /// `intensity` is ignored (each slot's is its candidate's, times [`LightPool::gain`]).
+    ///
+    /// Contact shadows need the host's camera to carry Bevy's `ContactShadows` (and, measured on the
+    /// courtyard, TAA, or they dot a lit wall); soft shadows need Bevy's `experimental_pbr_pcss` feature
+    /// and soften visibly only at a `radius` of metres, which also widens every highlight the light makes.
+    /// Both are off in the default template.
     ///
     /// Changing `gain`, `size` or `reach` does not touch the slots' looks, so a host that tints its own
     /// fire lights (a palette recolouring every light that carries its fire marker) keeps its tint
-    /// through the night's glide, which writes `gain` every frame.
+    /// through the night's glide, which writes `gain` every frame. A change to the template does reset
+    /// every light to it, colour included.
     #[cfg_attr(feature = "serde", serde(with = "template_serde"))]
     pub light: PointLight,
     /// How much better a challenger must be than the light a slot already holds before it takes it:
@@ -177,12 +187,17 @@ impl Default for LightPool {
     }
 }
 
-/// Serde for [`LightPool::light`]: only the fields the pool copies onto its slots.
+/// Serde for [`LightPool::light`]: every field the pool's lights take from it (all but `intensity`).
 #[cfg(feature = "serde")]
 mod template_serde {
     use bevy::light::PointLight;
-    use bevy::prelude::Color;
+    use bevy::prelude::*;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    /// Bevy's `PointLight::soft_shadows_enabled` exists only with its `experimental_pbr_pcss` feature,
+    /// which this crate does not turn on, so it is read and written by name: saved as `false` and
+    /// ignored on load in a build without it.
+    const SOFT_SHADOWS: &str = "soft_shadows_enabled";
 
     #[derive(Serialize, Deserialize)]
     #[serde(default)]
@@ -191,40 +206,70 @@ mod template_serde {
         range: f32,
         radius: f32,
         shadow_maps_enabled: bool,
+        contact_shadows_enabled: bool,
+        soft_shadows_enabled: bool,
+        affects_lightmapped_mesh_diffuse: bool,
+        shadow_depth_bias: f32,
+        shadow_normal_bias: f32,
+        shadow_map_near_z: f32,
     }
 
-    impl Default for Template {
-        fn default() -> Self {
-            let light = super::LightPool::default().light;
+    impl From<&PointLight> for Template {
+        fn from(light: &PointLight) -> Self {
             Self {
                 color: light.color,
                 range: light.range,
                 radius: light.radius,
                 shadow_maps_enabled: light.shadow_maps_enabled,
+                contact_shadows_enabled: light.contact_shadows_enabled,
+                soft_shadows_enabled: light
+                    .field(SOFT_SHADOWS)
+                    .and_then(|field| field.try_downcast_ref::<bool>())
+                    .copied()
+                    .unwrap_or(false),
+                affects_lightmapped_mesh_diffuse: light.affects_lightmapped_mesh_diffuse,
+                shadow_depth_bias: light.shadow_depth_bias,
+                shadow_normal_bias: light.shadow_normal_bias,
+                shadow_map_near_z: light.shadow_map_near_z,
             }
         }
     }
 
-    pub fn serialize<S: Serializer>(light: &PointLight, serializer: S) -> Result<S::Ok, S::Error> {
-        Template {
-            color: light.color,
-            range: light.range,
-            radius: light.radius,
-            shadow_maps_enabled: light.shadow_maps_enabled,
+    impl Default for Template {
+        fn default() -> Self {
+            Self::from(&super::LightPool::default().light)
         }
-        .serialize(serializer)
+    }
+
+    impl Template {
+        /// The template light, with the intensity the pool ignores at 0.
+        fn into_light(self) -> PointLight {
+            let mut light = super::LightPool::default().light;
+            light.intensity = 0.0;
+            light.color = self.color;
+            light.range = self.range;
+            light.radius = self.radius;
+            light.shadow_maps_enabled = self.shadow_maps_enabled;
+            light.contact_shadows_enabled = self.contact_shadows_enabled;
+            light.affects_lightmapped_mesh_diffuse = self.affects_lightmapped_mesh_diffuse;
+            light.shadow_depth_bias = self.shadow_depth_bias;
+            light.shadow_normal_bias = self.shadow_normal_bias;
+            light.shadow_map_near_z = self.shadow_map_near_z;
+            if let Some(soft) =
+                light.field_mut(SOFT_SHADOWS).and_then(|field| field.try_downcast_mut::<bool>())
+            {
+                *soft = self.soft_shadows_enabled;
+            }
+            light
+        }
+    }
+
+    pub fn serialize<S: Serializer>(light: &PointLight, serializer: S) -> Result<S::Ok, S::Error> {
+        Template::from(light).serialize(serializer)
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(deserializer: D) -> Result<PointLight, D::Error> {
-        let t = Template::deserialize(deserializer)?;
-        Ok(PointLight {
-            color: t.color,
-            intensity: 0.0,
-            range: t.range,
-            radius: t.radius,
-            shadow_maps_enabled: t.shadow_maps_enabled,
-            ..Default::default()
-        })
+        Ok(Template::deserialize(deserializer)?.into_light())
     }
 }
 
@@ -371,6 +416,7 @@ impl LightPool {
         non_negative(&mut out, "fade_seconds", self.fade_seconds);
         positive(&mut out, "light.range", self.light.range);
         non_negative(&mut out, "light.radius", self.light.radius);
+        positive(&mut out, "light.shadow_map_near_z", self.light.shadow_map_near_z);
         out
     }
 }
@@ -426,27 +472,27 @@ impl PoolBudget {
     }
 }
 
-/// The three fields of [`LightPool::light`] that every pool light shares, as they were last written
-/// onto the slots. The shadow flag is not one of them: the pool sets it per slot.
-#[derive(Clone, Copy, PartialEq)]
-struct SlotLook {
-    color: Color,
-    range: f32,
-    radius: f32,
+/// The part of [`LightPool::light`] every pool light shares: the whole template but the two fields each
+/// light sets for itself — its `intensity` (its candidate's, through its [`Flicker`]) and its
+/// `shadow_maps_enabled` (the shadow budget's) — zeroed here so a comparison ignores them.
+fn shared(template: &PointLight) -> PointLight {
+    PointLight { intensity: 0.0, shadow_maps_enabled: false, ..*template }
 }
 
-impl SlotLook {
-    fn of(light: &PointLight) -> Self {
-        Self { color: light.color, range: light.range, radius: light.radius }
-    }
+/// Whether two lights agree field for field, by the light's own `Reflect` equality, so a field this
+/// crate does not name is compared too: Bevy's `soft_shadows_enabled`, which exists only with its
+/// `experimental_pbr_pcss` feature.
+fn same_light(a: &PointLight, b: &PointLight) -> bool {
+    a.reflect_partial_eq(b) == Some(true)
+}
 
-    /// Writes the look onto a slot, touching it (and so its change detection) only if it differs.
-    fn apply(self, light: &mut PointLight) {
-        if light.color != self.color || light.range != self.range || light.radius != self.radius {
-            light.color = self.color;
-            light.range = self.range;
-            light.radius = self.radius;
-        }
+/// Writes the template's shared part onto a pool light, keeping the light's own intensity and shadow
+/// flag, and touching it (and so its change detection) only if a setting differs.
+fn apply_shared(look: &PointLight, light: &mut Mut<PointLight>) {
+    let wanted =
+        PointLight { intensity: light.intensity, shadow_maps_enabled: light.shadow_maps_enabled, ..*look };
+    if !same_light(light, &wanted) {
+        **light = wanted;
     }
 }
 
@@ -512,8 +558,8 @@ struct HandOffState {
     /// Seconds since each slot last changed owner (or shadow). A slot that has never changed owner holds
     /// [`f32::MAX`], so its fade is finished.
     fade_at: std::collections::HashMap<usize, f32>,
-    /// The template's shared fields as they were last written onto the slots.
-    applied: Option<SlotLook>,
+    /// The template's shared part ([`shared`]) as it was last written onto the slots.
+    applied: Option<PointLight>,
     /// The shadow settings (the template's flag and [`LightPool::max_shadowed`]) the slots were last
     /// shadowed under: a change of settings applies at once, a change of ranking cross-fades.
     shadow_settings: Option<(bool, Option<usize>)>,
@@ -529,8 +575,9 @@ struct HandOffState {
 /// One frame, in order:
 ///
 /// 1. **Slots.** Spawns the missing entities so slots `0..size` exist, and despawns those past
-///    `size`. When the shared fields of [`LightPool::light`] changed, they are copied onto every
-///    slot; each slot's intensity is left to the assignment.
+///    `size`. When [`LightPool::light`] changed, every field of it but `intensity` and
+///    `shadow_maps_enabled` is copied onto every slot, reserves included; each slot's intensity is left
+///    to the assignment and its shadow flag to the shadow budget.
 /// 2. **Focus.** The one entity carrying `F`. None, or more than one, means no assignment this frame
 ///    (and a warning for the second case): a pool with two cameras has no single near.
 /// 3. **Candidates.** Every [`PoolCandidate`] whose own [`Visibility`] is not `Hidden`, within
@@ -574,7 +621,7 @@ fn assign_pool<F: Component>(
             commands.spawn((
                 Name::new(format!("Pool light {slot}")),
                 PoolLight { slot },
-                PointLight { intensity: 0.0, shadow_maps_enabled: false, ..pool.light },
+                shared(&pool.light),
                 Flicker { base: 0.0, phase: 1.3 * slot as f32, ..default() },
                 Transform::default(),
                 Visibility::Hidden,
@@ -587,15 +634,16 @@ fn assign_pool<F: Component>(
         }
     }
 
-    // The shared light settings follow the template, so a host can recolour or re-range the whole pool
-    // in one write. They are applied when the *template's* three shared fields change, not whenever the
-    // resource does: a host that writes `gain` every frame (the night's glide) would otherwise reset
-    // every slot to the template's colour on every frame, undoing a palette that tints its own lights.
-    // A slot's own intensity and shadow are the assignment's, never the template's.
-    let look = SlotLook::of(&pool.light);
-    if *applied != Some(look) {
+    // The shared light settings follow the template, so a host can recolour, re-range or re-shadow the
+    // whole pool in one write: every field but the two each light sets for itself ([`shared`]), so a
+    // light spawned later and a light already burning carry the same settings. They are applied when the
+    // *template's* shared part changes, not whenever the resource does: a host that writes `gain` every
+    // frame (the night's glide) would otherwise reset every slot to the template's colour on every frame,
+    // undoing a palette that tints its own lights.
+    let look = shared(&pool.light);
+    if !applied.as_ref().is_some_and(|last| same_light(last, &look)) {
         for (_, _, _, _, _, mut light) in &mut slots {
-            look.apply(&mut light);
+            apply_shared(&look, &mut light);
         }
         *applied = Some(look);
     }
