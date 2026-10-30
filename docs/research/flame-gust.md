@@ -42,7 +42,7 @@ Hosts own the mean wind (weather is `bevy_elements`'). A `FlameGust { mean, inte
 |---|---|---|
 | `intensity` default | 0.25 | design default. IEC class C is 0.12 at hub height over open water (Hannesdóttir et al., quoted above); ground level among walls is rougher, and a lean is only readable above about 0.2. `I = 0.12` is available and reads as a faint sway |
 | `timescale` default | 2.0 s | design default: slow against the flame's 1–3 Hz puff (`flicker_rate`), fast enough to see a gust build and drop within a few seconds. The paper's 120 m turbulence length scale at 100 m height over a 10 m/s mean is 12 s; near the ground the eddies are smaller, so a shorter time is used |
-| `N` (sinusoids) | 8, frequencies `1 / (2π T) · 2^(k − 3)`, k = 0..7 (0.12 to 15 times the corner) | design default: spans the one-pole spectrum's knee and a decade above, where it has lost 99 % of its power |
+| `N` (sinusoids) | 12, frequencies `1 / (2π T) · 0.125 · √2^k`, k = 0..11 (0.125 to 5.7 times the corner) | design default: spans the one-pole spectrum's knee; beyond 5.7 corners it holds about 3 % of the power, and cutting it keeps a frame step under 0.1 sigma |
 | speed floor | 0 | a gust cannot blow upwind of the mean's heading by speed; the heading wander handles direction |
 | heading wander | `I · y(t)` rad | design default (see above) |
 | the unit process's variance | normalised to exactly 1 over the discrete amplitudes | construction |

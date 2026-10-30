@@ -4118,3 +4118,27 @@ Gate: build (release and dev), test, test --features serde, build --examples --a
 5. GIF banding in the pool gradients.
 
 Release: v0.2.6 published, https://crates.io/crates/bevy_lights/0.2.6 (tag `v0.2.6`, commit `6a80913`; `cargo semver-checks` found no breaking change). Cleanup: removed `/tmp/l196` (captures, binaries, gate logs); this pass made no worktree. Leftover baseline worktrees from earlier passes, listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13` (all detached heads, sizes and cleanliness in the pass transcript; none touched).
+
+## Iteration 197 — 2026-10-29 — flame gusts (`FlameGust`, `gust_unit`, `gust_velocity`)
+
+Outcome: a new `FlameGust { mean, intensity, timescale, seed }` resource makes `FlamePlugin` write `FlameWind` every frame from `model::gust_velocity`: `|mean| · (1 + I·x(t))` with the heading turned by `I·y(t)` rad, `x`/`y` independent unit-variance stationary processes from `model::gust_unit` (stateless sum of 12 sinusoids under a one-pole spectrum, `f64` time so it stays smooth after hours). Without a `FlameGust` the plugin leaves `FlameWind` alone. `courtyard` takes `LIGHTS_GUST=I`.
+
+Why first: open issues none, no parked branch; the loop-196 backlog's item 2 (gusts) was the only one with a researched path. Runner-up: overhead flame at EV 9 (still no researched construction). Skipped: none filed.
+
+Sources: craft `10.7456_tojdac.1674124` (Doğaner 2025); technical Hannesdóttir, Kelly & Dimitrov 2019 `10.5194/wes-4-325-2019` (Gaussian stationary turbulence, meaning of turbulence intensity, IEC class C 0.12; read from the publisher's HTML). Corpus `distill_search` for gust spectra returned nothing relevant. No shipping-game source (`Pending index` in `docs/research/flame-gust.md`); spectral shape, `intensity` 0.25 and `timescale` 2 s are design defaults.
+
+Critique and verdict (`/tmp/l197/critique.md`, removed with the scratch): gentle breeze (0.4 m/s, I 0.5, brazier crop, 14 frames 0.5 s apart): lean eases between upright and ~40° over 1–2 s, foot rooted, no clipping, no twitch at the 2.6 Hz puff: GREAT. At 1 m/s the lean sits on the flat part of the tilt law (sin θ 0.63–0.76 over 0.65–1.35 m/s), gust vs steady frame difference 0.03–0.11 DN mean: nearly invisible, physics and documented in the README. Process checks: variance 0.6–1.4 for six seeds, frame step under 0.1σ, autocorrelation at lag T within 0.2 of e⁻¹, heading σ within 0.1 of I. A first 16-tone version stepped 0.107σ per frame; cut to 12 tones (top 5.7 corners). A gate failure caught `intensity 0` returning `x≈-4e-8` for a mean along +Z; it now returns the mean exactly.
+
+Craft numbers (key-to-fill, falloff, flicker, hand-off): untouched. Bench `bench_lights` (CPU, pool 16, 5000 candidates): min 268 µs, p50 427 µs (before, loop 196: min 254–291, p50 512–597); no flames in the bench, no expected change. The gust is one 24-sine evaluation per frame on the CPU.
+
+Decisions assumed (owner may override): host keeps owning the mean wind; gusts are an opt-in resource, not on by default; heading wander `= I` rad.
+
+Gate: build (release, dev), test, test --features serde, build --examples --all-features, clippy -D warnings, doc -D warnings, fmt --check, wasm, wesl-check all green.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Spatial gust coherence (a gust crossing the courtyard) if a host reports wind-in-step looking wrong; needs a source.
+4. Bearers are placeholder capsules.
+5. GIF banding in the pool gradients.
