@@ -4238,3 +4238,19 @@ Why: no open issues, no parked branch. Editor-needs rule (bevy_emerge #103, a pl
 Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). No worktrees or scratch made; earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
 
 Release: v0.2.12 published, https://crates.io/crates/bevy_lights/0.2.12 (tag `v0.2.12`; semver-checks: no update required).
+
+## Iteration 203 — 2026-10-29 — `FireKind::candidate`
+
+Outcome: `FireKind::candidate(lux, over)` returns the `PoolCandidate` for a kind, sized like `FireKind::light` (mean lights the kind's reach to `lux`) with the kind's diameter and depth, so `flicker`/`light`, `site` and `candidate` all come from one name. Test `a_kinds_pool_candidate_is_the_same_fire_as_its_light` in `tests/settings.rs`.
+
+Why: no open issues, no parked branch. Editor-needs rule (bevy_emerge #103, 3 comments, none asking for anything new): a placed fire's three components came from one name for two of them; the pooled one was hand-assembled. Runner-up: overhead flame at EV 9 (no researched construction). Skipped issues: none filed. No number, shader or render path changed: no capture, no bench.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
+4. Spatial gust coherence if a host reports it.
+5. Bearers are placeholder capsules; GIF banding.
+
+Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). No worktrees or scratch made; earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.

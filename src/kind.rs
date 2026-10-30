@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use crate::model::{CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, fire_lumens, flicker_rate};
-use crate::{FlameSite, Flicker};
+use crate::{FlameSite, Flicker, PoolCandidate};
 
 /// A named kind of fire: its fuel-bed diameter, flicker depth and flame height together, so a
 /// picker (or a project file) stores one word instead of three loose numbers.
@@ -110,6 +110,18 @@ impl FireKind {
     /// [`flicker`](Self::flicker) averaging [`lumens`](Self::lumens).
     pub fn light(self, lux: f32, over: f32) -> Flicker {
         self.flicker(self.lumens(lux, over))
+    }
+
+    /// The pool candidate for this fire, sized like [`light`](Self::light): its mean lights
+    /// [`reach`](Self::reach) to `lux` with the light `over` metres above the ground. `offset` is
+    /// zero (put the candidate on the [`FlameSite`] entity, whose origin is the flame's foot), `phase`
+    /// is `None`, and `diameter` and `depth` are this kind's, so the light a torch is handed breathes
+    /// at the flame's own rate and depth.
+    pub fn candidate(self, lux: f32, over: f32) -> PoolCandidate {
+        PoolCandidate {
+            diameter: Some(self.diameter()),
+            ..PoolCandidate::at_mean(self.lumens(lux, over), self.depth())
+        }
     }
 
     /// How fast the fire flickers, in hertz: the puffing law at [`diameter`](Self::diameter).
