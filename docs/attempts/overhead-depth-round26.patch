@@ -1,0 +1,16 @@
+diff --git a/src/flame.wesl b/src/flame.wesl
+index 2ab15d7..466dea6 100644
+--- a/src/flame.wesl
++++ b/src/flame.wesl
+@@ -377,7 +377,10 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
+         let licks = mix(1.0, clamp(0.3 + 1.4 * streak, 0.0, 1.3), smoothstep(0.0, 0.35, rq / radius)) * mix(0.05, 1.0, masses);
+         mask = max(mask, smoothstep(0.0, 0.18, disc) * licks * in.overhead.x);
+         // Each mass is hottest on its crest: the clefts between are cooler, so the colour separates them as well as the brightness.
+-        let crest = mix(0.3, 1.0, masses);
++        let depth_a = fbm(q * 4.1 / (1.0 + OVERHEAD_FLOW_GROWTH * cycle) + vec2<f32>(-3.3, 5.1));
++        let depth_b = fbm(q * 4.1 / (1.0 + OVERHEAD_FLOW_GROWTH * cycle_b) + vec2<f32>(8.8, -1.7));
++        let height = clamp(0.5 + 2.2 * (weight_a * (depth_a - 0.5) + weight_b * (depth_b - 0.5)) * inverseSqrt(weight_a * weight_a + weight_b * weight_b), 0.0, 1.0);
++        let crest = mix(0.3, 1.0, masses) * mix(1.0, mix(0.55, 1.35, height), smoothstep(0.10, 0.45, rq / radius));
+         // The core is a round heat, only its outline is lobed: a heat that followed the lobes drew rays out of the centre.
+         let core_radius = 0.5 * (radius + FLAME_HALF_WIDTH);
+         heat = max(heat, clamp(1.0 - rq / core_radius, 0.0, 1.0) * (1.0 - 0.45 * rq / core_radius) * mix(0.75, 1.1, streak) * in.overhead.x);

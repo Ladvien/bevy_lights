@@ -4873,3 +4873,11 @@ Outcome: worked issue #7 (only open issue; no parked branches; no new research, 
 Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: a separate depth field for tongues rising toward the viewer, or stop at 24 rounds and treat the straight-down view as done (owner's call on #7); (3) luminance-amplitude source; (4) pool-to-grid fixture list (plain-data export of lit fires beside `ground_ramp`); (5) heat haze hook once bevy_elements#50 lands.
 
 Removed: nothing outside the clone; scratch `/tmp/l248` left until the next pass reads it? No: removed below. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 249 — 2026-10-30 — Overhead flame round 26: depth field rejected, rounds stopped
+
+Outcome: worked issue #7 (only open issue; no parked branches; no new research, home-still not needed). Round 26 gave the cleft crests their own widened `fbm` depth field (round 25's stated blocker). Captured seed 7, EV 9, 1280x720, frame 90, eye 2.3 m above the brazier (`/tmp/l249/{b,a}/close.png`): crests slightly yellower, not readable at full frame. Verdict NOT YET; reverted, patch `docs/attempts/overhead-depth-round26.patch`, note in `docs/research/flame-overhead.md`. Assumed decision (owner may override), posted on #7 with label `assumed-decision`: stop layering noise on the straight-down view (the close view is already a cloud of masses and clefts round a whole core; 9 m is below resolution; 45-66° unchanged); reopen with a reference image of a specific defect. #7 left open for the owner. No source change: gate and bench not run (wesl-check passed on the attempt). Release: v0.2.20 tagged 02:03 CDT, 4.4 h old at 06:30; v0.2.21 blocked until ~08:03 CDT; carries 231-249. bevy_emerge#103 not re-read this pass.
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) luminance-amplitude source (none citable so far); (3) pool-to-grid fixture list (plain-data export of lit fires beside `ground_ramp`); (4) heat haze hook once bevy_elements#50 lands; (5) overhead flame only on a reference image showing a defect.
+
+Removed: scratch `/tmp/l249`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
