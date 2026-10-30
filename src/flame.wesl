@@ -41,6 +41,9 @@ struct Flame {
 
 // The quad's width over its height: narrower than tall, with a margin for the sway.
 const FLAME_ASPECT: f32 = 0.6;
+// A catching flame's drawn size is its share of the burn to this power: a flame's height goes as the heat release rate to the 2/3
+// while it is small (Delichatsios 2007), and the light goes with the burn itself. `docs/research/flame-catch-size.md`.
+const CATCH_SIZE_EXPONENT: f32 = 0.6666667;
 const TAU: f32 = 6.2831853;
 const PI: f32 = 3.14159265;
 // The silhouette: its widest half width (in flame heights), where its tip is, and the profile's own peak (so the widest
@@ -255,8 +258,9 @@ fn vertex(vertex_in: Vertex) -> FlameVertexOutput {
     // over the same envelope the light flares by (`kindle_gain`), so the source and the light it
     // motivates are one event in two channels. `took` is the instance scale `update_flames` writes,
     // read above; multiplying it in here is the whole difference between a documented catch and a
-    // flame that appears whole. `docs/research/flame-kindle.md` measures it.
-    let size = tag.y * material.params.y * took;
+    // flame that appears whole. `docs/research/flame-kindle.md` measures it; the 2/3 power is the height law
+    // in `docs/research/flame-catch-size.md`, so the flame is as far along as the light it motivates.
+    let size = tag.y * material.params.y * pow(max(took, 0.0001), CATCH_SIZE_EXPONENT);
     // The camera's elevation over the flame's source: 0 level, 1.57 straight down.
     let centre = origin + up * (size * SOURCE_HEIGHT);
     let to_eye = view.world_from_view[3].xyz - centre;

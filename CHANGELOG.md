@@ -12,6 +12,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 - **`FireKind::fire(lux, over)`**: the flame and its light as one bundle, `(FlameSite, PoolCandidate)`, so a picker spawns both from one call and a flame never goes without the light the pool hands it (the sparks stay `embers()`, absent for a candle). No new numbers. `docs/research/fire-kinds.md`.
 
+### Changed
+
+- **A catching or dying flame is taller for its share of the light.** The flame's (and its sparks') drawn size was its catch, `took`, in a straight line, so its area was `took²` against a light that goes with `took`: a third of the way through a catch the light was a third up and the flame a sliver. The size is now `took^(2/3)`, the intermediate-regime law for flame height against heat release rate (Delichatsios 2007), so a settled flame (`took` 1) and a put-out one (0) are exactly as before and the middle moves up (0.3 draws 0.45, 0.5 draws 0.63). On the courtyard's relight the flame shows about one saved frame (33 ms) earlier. `docs/research/flame-catch-size.md`.
+
 ### Documentation
 
 - The courtyard example's `LIGHTS_GPU_TIMING=1` prints mean GPU time per render pass; with it the ember quad measures about 0.1 ms a frame (transparent pass 11 µs without embers, 107 to 137 µs with, RTX 3090, 52 flames).

@@ -40,6 +40,8 @@ const TAU: f32 = 6.2831853;
 const SLOTS: u32 = 16u;
 // The tag's rate byte is `rate / MAX_RATE`; `MAX_EMBER_RATE` in `src/embers.rs` is this number.
 const MAX_RATE: f32 = 8.0;
+// The same law as the flame's size (`flame.wesl`), so the sparks do not outgrow the flame they leave.
+const CATCH_SIZE_EXPONENT: f32 = 0.6666667;
 // How far up the quad reaches, in flame heights above the foot, and how wide it is either side of the axis.
 const RISE_MAX: f32 = 2.6;
 const HALF_WIDTH: f32 = 0.7;
@@ -163,7 +165,7 @@ fn vertex(vertex_in: Vertex) -> EmberVertexOutput {
     // the rate, as a share of MAX_RATE.
     let raw = mesh_functions::get_tag(vertex_in.instance_index);
     let tag = unpack2x16unorm(raw);
-    let size = tag.y * material.params.y * took;
+    let size = tag.y * material.params.y * pow(max(took, 0.0001), CATCH_SIZE_EXPONENT);
     let centre = origin + up * (size * SOURCE_HEIGHT);
     let to_eye = view.world_from_view[3].xyz - centre;
     let sin_e = clamp(to_eye.y / max(length(to_eye), 1e-4), 0.0, 1.0);
