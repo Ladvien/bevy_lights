@@ -259,8 +259,10 @@ pool-fire tilt for *its own fire's* `diameter`, so a brazier bends less than a t
 every flame in the scene bends the same way. The flame keeps its foot and its length and turns about its
 foot (a 3 m/s wind lays a 0.34 m brazier's flame over by about 60°; the lean is capped at 70°), and it is
 drawn upright from straight overhead. No `FlameWind` (or a zero one) draws every flame exactly as before.
-`flame_tilt(speed, diameter)` is the same law as a plain function. The fire's light does not move with the
-lean. `LIGHTS_WIND=x,z cargo run --release --example courtyard` shows it; `docs/research/flame-wind.md`
+`flame_tilt(speed, diameter)` is the same law as a plain function. The pool's light for a fire moves with the
+lean, to where the leaned flame's middle is (`lean_light_shift`), so a fire spawned from a `FireKind` bundle
+(`FireKind::Brazier.fire(lux, over)`: its light is handed to the flame's middle, not its foot) keeps its key
+light in the flame in a wind. `LIGHTS_WIND=x,z cargo run --release --example courtyard` shows it; `docs/research/flame-wind.md`
 has the sources.
 
 **Gusts.** Insert `FlameGust { mean, intensity, timescale, seed }` instead of writing `FlameWind` yourself and `FlamePlugin` writes `FlameWind::velocity` every frame from `gust_velocity`: the mean wind with a stationary Gaussian fluctuation of relative size `intensity` (the turbulence intensity, 0.25 by default) that stays correlated for `timescale` seconds (2 by default), with the heading wandering about `intensity` radians. It is a pure function of `Time<Real>` and the `seed`, so two machines see the same wind and a paused world's fires still sway. The tilt law is steep at a breeze and flat at a gale, so gusts read best at 0.2–0.8 m/s (a flame easing between roughly 20° and 40°); at 3 m/s the flame is already near its cap. `LIGHTS_WIND=0.4,0 LIGHTS_GUST=0.5 cargo run --release --example courtyard` shows it; `docs/research/flame-gust.md` has the sources and what is a design default.

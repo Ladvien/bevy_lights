@@ -313,8 +313,9 @@ impl FlameLook {
 /// metres converts first. `x` is the world's X and `y` the world's Z (`Vec3::new(v.x, 0.0, v.y)` is
 /// the direction the air moves).
 ///
-/// The lean is drawn in the flame's own quad; the fire's light does not move with it
-/// (`docs/research/flame-wind.md`, Deviations).
+/// The lean is drawn in the flame's own quad, and the pool's light for the fire moves with it: a pooled
+/// light on the [`FlameSite`]'s entity (or one the site's `fire` names) is carried to where the leaned flame's
+/// middle is ([`lean_light_shift`](crate::lean_light_shift), `docs/research/flame-lean-light.md`).
 #[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 #[reflect(Resource)]
