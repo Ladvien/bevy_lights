@@ -4787,3 +4787,11 @@ Outcome: log only. Tree clean on `main` at f691b53, no open issues (`gh` worked)
 Ranked candidates: (1) publish v0.2.21 after 08:03; (2) overhead flame construction; (3) heat haze (outside the map); (4) luminance-amplitude source; (5) a pool-to-grid fixture list (host glue, needs the grid's cell size).
 
 Removed: nothing created. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 239 — 2026-10-30 — No-op: nothing workable, release gated by the 6-hour rule
+
+Outcome: log only. Tree clean on `main` at 06e106c, no open issues (`gh` worked), no `wiggum/parked-*` branches. Release: v0.2.20 is 191 min old at 05:15 CDT; v0.2.21 is blocked until ~08:03 CDT and carries iterations 231-236 (14 files, +966/-30 in `src`, `README`, `Cargo.toml` since the tag). Home-still, capture, bench and gate not run (no code changed). Blocker for a feature pick, as in 237-238: overhead flame needs a multi-round capture job, heat haze is outside the ownership map, no citable luminance-amplitude source.
+
+Ranked candidates: (1) publish v0.2.21 after 08:03; (2) overhead flame construction; (3) heat haze (outside the map); (4) luminance-amplitude source; (5) a pool-to-grid fixture list (host glue, needs the grid's cell size).
+
+Removed: nothing created. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
