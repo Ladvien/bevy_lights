@@ -4436,3 +4436,19 @@ Ranked candidates this pass: (1) none workable as a defect, (2) cited flicker am
 5. Pool top-K selection if a host reports the pool over 0.5 ms.
 
 Removed this pass: scratch `/tmp/l213`, `/tmp/m.html`, `/tmp/m.pdf`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 214 — 2026-10-30 — Audit pass: nothing shipped (release window closed, overhead flame judged at diminishing returns)
+
+Outcome: no code change. No open issues on bevy_lights (list read), no new parked branch (only the old iteration-115 WIP). Release: v0.2.20 is tagged (annotated 02:03 CDT) and unpublished; crates.io's newest version is 0.2.19 (published 06:45 UTC, 36 minutes before this pass), 19 versions in 24 h, so the 6-hour rule applies and no publish was attempted. The next pass at or after 12:45 UTC publishes 0.2.20 as is (no re-bump, no re-tag), then `cargo info bevy_lights@0.2.20` and the crates.io URL here.
+
+Checked: gate on clean `main` (`3a6c872`) is green: build release and debug, `cargo test`, `cargo test --features serde`, clippy -D, doc -D, fmt, wasm, wesl-check (both DEPTH_PREPASS variants). Captures of one brazier, seed 7, frame 120, 1280x720, from straight down and at 70°, 55° and 30° elevation (`/tmp/l214/before`, removed): the round-15 look holds, the flame is a lobed disc as wide as the coal bed with a hot core from above and a leaning tongue below 70°; no seam, ray, pop or unmotivated light. A sixteenth shader round has no defect to aim at; the remaining NOT YET (tongue structure from straight above) is taste, and a change would need a release the window blocks.
+
+### Top 5 remaining, ranked
+
+1. Publish v0.2.20 (no re-bump, tag exists), crates.io URL here.
+2. Cited flicker amplitude: needs Maynard 2013 from a host with library access.
+3. Overhead flame: tongue structure from straight above.
+4. Per-fire flame colour, if a per-fuel colour-temperature table is found.
+5. Pool top-K selection if a host reports the pool over 0.5 ms.
+
+Removed this pass: scratch `/tmp/l214`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
