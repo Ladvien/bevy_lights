@@ -52,6 +52,10 @@ Candle and Lantern are flames small enough that the 1 m floor of `fire_lumens` d
 
 A picker where a bonfire lights a courtyard, a torch a doorway and a candle a table, with no lumen number typed by the author, and with the flame never visibly too small or too large for the ground it lights.
 
+## Read back: `fire_lux` and `fire_reach`
+
+The same inverse-square law (`E = Φ / 4π / slant²`, `book_real_time_rendering_4th_akenine`) read the other way, for an editor that draws a placed fire's reach: `fire_lux(lumens, reach, over)` is the ground illuminance, `fire_reach(lumens, lux, over)` the radius of the iso-lux circle. Both clamp as `fire_lumens` does, so they invert it exactly for reach >= 1. No new constant.
+
 ## Deviations
 
 None: Brazier and Torch are the shipped constants. The other four are design defaults, flagged above.
