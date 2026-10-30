@@ -459,7 +459,6 @@ fn update_flames(
         &ChildOf,
     )>,
     sites: Sites,
-    wind: Option<Res<FlameWind>>,
 ) {
     if !assets.built {
         return;
@@ -470,7 +469,7 @@ fn update_flames(
     let dt = real.delta_secs();
     let t = time.elapsed_secs();
     // The wind this frame: speed and the unit direction it blows towards, on the ground plane.
-    let wind = wind.as_deref().map_or((0.0, Vec2::ZERO), |w| {
+    let wind = sites.wind.as_deref().map_or((0.0, Vec2::ZERO), |w| {
         let speed = w.velocity.length();
         (speed, if speed > 0.0 && speed.is_finite() { w.velocity / speed } else { Vec2::ZERO })
     });
@@ -557,6 +556,7 @@ struct Sites<'w, 's> {
     sites: Query<'w, 's, (&'static FlameSite, Option<&'static ChildOf>)>,
     lights: Query<'w, 's, (Option<&'static Flicker>, Option<&'static PoolCandidate>)>,
     kindles: Query<'w, 's, &'static Kindle>,
+    wind: Option<Res<'w, FlameWind>>,
 }
 
 impl Sites<'_, '_> {
