@@ -193,7 +193,7 @@ Round 6's values, all in `src/flame.wesl`; each is a design default calibrated i
 | disc radius `R` | `FLAME_HALF_WIDTH = 0.20` of the flame's height, rippled `±25 %` by the disc's own fbm | the plume's own widest half-width, already in the shader |
 | `OVERHEAD_HEIGHT` | 1.0 flame heights | design default: covers the foreshortened tongue (±0.35) and the ellipse (±0.2) at every elevation past 50° |
 | `OVERHEAD_COS_FLOOR` | 0.05 | design default: `cos` is floored when a screen distance is turned back into a world height, so a camera straight down does not divide by zero |
-| `OVERHEAD_TONGUE` | 0.6 | design default: the share of the tongue's brightness that is gone at full overhead, judged in captures |
+| `OVERHEAD_TONGUE` | 0.6 × `topdown⁵` | design default (round 12: was `× topdown`): the share of the tongue's brightness that is gone at full overhead, applied late so a flame still in view at 60-70° keeps it, judged in captures |
 | tongue foot softening | `+0.30·topdown` on the 0.06 foot | design default: removes the hard line across the bed |
 | disc brightness | `clamp(1.2·(ripple − 0.5) + 1.0, 0, 1.3)` | design default |
 | overhead rim cooling | `1 − 0.45·radial` | design default, from the tongue's `1 − 0.85·u` reduced because a cross-section has no long axis to fall off along |
@@ -270,3 +270,13 @@ No shader change. `courtyard` gains `LIGHTS_EV100` (default 6). Captured the unm
 ### Round 11 — the edge-on tongue (iteration 157)
 
 At `LIGHTS_EV100=9`, straight down (eye 5.3,9,5), the flame reads as a ragged burst with a pale core on a dark bed, and one defect shows at 24x zoom: a faint one-pixel horizontal slab right of the core, past the ellipse. It is the upright tongue seen edge-on: `rise` is clamped by `OVERHEAD_COS_FLOOR`, so the widest row is drawn as a line, and `OVERHEAD_TONGUE` leaves 40 % of it. Fix: the tongue's factor is also multiplied by `1 - smoothstep(0.970, 0.996, sin(elevation))` (design default; 0.970 is sin 76°, where every earlier term is already settled). Captures `/tmp/l157/{before,after}/`: the slab is gone at 90°, 76° differs by 2 pixels (GPU noise), 60° by 0. Not claimed: the burst is still not tongues; that stays NOT YET.
+
+### Round 12 — the mid-blend dip (iteration 207)
+
+**Defect.** Sweeping a camera 4 m from a brazier (`/tmp/l207/before`, seed 7, frame 90, 1280x720) the flame is a vivid tongue at 45° and 55° and a pale haze at 66°-70°: the tongue is dimmed by `OVERHEAD_TONGUE · topdown`, which is already 0.4 · 0.6 = 24 % gone at 66° while the cross-section has barely arrived. Mean grey of the tongue window (120x70 px above the coal centre): 134.5, 129.8, 118.1, 112.9, 111.4 at 55°, 60°, 66°, 70°, 76°, a fall of 11.7 and then 5.2 DN per step.
+
+**Sources, all quoted above:** craft — Doğaner (`10.7456_tojdac.1674124`), a practical must stay visibly where its light is, which a fire that dims as the camera rises does not; production — Gregory §11.4.3 and `s2011-advances-pdf-slides`, shipped fire layers hide any one layer's loss of face; technical — Akenine-Möller et al. §13.6.3, an axial billboard loses area as `cos(elevation)`, which the quad's facing switch at 50° already undoes, so the brightness it keeps is not an artefact to dim away.
+
+**Model.** The tongue's dimming is `OVERHEAD_TONGUE · topdown⁵` instead of `· topdown`: nothing below ~60°, the full 0.6 only at 76° and past, where the disc is fully in. Design default, judged in captures. Frames at or below 55° and at 76° and past are unchanged (`magick compare` AE 0.01 px at 45°, 55°, 85°; 0.7 px at 76°).
+
+**Result.** Same window, same seed: 131.3, 123.6, 116.2, 113.2, 111.4 at 60°, 66°, 70°, 73°, 76° (steps 7.7, 7.4, 3.0, 1.8), so the fall is spread evenly instead of landing between 60° and 66°. At 66° the tongue's mean is +5.5 DN over round 11's. Still NOT YET as a whole: the flame is lower in contrast than at 45° because the floor behind it is lit orange, and a faint stub of the tongue's tip stands above the bowl's rim at 60°-66°.

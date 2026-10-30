@@ -326,9 +326,10 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     body -= (1.0 - n3) * 0.9 * pow(u, 1.8);
     body = select(body, -1.0, dy < 0.0);
     // From above the tongue is a short smear along the view and the cross-section is the shape, so the tongue gives way as the disc
-    // arrives: its foot is softened (a hard line across the coal bed is the tongue's seat) and it is dimmed by OVERHEAD_TONGUE.
+    // arrives: its foot is softened (a hard line across the coal bed is the tongue's seat) and it is dimmed by OVERHEAD_TONGUE, as the
+    // fifth power of the blend so a flame still in view at 60-70 degrees keeps its brightness until the disc has taken over.
     // Straight down the upright flame is edge-on: a one-pixel slab of its widest row that pokes past the disc. It is gone by 85 degrees.
-    let tongue = (1.0 - OVERHEAD_TONGUE * in.overhead.x) * (1.0 - smoothstep(0.970, 0.996, in.overhead.z));
+    let tongue = (1.0 - OVERHEAD_TONGUE * pow(in.overhead.x, 5.0)) * (1.0 - smoothstep(0.970, 0.996, in.overhead.z));
     var mask = smoothstep(0.0, 0.30, body) * smoothstep(0.0, 0.06 + 0.30 * in.overhead.x, y) * tongue;
     // Hottest along the axis and low down: red rim and tip, the host's fire, a yellow core.
     var heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);

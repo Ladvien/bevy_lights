@@ -4315,3 +4315,27 @@ Bench (3 alternating runs, same machine): `p50_us` base 549-564, after 553-589; 
 5. Bearers are placeholder capsules; GIF banding.
 
 Release: v0.2.16 published, https://crates.io/crates/bevy_lights/0.2.16 (tag `v0.2.16`; semver-checks: no update required). Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm, wesl-check). Removed this pass: `~/l206_base`, `~/l206_base-target`, `/tmp/l206`. Earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 207 — 2026-10-30 — The flame keeps its brightness through 60-70° (overhead round 12)
+
+Outcome: the upright tongue's overhead dimming is `OVERHEAD_TONGUE · topdown⁵` instead of `· topdown` (`src/flame.wesl`), so the flame no longer goes pale at 60°-70° before the cross-section has arrived. Frames at or below 55° and at 76° and past are unchanged (`magick compare` AE 0.01 px at 45°, 55°, 85°; 0.7 px at 76°).
+
+Why: no open issues on bevy_lights, no parked branch (only the old iteration-115 WIP commits, superseded); bevy_emerge #103 asks for nothing new (last comment: light-grid pin). Ranked candidates: (1) overhead flame mid-blend dip (a visible artifact: 24 % of the tongue's brightness gone at 66° with the disc not yet in), (2) cited flicker amplitude, (3) per-kind colour temperature, (4) flux/radiative-fraction source, (5) bearers/GIF banding. Research attempts this pass: Chen et al. (`10.1038_s41598-018-36754-w`) measures candle-flame brightness as a dimensionless grey time series, figures only, no amplitude in the text, so (2) stays uncited and a single candle there is steady (it flickers only in bundles of 3+); (3) has no per-fuel temperature source in the corpus (distill returned only PBR ch. 12's blackbody) and wood-fire kinds would differ by tens of kelvin, so it was dropped.
+
+Sources: craft `10.7456_tojdac.1674124` (Doğaner), production Gregory §11.4.3 and `s2011-advances-pdf-slides`, technical RTR4 §13.6.3 (`book_real_time_rendering_4th_akenine`), all already quoted in `docs/research/flame-overhead.md`, which gained "Round 12".
+
+Critique and verdict (`/tmp/l207/critique.md`, `/tmp/l207/{before,after,p5}`): the mid-blend brightness slice GREAT, the overhead flame as a whole still NOT YET. Tongue-window mean grey at 60°, 66°, 70°, 73°, 76°: 131.3, 123.6, 116.2, 113.2, 111.4 (steps 7.7, 7.4, 3.0, 1.8) against 129.8, 118.1, 112.9, -, 111.4 before (steps 11.7, 5.2): the fall is spread, not stepped, and the 66° tongue reads as a plume, not a haze. Remaining flaws: lower contrast than at 45° because the floor behind is lit orange; a faint stub of the tongue's tip above the bowl rim at 60°-66°. Round one (`topdown³`) gave a smaller lift (+2.8 DN at 66°) and was replaced by `⁵` (+5.5).
+
+Bench: not run; the change is two shader stages, `bench_lights` runs none. Hero GIF: not re-encoded (the showcase camera is at 0°-45°, unchanged to the pixel).
+
+Gate green: build (release and debug), test, serde test, examples, clippy, doc, fmt, wasm, wesl-check.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame: contrast against a lit floor, the tip stub at 60°-66°, then a construction that is not the round disc stack.
+2. A cited, luminance-measured flicker amplitude (Maynard 2013 is not retrievable; Chen 2019 has figures only).
+3. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
+4. Spatial gust coherence if a host reports it.
+5. Bearers are placeholder capsules; GIF banding.
+
+Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13` (all detached, not mine). Removed this pass: scratch `/tmp/l207` (below).
