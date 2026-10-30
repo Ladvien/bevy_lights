@@ -339,6 +339,9 @@ const BRAZIERS: [Vec3; 4] = [
 fn shadowed_env() -> usize {
     std::env::var("LIGHTS_SHADOWED").ok().and_then(|v| v.parse().ok()).unwrap_or(3)
 }
+fn zz_soft() -> f32 {
+    std::env::var("ZZ_SOFT").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0)
+}
 
 /// `LIGHTS_GPU_TIMING=1` records the render graph's GPU timestamps and prints, once, the mean per pass
 /// (microseconds, frames 100 to 400) on stdout as `gpu_us <pass> <mean>`. It needs a Vulkan or DX12
@@ -771,6 +774,8 @@ fn spawn_scene(
                             intensity: lumens,
                             range: BRAZIER_POOL * POOL_RANGE_MARGIN,
                             shadow_maps_enabled: true,
+                            radius: zz_soft(),
+                            soft_shadows_enabled: zz_soft() > 0.0,
                             ..default()
                         },
                         Flicker {
