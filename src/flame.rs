@@ -23,7 +23,8 @@ use crate::LightsSystems;
 use crate::chain_sets;
 use crate::flicker::{Flicker, Kindle};
 use crate::model::{
-    FLICKER_DEPTH, KINDLE_SECONDS, flicker_swing, kindle_gain, pack_flame_tag, set_flame_brightness,
+    DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, KINDLE_SECONDS, flame_tilt, flicker_swing, kindle_gain,
+    pack_flame_tag, set_flame_brightness,
 };
 use crate::pool::PoolCandidate;
 
@@ -45,6 +46,7 @@ impl Plugin for FlamePlugin {
             .init_resource::<FlameLook>()
             .init_resource::<FlameAssets>()
             .register_type::<FlameLook>()
+            .register_type::<FlameWind>()
             .register_type::<FlameSite>()
             .add_systems(Update, (dress_flames, update_flames).chain().in_set(LightsSystems::Flame))
             .add_systems(Startup, build_flame_assets);
@@ -276,6 +278,54 @@ impl FlameLook {
     }
 }
 
+/// The wind the flames lean in: a velocity on the ground plane, in metres per second.
+///
+/// The host copies its weather's wind into this one resource (the wind belongs to `bevy_elements`
+/// or the game; this crate reads it and owns nothing of it). Every [`FlameSite`]'s flame then leans
+/// *downwind* by [`flame_tilt`] of the wind's speed and that fire's own `diameter`
+/// ([`DEFAULT_FIRE_DIAMETER`] when it has none), so a brazier bends less than a torch in the same
+/// gust, and every flame in the scene bends the same way. The flame keeps its length and its foot:
+/// only its tip moves, and it is drawn that much shorter on screen.
+///
+/// The default is no wind, which draws every flame exactly as it was drawn before this resource
+/// existed. The crate does not add it: insert it (or `init_resource` it) when there is a wind, and
+/// write `velocity` each frame the wind changes. The tilt law is SI, so a host whose world is not in
+/// metres converts first. `x` is the world's X and `y` the world's Z (`Vec3::new(v.x, 0.0, v.y)` is
+/// the direction the air moves).
+///
+/// The lean is drawn in the flame's own quad; the fire's light does not move with it
+/// (`docs/research/flame-wind.md`, Deviations).
+#[derive(Resource, Clone, Copy, Debug, Default, PartialEq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
+#[reflect(Resource)]
+pub struct FlameWind {
+    /// The direction the air moves and how fast, in metres per second, on the world's XZ plane.
+    pub velocity: Vec2,
+}
+
+impl FlameWind {
+    /// What is unusable in these settings, field by field; empty when they are fine. See
+    /// [`Flicker::problems`](crate::Flicker::problems).
+    pub fn problems(&self) -> Vec<crate::Problem> {
+        use crate::model::problem::finite;
+        let mut out = Vec::new();
+        finite(&mut out, "velocity.x", self.velocity.x);
+        finite(&mut out, "velocity.y", self.velocity.y);
+        out
+    }
+}
+
+/// Writes a flame's instance scale: `x` is its catch (the size the vertex stage multiplies in), and
+/// `y` and `z` are `1 +` the downwind lean (`sin θ` along world X and Z). Lengths, not directions, so a
+/// parent's rotation cannot change them; `1 +` keeps them positive. Written only when it changes, so a
+/// flame in still air costs nothing.
+fn set_scale(transform: &mut Transform, took: f32, lean: Vec2) {
+    let scale = Vec3::new(took, 1.0 + lean.x, 1.0 + lean.y);
+    if transform.scale != scale {
+        transform.scale = scale;
+    }
+}
+
 /// The one mesh, the two materials, and the height scale every flame in the scene shares.
 #[derive(Resource, Default)]
 struct FlameAssets {
@@ -409,6 +459,7 @@ fn update_flames(
         &ChildOf,
     )>,
     sites: Sites,
+    wind: Option<Res<FlameWind>>,
 ) {
     if !assets.built {
         return;
@@ -418,12 +469,18 @@ fn update_flames(
     // with no kindle is left alone — a fire burning all along costs nothing here.
     let dt = real.delta_secs();
     let t = time.elapsed_secs();
+    // The wind this frame: speed and the unit direction it blows towards, on the ground plane.
+    let wind = wind.as_deref().map_or((0.0, Vec2::ZERO), |w| {
+        let speed = w.velocity.length();
+        (speed, if speed > 0.0 && speed.is_finite() { w.velocity / speed } else { Vec2::ZERO })
+    });
     for (mut flame, mut transform, mut tag, mut material, parent) in &mut flames {
         let (site, owner) = sites.sites.get(parent.parent()).map_or((None, None), |(s, o)| (Some(s), o));
         let source = owner.map(ChildOf::parent).filter(|owner| !sites.sites.contains(*owner));
         if flame.source != source {
             flame.source = source;
         }
+        let mut lean = Vec2::ZERO;
         if let Some(site) = site {
             // A site whose `depth_fade` changed moves its flame to the other shared material; the comparison
             // reads through `Deref`, so a flame that did not change is not marked changed.
@@ -436,6 +493,9 @@ fn update_flames(
             // that flame. The byte holds 1/255 of the swing, so at 60 fps a 2.6 Hz fire skips some
             // frames; a fire that never changes costs nothing at all.
             let (diameter, depth, phase) = sites.fire_of(site);
+            if wind.0 > 0.0 && wind.0.is_finite() {
+                lean = wind.1 * flame_tilt(wind.0, diameter.unwrap_or(DEFAULT_FIRE_DIAMETER)).sin();
+            }
             let brightness = flicker_swing(diameter, depth, t, phase);
             let packed = set_flame_brightness(tag.value, brightness);
             if packed != tag.value {
@@ -448,10 +508,7 @@ fn update_flames(
         if let Some(elapsed) =
             site.and_then(|site| sites.kindle_of(site)).filter(|elapsed| *elapsed < KINDLE_SECONDS)
         {
-            let scale = Vec3::splat(kindle_gain(elapsed).max(0.001));
-            if transform.scale != scale {
-                transform.scale = scale;
-            }
+            set_scale(&mut transform, kindle_gain(elapsed).max(0.001), lean);
             if flame.kindled < f32::MAX {
                 flame.kindled = f32::MAX;
             }
@@ -459,9 +516,7 @@ fn update_flames(
         }
         if flame.kindled >= f32::MAX {
             // Done catching. A link whose `Kindle` has gone leaves the scale where it stopped; put it back.
-            if transform.scale != Vec3::ONE {
-                transform.scale = Vec3::ONE;
-            }
+            set_scale(&mut transform, 1.0, lean);
             continue;
         }
         flame.kindled = (flame.kindled + dt).min(f32::MAX);
@@ -469,10 +524,10 @@ fn update_flames(
         let gain = if catch > 0.0 { kindle_gain(flame.kindled.min(catch)) } else { 1.0 };
         // Width and height both: a fire that is catching is smaller in both, and a flame that grew tall
         // while staying wide would read as a sheet. The brightness is in the tag and is written above.
-        transform.scale = Vec3::splat(gain.max(0.001));
+        set_scale(&mut transform, gain.max(0.001), lean);
         if flame.kindled >= catch {
             flame.kindled = f32::MAX;
-            transform.scale = Vec3::ONE;
+            set_scale(&mut transform, 1.0, lean);
         }
     }
     let elapsed = real.elapsed_secs_wrapped();
@@ -1245,5 +1300,77 @@ mod catch_colour_tests {
         assert_eq!(catching.len(), 2, "two flames: {catching:?}");
         assert!(catching[0] < 0.2, "the catching one is small: {catching:?}");
         assert!((catching[1] - 1.0).abs() < 1e-5, "the steady one is untouched: {catching:?}");
+    }
+
+    /// A site's flame and its instance scale after one more frame.
+    fn flame_scale(app: &mut App) -> Vec3 {
+        app.update();
+        app.world_mut().query_filtered::<&Transform, With<Flame>>().single(app.world()).unwrap().scale
+    }
+
+    fn site_with(diameter: Option<f32>) -> FlameSite {
+        FlameSite {
+            height: 0.9,
+            phase: 0.0,
+            kindle: 0.0,
+            diameter,
+            depth: FLICKER_DEPTH,
+            depth_fade: false,
+            fire: None,
+        }
+    }
+
+    #[test]
+    fn a_flame_leans_downwind_by_its_own_fires_size_and_stands_upright_in_still_air() {
+        let mut app = app();
+        app.world_mut().spawn((site_with(Some(0.34)), Transform::default()));
+        assert_eq!(flame_scale(&mut app), Vec3::ONE, "no wind resource: upright");
+
+        app.insert_resource(FlameWind { velocity: Vec2::new(3.0, 0.0) });
+        let scale = flame_scale(&mut app);
+        let want = crate::model::flame_tilt(3.0, 0.34).sin();
+        assert!((scale.y - (1.0 + want)).abs() < 1e-6, "downwind along +X: {scale:?}");
+        assert_eq!(scale.z, 1.0, "nothing across it: {scale:?}");
+        assert_eq!(scale.x, 1.0, "the catch is untouched: {scale:?}");
+
+        app.insert_resource(FlameWind { velocity: Vec2::new(0.0, -3.0) });
+        let scale = flame_scale(&mut app);
+        assert!((scale.z - (1.0 - want)).abs() < 1e-6, "downwind along -Z: {scale:?}");
+        assert_eq!(scale.y, 1.0);
+
+        app.insert_resource(FlameWind::default());
+        assert_eq!(flame_scale(&mut app), Vec3::ONE, "the wind dropped: upright again");
+    }
+
+    #[test]
+    fn a_larger_fire_leans_less_in_the_same_wind() {
+        let mut app = app();
+        app.insert_resource(FlameWind { velocity: Vec2::new(2.0, 0.0) });
+        app.world_mut().spawn((site_with(Some(0.2)), Transform::default()));
+        app.world_mut().spawn((site_with(Some(2.0)), Transform::default()));
+        app.update();
+        app.update();
+        let mut lean: Vec<(f32, f32)> = app
+            .world_mut()
+            .query_filtered::<(&Transform, &ChildOf), With<Flame>>()
+            .iter(app.world())
+            .map(|(t, c)| (site_diameter(app.world(), c.parent()), t.scale.y - 1.0))
+            .collect();
+        lean.sort_by(|a, b| a.0.total_cmp(&b.0));
+        assert!(lean[0].1 > lean[1].1 && lean[1].1 > 0.0, "{lean:?}");
+    }
+
+    fn site_diameter(world: &World, site: Entity) -> f32 {
+        world.get::<FlameSite>(site).and_then(|s| s.diameter).unwrap_or(f32::NAN)
+    }
+
+    #[test]
+    fn a_wind_that_is_not_a_number_or_infinite_leaves_the_flame_upright() {
+        let mut app = app();
+        app.world_mut().spawn((site_with(None), Transform::default()));
+        for velocity in [Vec2::new(f32::NAN, 0.0), Vec2::new(f32::INFINITY, 0.0)] {
+            app.insert_resource(FlameWind { velocity });
+            assert_eq!(flame_scale(&mut app), Vec3::ONE, "{velocity:?}");
+        }
     }
 }

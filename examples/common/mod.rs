@@ -13,6 +13,8 @@
 //! - `LIGHTS_SEED=N` (default 7) moves the torch-bearers' start angles, so a capture is not always
 //!   the same arrangement of figures.
 //! - `LIGHTS_POOL=N` overrides the pool's size (the courtyard's default is 8).
+//! - `LIGHTS_WIND=x,z` blows a wind of that velocity (metres per second, on the ground plane) through
+//!   the flames; unset is still air.
 //!
 //! Keys: WASD + Q/E move (Shift ×5), hold the right mouse button to look.
 //!
@@ -35,6 +37,13 @@ pub struct ExampleHarness;
 pub fn vec3_env(name: &str) -> Option<Vec3> {
     let v: Vec<f32> = std::env::var(name).ok()?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
     (v.len() == 3).then(|| Vec3::new(v[0], v[1], v[2]))
+}
+
+/// The wind from `LIGHTS_WIND=x,z`, in metres per second; `None` is still air.
+pub fn wind_env() -> Option<Vec2> {
+    let v: Vec<f32> =
+        std::env::var("LIGHTS_WIND").ok()?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
+    (v.len() == 2).then(|| Vec2::new(v[0], v[1]))
 }
 
 /// `LIGHTS_SEED` (default 7): the seed the examples' own randomness draws from.

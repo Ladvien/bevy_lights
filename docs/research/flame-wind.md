@@ -52,9 +52,9 @@ The wind is a world-space vector on the ground plane (`FlameWind::velocity`, met
 | `c`, `a`, `b` | 0.666, 0.333, 0.117 | Pritchard & Binding, via DGMR (quoted above) |
 | `g` | 9.81 m/s² | physical constant |
 | `ν` (air, 20 °C) | 1.5e-5 m²/s | physical constant, textbook value |
-| `FLAME_TILT_LIMIT` | 70° (`sin θ` 0.94) | design default: the correlation reaches 80° at a gale's 10 m/s; a flame laid flat stops reading as a flame, and the billboard's quad widens by `tan θ` (2.7 at 70°) |
+| `FLAME_TILT_LIMIT` | 70° (`sin θ` 0.94) | design default: the correlation reaches 80° at a gale's 10 m/s; a flame laid flat stops reading as a flame, and the billboard's quad widens by `sin θ` (0.94 at 70°) |
 | default diameter when a fire has none | 0.2 m | design default: a torch head to a lantern's flame bed |
-| bend profile `h^1.6` | | design default: a flame is rooted, so its foot stays upright and the tip takes the whole lean; chosen by eye against the straight-shear alternative, which reads as a leaning post |
+| lean drawn as | a rigid rotation of the flame about its foot | design default: a first version bent the flame (`x - tan θ · h^1.6`, a shear) and at 57° it collapsed to a one-pixel streak, because a shear of a narrow shape keeps its horizontal width and loses its perpendicular one; rotating the flame keeps the silhouette, the ramp and the noise as they were |
 | lean from above | fades with the overhead blend | design default: from straight overhead the plume's cross-section is what is seen, and it is not translated |
 
 ## What great looks like
@@ -64,14 +64,14 @@ A row of braziers in a crosswind, each leaning the same way, the large ones less
 ## Validation targets
 
 - `flame_tilt(0, d) == 0` for every `d`; monotonic in `U`; a larger `d` tilts less at the same `U` (the Froude number falls faster than the Reynolds number rises); never reaches 90°.
-- Anchor values by hand from the formula: brazier `D = 0.34 m`, `U = 3 m/s` → `k ≈ 3.3`, `θ ≈ 53°`; a 0.2 m torch at 1 m/s → 44°.
+- Anchor values by hand from the formula: brazier `D = 0.34 m`, `U = 3 m/s` → `k ≈ 3.4`, `θ ≈ 59.8°`; a 0.2 m torch at 1 m/s → 47.5°; a 0.1 m/s draught on the brazier → 13°.
 - Zero wind leaves every flame's transform scale at exactly `(took, 1, 1)`: the existing flame tests hold unchanged.
 - Capture: courtyard at `LIGHTS_WIND` 0 vs 2 m/s, ground and eye level, two seeds; flame foot pixels identical to the no-wind frame, tip displaced downwind, the flame not clipped by its quad.
 
 ## Deviations
 
 - The correlation was fitted to liquid pool fires of 0.1–1 m; a torch is smaller. Used anyway (a lab flame does lean at 0.3 m/s); `FLAME_TILT_LIMIT` bounds the extreme.
-- The component of the wind along the view direction is drawn only as the shortening `cos θ`, not as a flame leaning towards or away from the camera.
+- A lean towards or away from the camera is drawn only as the axis's foreshortening, not as a billboard turned out of the screen plane.
 - Flame *length* does not shrink with wind (Wen), only its height through the tilt.
 - The light's position and its flicker do not move with the lean (the light sits at the flame's foot-third, which moves by under 0.1 of the height at the tilts shown).
 
