@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.10] - 2026-10-29
+
 ### Added
 
 - **`FireKind` implements `Display` and `FromStr`** (case-insensitive, trimmed), with `UnknownFireKind` listing the valid names, so a text field, command line or environment variable picks a kind. No numbers changed.
