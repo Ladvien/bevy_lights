@@ -48,6 +48,13 @@ fn a_flame_site_and_look_report_their_own_fields() {
 }
 
 #[test]
+fn a_wind_names_the_component_that_is_not_a_number() {
+    assert!(FlameWind::default().problems().is_empty());
+    let wind = FlameWind { velocity: bevy::math::Vec2::new(f32::NAN, 2.0) };
+    assert_eq!(fields(wind.problems()), ["velocity.x"]);
+}
+
+#[test]
 fn a_pool_reports_reach_hysteresis_and_the_template_light() {
     let mut pool = LightPool { reach: 0.0, hysteresis: 0.5, fade_seconds: f32::NAN, ..Default::default() };
     pool.light.range = -3.0;
@@ -72,7 +79,7 @@ fn intensity_at_follows_the_kindle_and_then_the_flicker() {
 #[cfg(feature = "serde")]
 #[allow(clippy::unwrap_used)]
 mod saved_settings {
-    use bevy_lights::{FlameLook, Flicker, Kindle};
+    use bevy_lights::{FlameLook, FlameWind, Flicker, Kindle};
 
     #[test]
     fn a_file_naming_only_some_fields_takes_the_defaults_for_the_rest() {
@@ -82,6 +89,9 @@ mod saved_settings {
 
         let look: FlameLook = serde_json::from_str("{}").unwrap();
         assert_eq!(look, FlameLook::default());
+
+        let wind: FlameWind = serde_json::from_str("{}").unwrap();
+        assert_eq!(wind, FlameWind::default());
 
         let k: Kindle = serde_json::from_str("{}").unwrap();
         assert_eq!(k, Kindle::default());

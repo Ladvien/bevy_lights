@@ -220,6 +220,51 @@ pub fn kindle_gain(t: f32) -> f32 {
     s + 0.35 * (PI * s).sin()
 }
 
+/// The most a flame is allowed to lean, in radians (70°): `sin θ` is 0.94.
+///
+/// Design default (`docs/research/flame-wind.md`): the correlation reaches 80° at a gale's 10 m/s, and
+/// a flame laid flat stops reading as a flame.
+pub const FLAME_TILT_LIMIT: f32 = 70.0 * PI / 180.0;
+
+/// How far a flame of fuel-bed diameter `diameter` leans from vertical in a wind of `speed`, in
+/// radians: Welker & Sliepcevich's `tan θ / cos θ = c · Fr^a · Re^b` with Pritchard & Binding's
+/// `c = 0.666`, `a = 0.333`, `b = 0.117`, `Fr = U² / (g·D)` and `Re = D·U / ν`
+/// (`docs/research/flame-wind.md`).
+///
+/// **SI units**: `speed` in metres per second and `diameter` in metres. The crate converts nothing, so a
+/// host whose world is not in metres scales both before calling. Zero (or negative or `NaN`) wind is no
+/// lean; the result rises with the wind, falls with the fire's size and is capped at
+/// [`FLAME_TILT_LIMIT`]. A diameter is clamped at 1 cm from below, as [`flicker_rate`]'s is.
+///
+/// ```
+/// # use bevy_lights::model::fire::*;
+/// assert_eq!(flame_tilt(0.0, 0.34), 0.0);
+/// assert!((flame_tilt(3.0, 0.34).to_degrees() - 59.8).abs() < 0.5, "a brazier in a stiff breeze");
+/// assert!(flame_tilt(3.0, 4.0) < flame_tilt(3.0, 0.34), "a bonfire bends less than a brazier");
+/// assert!(flame_tilt(100.0, 0.2) <= FLAME_TILT_LIMIT);
+/// ```
+pub fn flame_tilt(speed: f32, diameter: f32) -> f32 {
+    if speed.is_nan() || speed <= 0.0 {
+        return 0.0;
+    }
+    let d = if diameter.is_nan() { DEFAULT_FIRE_DIAMETER } else { diameter.clamp(MIN_BED, 1.0e6) };
+    let froude = speed * speed / (GRAVITY * d);
+    let reynolds = d * speed / AIR_VISCOSITY;
+    let k = 0.666 * froude.powf(0.333) * reynolds.powf(0.117);
+    // tan θ / cos θ = sin θ / cos² θ = k  ⇒  k·sin²θ + sin θ − k = 0.
+    let sin = if k < 1.0e-6 { k } else { ((1.0 + 4.0 * k * k).sqrt() - 1.0) / (2.0 * k) };
+    sin.clamp(0.0, 1.0).asin().min(FLAME_TILT_LIMIT)
+}
+
+/// The diameter [`flame_tilt`] assumes for a fire with none given, in metres: a torch head to a lantern's
+/// flame bed. Design default (`docs/research/flame-wind.md`).
+pub const DEFAULT_FIRE_DIAMETER: f32 = 0.2;
+
+/// Gravity, m/s².
+const GRAVITY: f32 = 9.81;
+/// The kinematic viscosity of air at 20 °C, m²/s.
+const AIR_VISCOSITY: f32 = 1.5e-5;
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
@@ -317,5 +362,35 @@ mod tests {
             kindle_gain(KINDLE_SECONDS),
             "the gain is exactly 1 after KINDLE_SECONDS"
         );
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+mod wind_tests {
+    use super::*;
+
+    #[test]
+    fn a_flame_leans_more_in_more_wind_and_less_when_larger() {
+        assert_eq!(flame_tilt(0.0, 0.34), 0.0);
+        assert_eq!(flame_tilt(-2.0, 0.34), 0.0);
+        assert_eq!(flame_tilt(f32::NAN, 0.34), 0.0);
+        let mut last = 0.0;
+        for speed in [0.1, 0.5, 1.0, 2.0, 4.0, 8.0, 16.0, 200.0] {
+            let tilt = flame_tilt(speed, 0.34);
+            // Strictly rising until the limit caps it, never falling after.
+            assert!(tilt > last || last == FLAME_TILT_LIMIT, "{speed} m/s: {tilt} not above {last}");
+            assert!(tilt <= FLAME_TILT_LIMIT, "{speed} m/s: {tilt} past the limit");
+            last = tilt;
+        }
+        assert_eq!(last, FLAME_TILT_LIMIT, "a gale is capped");
+        // The hand-worked anchors in the research note.
+        assert!((flame_tilt(3.0, 0.34).to_degrees() - 59.8).abs() < 0.5);
+        assert!((flame_tilt(1.0, 0.2).to_degrees() - 47.5).abs() < 0.5);
+        assert!((flame_tilt(0.1, 0.34).to_degrees() - 13.0).abs() < 0.5, "a draught still leans");
+        for diameter in [0.1, 0.34, 1.0] {
+            assert!(flame_tilt(2.0, diameter * 2.0) < flame_tilt(2.0, diameter));
+        }
+        assert!(flame_tilt(2.0, f32::NAN).is_finite());
     }
 }
