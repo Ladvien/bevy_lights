@@ -215,7 +215,8 @@ lights can afford three shadows where they could not afford sixteen. A light tha
 shadow because the ranking moved is cross-faded to itself through a reserve light, so the shadow
 deepens over `fade_seconds` while the lit ground around it holds still; give a pool with shadows
 `reserve: 2`, since hand-offs and shadow changes share the reserves. A change to the cap or the flag
-applies at once, as a graphics setting should.
+applies at once, as a graphics setting should: shadows turned off, by the flag or a cap of `Some(0)`, are
+off on that frame for the reserve lights fading a light out too.
 
 **One template, every light, live.** Every field of `LightPool::light` but `intensity` and
 `shadow_maps_enabled` is every pool light's: colour, range, radius, the shadow's biases and near plane,
