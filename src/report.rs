@@ -30,6 +30,7 @@ macro_rules! checked {
 
 checked!(
     crate::Flicker,
+    crate::Kindle,
     crate::Snuff,
     crate::FlameSite,
     crate::FlameEmbers,

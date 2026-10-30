@@ -56,6 +56,22 @@ fn the_first_bad_flicker_is_named_once_however_many_follow() {
 }
 
 #[test]
+fn a_kindle_with_a_bad_elapsed_is_named_and_a_fresh_one_is_not() {
+    let quiet = log_of(|world| {
+        world.spawn(Kindle::default());
+    });
+    assert!(quiet.is_empty(), "{quiet}");
+
+    let bad = log_of(|world| {
+        for _ in 0..20 {
+            world.spawn(Kindle { elapsed: f32::NAN });
+        }
+    });
+    assert_eq!(bad.matches("Kindle").count(), 1, "{bad}");
+    assert!(bad.contains("`elapsed`"), "{bad}");
+}
+
+#[test]
 fn a_sane_fire_says_nothing_and_each_kind_has_its_own_warning() {
     let quiet = log_of(|world| {
         world.spawn(Flicker::at_mean(800.0, FLICKER_DEPTH));

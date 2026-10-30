@@ -4723,3 +4723,15 @@ Bench (`bench_lights`, same machine, back to back): with the change p50 755/760 
 Top 5 remaining: (1) publish v0.2.21 after ~08:03 CDT; (2) overhead flame construction; (3) cheaper ember quad; (4) heat haze; (5) a luminance-amplitude source.
 
 Removed: nothing made this pass (no worktree, no capture). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 232 — 2026-10-30 — A bad `Kindle` is reported when it arrives
+
+Outcome: `Kindle` had `problems()` but was the one settings component the add-time warning (`report.rs`) missed, so a scene file or BRP write of a `NaN` or negative `elapsed` produced a bad gain in silence. `FlickerPlugin` now watches it. Test `a_kindle_with_a_bad_elapsed_is_named_and_a_fresh_one_is_not` (tests/report.rs): failed before (0 lines, expected 1), passes after. Not visual, no art default: no capture, bench or research note (the rule is `settings-report.md`'s, unchanged in scope except one more type).
+
+Issues: none open. Parked: none. bevy_emerge #103: the editor validates only `Flicker` from RON today; no crate-side need unmet. Release: v0.2.20 tag 2.6 h old, the 6-hour rule blocks v0.2.21 until ~08:03 CDT; changes ride in it. Ranked candidates: (1) Kindle unwatched (won: a true bug against a documented rule, smallest, testable); (2) overhead flame construction (twelve NOT YET rounds); (3) cheaper ember quad (GPU cost unmeasured, needs timestamp query); (4) heat haze (outside the map); (5) luminance-amplitude source (none citable). Home-still live: distill idle, 18 069 embedded docs, scribe idle.
+
+Gate: build release and debug, test, test --features serde, examples, clippy, doc, fmt, wasm green. wesl-check not run (no shader touched).
+
+Top 5 remaining: (1) publish v0.2.21 after ~08:03 CDT; (2) overhead flame construction; (3) cheaper ember quad; (4) heat haze; (5) luminance-amplitude source.
+
+Removed: `/tmp/em_l232` (bevy_emerge shallow clone). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
