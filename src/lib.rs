@@ -85,16 +85,16 @@ mod kind;
 mod pool;
 
 pub use flame::{Flame, FlameGust, FlameLook, FlameMaterial, FlamePlugin, FlameSite, FlameWind};
-pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled};
+pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled, Snuff, Snuffed};
 pub use kind::{FireKind, UnknownFireKind};
 pub use model::{
     CALM_FLICKER_DEPTH, DEFAULT_FIRE_DIAMETER, EMBER_AT, FADE_SECONDS, FLAME_TILT_LIMIT, FLICKER_DEPTH,
     HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY, MAX_FLICKER_DEPTH, MOON_KEY, Problem, ProblemKind,
-    RANGE_MARGIN, WHIPPING_FLICKER_DEPTH, blackbody_colour, blackbody_luminance, char_field, char_radiance,
-    coal_radiance, fade_factor, fill_for, fire_lumens, fire_lux, fire_reach, flame_light_offset, flame_tilt,
-    flicker_depth, flicker_factor, flicker_mean, flicker_swing, ground_lux, ground_reach, hand_off,
-    key_to_fill, kindle_gain, pack_flame_tag, preferred, raised_light, stops, unpack_flame_tag,
-    white_balanced,
+    RANGE_MARGIN, SNUFF_SECONDS, WHIPPING_FLICKER_DEPTH, blackbody_colour, blackbody_luminance, char_field,
+    char_radiance, coal_radiance, fade_factor, fill_for, fire_lumens, fire_lux, fire_reach,
+    flame_light_offset, flame_tilt, flicker_depth, flicker_factor, flicker_mean, flicker_swing, ground_lux,
+    ground_reach, hand_off, key_to_fill, kindle_gain, pack_flame_tag, preferred, raised_light, snuff_gain,
+    stops, unpack_flame_tag, white_balanced,
 };
 pub use pool::{LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
 

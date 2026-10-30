@@ -26,7 +26,7 @@
 //!
 //! # Knobs
 //!
-//! `LIGHTS_RELIGHT=<seconds>` re-lights the braziers once at that time (what `K` does). `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
+//! `LIGHTS_RELIGHT=<seconds>` re-lights the braziers once at that time (what `K` does); `LIGHTS_SNUFF=<seconds>` puts them out (what `O` does). `LIGHTS_FRAMES`, `LIGHTS_SHOT`, `LIGHTS_SHOT_DIR`/`LIGHTS_SHOT_EVERY`/`LIGHTS_SHOT_FROM`,
 //! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`. `LIGHTS_EV100=x` sets the camera's exposure (default 6; 9 is a dark frame whose ground is not saturated by the fires). `LIGHTS_DEPTH_FADE=1`
 //! sets `FlameSite::depth_fade` on every flame and gives the camera a `DepthPrepass`; the occlusion
 //! case it is for has its own scene in `examples/occlusion.rs`.
@@ -380,8 +380,8 @@ fn main() {
         .insert_resource(FlameWind { velocity: wind_env().unwrap_or_default() })
         .insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 0.0, ..default() })
         .add_systems(Startup, (spawn_scene, spawn_camera, gust_from_env).chain())
-        .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers).chain())
-        .add_systems(Update, report_kindled)
+        .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers, snuff_braziers).chain())
+        .add_systems(Update, (report_kindled, report_snuffed))
         .add_systems(Update, report_look)
         .add_systems(Update, report_flicker)
         .run();
@@ -897,7 +897,34 @@ fn relight_braziers(
     for children in &braziers {
         for child in children.iter() {
             if lights.contains(child) {
-                commands.entity(child).insert(Kindle::default());
+                commands.entity(child).remove::<Snuff>().insert(Kindle::default());
+            }
+        }
+    }
+}
+
+/// `O` puts every brazier out: inserting [`Snuff::default()`] dims each light to nothing and shrinks the
+/// flame linked to it, and [`Snuffed`] is written when the last of it is gone. `LIGHTS_SNUFF=<seconds>`
+/// does it once at that elapsed time, so an unattended capture can show a fire going out. `K` lights them
+/// again.
+fn snuff_braziers(
+    mut commands: Commands,
+    keys: Res<ButtonInput<KeyCode>>,
+    time: Res<Time>,
+    braziers: Query<&Children, With<Brazier>>,
+    lights: Query<(), With<Kindle>>,
+    mut timed: Local<Option<Option<f32>>>,
+) {
+    let at = *timed.get_or_insert_with(|| std::env::var("LIGHTS_SNUFF").ok().and_then(|v| v.parse().ok()));
+    let elapsed = time.elapsed_secs();
+    let due = at.is_some_and(|at| elapsed - time.delta_secs() < at && elapsed >= at);
+    if !keys.just_pressed(KeyCode::KeyO) && !due {
+        return;
+    }
+    for children in &braziers {
+        for child in children.iter() {
+            if lights.contains(child) {
+                commands.entity(child).insert(Snuff::default());
             }
         }
     }
@@ -962,6 +989,16 @@ fn report_kindled(mut kindled: MessageReader<Kindled>, names: Query<&Name>) {
         match names.get(message.entity) {
             Ok(name) => println!("kindled {} ({})", message.entity, name),
             Err(_) => println!("kindled {}", message.entity),
+        }
+    }
+}
+
+/// Prints every [`Snuffed`]: four lines when the braziers have gone out.
+fn report_snuffed(mut snuffed: MessageReader<Snuffed>, names: Query<&Name>) {
+    for message in snuffed.read() {
+        match names.get(message.entity) {
+            Ok(name) => println!("snuffed {} ({})", message.entity, name),
+            Err(_) => println!("snuffed {}", message.entity),
         }
     }
 }
