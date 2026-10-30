@@ -4254,3 +4254,5 @@ Why: no open issues, no parked branch. Editor-needs rule (bevy_emerge #103, 3 co
 5. Bearers are placeholder capsules; GIF banding.
 
 Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). No worktrees or scratch made; earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+Release: v0.2.13 published, https://crates.io/crates/bevy_lights/0.2.13 (tag `v0.2.13`; semver-checks: no update required).
