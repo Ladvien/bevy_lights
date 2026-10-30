@@ -65,6 +65,9 @@ impl Plugin for FlamePlugin {
             .add_systems(Startup, build_flame_assets);
         crate::report::watch::<FlameSite>(app);
         crate::report::watch::<crate::FlameEmbers>(app);
+        crate::report::watch_resource::<FlameLook>(app);
+        crate::report::watch_resource::<FlameWind>(app);
+        crate::report::watch_resource::<FlameGust>(app);
     }
 }
 

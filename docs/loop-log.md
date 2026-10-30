@@ -4635,3 +4635,19 @@ Evidence and verdict: not a visual change, no capture, no GIF affected (the flam
 Top 5 remaining: (1) publish v0.2.21 once the v0.2.20 tag is 6 h old (embers, relight clip, timing, FireKind helpers, catch size, this); (2) cited flicker amplitude as luminance; (3) overhead tongue structure; (4) cheaper ember quad; (5) heat haze (outside the ownership map).
 
 Removed: nothing made this pass outside the repo. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 226 — 2026-10-30 — A bad settings resource is reported when it is written
+
+Outcome: `LightPool`, `FlameLook`, `FlameWind` and `FlameGust`, the resources a panel (bevy_emerge) edits live, are checked in `Last` on every frame they change (`src/report.rs`, `watch_resource`) and warn once per distinct set of problems. Iteration 225 left them out for "no single entry point"; the change tick is one. A slider dragged through `NaN` is one line, a fix then a new mistake warns again, an absent optional resource is silent. Nothing refused or clamped. Note `docs/research/settings-report-resources.md` (committed first). Tests in `tests/report.rs` (the guard is thread-local, so the test runs `Last` single-threaded).
+
+Issues: none open (`gh` worked). Parked: none. Release: v0.2.20 tag 1 h old, the 6-hour rule blocks a publish (v0.2.21 due after about 08:05 CDT). Not visual and no per-frame work beyond a change-tick test: no captures, bench not rerun, no GIF affected, wesl-check not rerun.
+
+Ranked candidates: (1) silent bad resources (won: the gap 225 named, the one an editor hits; smallest); (2) cited flicker amplitude as luminance (no source); (3) overhead tongue structure; (4) cheaper ember quad; (5) heat haze (outside the map).
+
+Sources: craft `10.7456_tojdac.1674124`; technical Bevy 0.20 `Res::is_changed`, the crate's `AGENTS.md`; no rendering-literature source applies (recorded in the note).
+
+Gate: build (release, debug), `cargo test`, `--features serde`, examples, clippy `-D warnings`, rustdoc `-D warnings`, fmt, wasm lib build clean.
+
+Top 5 remaining: (1) publish v0.2.21 once the v0.2.20 tag is 6 h old; (2) cited flicker amplitude as luminance; (3) overhead tongue structure; (4) cheaper ember quad; (5) heat haze.
+
+Removed: nothing made outside the repo. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.

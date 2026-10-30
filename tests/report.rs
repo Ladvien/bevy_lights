@@ -69,3 +69,40 @@ fn a_sane_fire_says_nothing_and_each_kind_has_its_own_warning() {
     });
     assert!(both.contains("Flicker") && both.contains("Snuff"), "{both}");
 }
+
+/// The log lines of an app with `LightPoolPlugin` after `edit` ran on the pool before each of `frames`.
+fn pool_log(frames: usize, mut edit: impl FnMut(usize, &mut LightPool)) -> String {
+    #[derive(Component)]
+    struct Focus;
+    let log = Captured::default();
+    let subscriber = tracing_subscriber::fmt().with_writer(log.clone()).with_ansi(false).finish();
+    let _guard = bevy::log::tracing::subscriber::set_default(subscriber);
+    let mut app = App::new();
+    app.add_plugins((MinimalPlugins, FlickerPlugin, LightPoolPlugin::<Focus>::new()));
+    // The log guard is thread-local: run the system that warns on this thread.
+    app.edit_schedule(Last, |schedule| {
+        schedule.set_executor(bevy::ecs::schedule::SingleThreadedExecutor::new());
+    });
+    for frame in 0..frames {
+        edit(frame, &mut app.world_mut().resource_mut::<LightPool>());
+        app.update();
+    }
+    String::from_utf8(log.0.lock().unwrap().clone()).unwrap()
+}
+
+#[test]
+fn a_pool_written_bad_every_frame_is_one_line_and_a_new_mistake_after_a_fix_is_another() {
+    let log = pool_log(8, |frame, pool| match frame {
+        0..=3 => pool.reach = f32::NAN,
+        4 => pool.reach = 60.0,
+        _ => pool.gain = -1.0,
+    });
+    assert_eq!(log.matches("LightPool").count(), 2, "{log}");
+    assert!(log.contains("`reach`") && log.contains("`gain`"), "{log}");
+}
+
+#[test]
+fn an_untouched_pool_and_a_sane_edit_say_nothing() {
+    let log = pool_log(4, |frame, pool| pool.size = 4 + frame);
+    assert!(log.is_empty(), "{log}");
+}
