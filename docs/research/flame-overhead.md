@@ -336,3 +336,12 @@ At `LIGHTS_EV100=9`, straight down (eye 5.3,9,5), the flame reads as a ragged bu
 **Aimed at.** Straight down (seed 7, EV 9, brazier at (5, 0, 5), eye (5, 9, 5.05), 1280x720, frame 90) the disc's outline reads as a smooth six-sided polygon: one low-frequency lobe noise (`fbm(dir · 0.9)`) has too few lobes for tongues.
 
 **Tried (patch in `docs/attempts/overhead-finelobes-round19.patch`).** A second, finer lobe noise `fbm(dir · 2.6 + (−0.9t, 11.3))` at 0.7 amplitude added to the radius, mean radius 0.92. Result: a spiky starburst, the very read round 15 removed (rays from direction-only noise). FAIL; reverted, `src/flame.wesl` is as at iteration 241. Direction-keyed noise on the outline cannot make tongues from above at any frequency; the untried construction is tongue *tips* placed by position noise on a ring (billows, not rays), or the layered-tongue construction listed in round 17.
+
+
+### Round 20 — the disc is as wide as the bowl's fire (iteration 243)
+
+**Defect.** Straight down (`/tmp/l243/b/tdz.png`, seed 7, EV 9, brazier at (5, 0, 5), eye (5, 9, 5.05), 1280x720, frame 90, 3x of a 240x240 window) the cloud is a small spiky burst in the middle of a much larger dark bowl: the lit fire covers about a third of the bowl's width, where the same fire seen at 45° is as wide as the bowl's coal bed. Cause: the cross-section's mean radius was `0.85 · FLAME_HALF_WIDTH`, narrower than the upright flame it stands in for (RTR4 §13.6.3, quoted above: the cross-section stands in for the plume), and the narrow lobed outline read as rays. Craft: Doğaner (`10.7456_tojdac.1674124`), quoted above, a practical's flame must read at the camera's angle; production: Gregory §11.4.3, quoted above, shipped fire is billows filling their fuel bed.
+
+**Model.** The disc's mean radius `0.85` → `1.2` of `FLAME_HALF_WIDTH` (lobe amplitude `0.8` unchanged). One constant, a design default judged in captures. Branch is the overhead one only: at 45° AE 106 px over 1280x720 at 2 % fuzz (GPU noise); 66° differs inside the cloud only.
+
+**Result.** `/tmp/l243/{b,a}`: straight down the cloud fills about two thirds of the bowl and the starburst spikes are gone, a rounder billow with the core unchanged; 76° and 66° are fuller, the foot on the bed is unchanged. Verdict: the "small against the bowl" slice (round 15's open item) GREAT enough to ship; the overhead flame as a whole is still NOT YET (the outer ring is a flat orange mottle, no layered tongues).
