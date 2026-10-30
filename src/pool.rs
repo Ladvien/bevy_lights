@@ -327,9 +327,11 @@ pub struct PoolCandidate {
     ///
     /// A fire's light belongs at the middle of the flame drawn on it —
     /// [`flame_light_offset`](crate::model::reach::flame_light_offset)`(height)` is that point, relative
-    /// to the `FlameSite`'s own origin — and a candidate spawned **on the `FlameSite` entity** therefore
-    /// needs no offset at all: its translation is already the flame's foot. A candidate on a *parent* of
-    /// the flame adds only the difference between the two positions.
+    /// to the `FlameSite`'s own origin, which is the flame's foot — so a candidate spawned **on the
+    /// `FlameSite` entity** takes that point as its `offset` ([`FireKind::candidate`](crate::FireKind::candidate)
+    /// does). With `offset` zero the light would stand at the foot, and the wind's lean, which moves the flame's
+    /// *middle*, would then sink it below the coal bed. A candidate on a *parent* of the flame adds only the
+    /// difference between the two positions.
     ///
     /// Adding the flame's height to a candidate that already sits at the flame puts the light above the
     /// fire, where nothing visible emits it, and loses the sizing: a torch sized for 250 lx at 2 m
