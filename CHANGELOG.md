@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.21] - 2026-10-30
+
 ### Added
 
 - **`ground_ramp(lumens, over, dim_lux, bright_lux)`**: the `(peak, reach)` of a linear ramp `peak * (1 - d/reach)` that crosses the true ground illuminance exactly at the `dim_lux` and `bright_lux` circles (`ground_reach`). For a host's coarse illuminance grid (a stealth or AI tile map baking each fire as a disc that fades linearly): a ramp fitted from the spike's peak over-reads the pool's middle several-fold, one fitted at the two thresholds a grid is read at draws the circles the ground shows. Plain data in world units and lux; no grid is named. `docs/research/fire-reach.md`.
