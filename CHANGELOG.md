@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **`Snuff` and `Snuffed`: a fire that goes out.** Insert `Snuff::default()` on a `Flicker` light and its intensity falls to exactly 0 over `SNUFF_SECONDS` (1.2 s) on `snuff_gain` (a smoothstep down, no flare); the flame of any `FlameSite` whose `fire` names that light shrinks on the same curve, so light and flame leave together. `Snuffed { entity }` is written once when it is out, for the hiss and the smoke. Remove `Snuff` and insert `Kindle::default()` to light it again; `Snuff` wins over `Kindle`. `Snuff::problems` validates it like `Kindle`. The courtyard example puts its braziers out with `O` or `LIGHTS_SNUFF=<seconds>`. Design defaults, `docs/research/flame-snuff.md`. Nothing existing changed.
+
 ## [0.2.14] - 2026-10-29
 
 ### Added
