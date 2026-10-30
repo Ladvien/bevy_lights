@@ -121,6 +121,7 @@ fn fire_kinds_slow_down_as_they_grow() {
 
 #[cfg(feature = "serde")]
 #[test]
+#[allow(clippy::unwrap_used)]
 fn a_fire_kind_round_trips_as_its_name() {
     for kind in FireKind::ALL {
         let json = serde_json::to_string(&kind).unwrap();

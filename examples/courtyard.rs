@@ -697,7 +697,6 @@ fn spawn_scene(
                             phase,
                             diameter: brazier_kind().map_or(brazier_bed(), |k| Some(k.diameter())),
                             depth: brazier_kind().map_or(FLICKER_DEPTH, FireKind::depth),
-                            ..default()
                         },
                         Kindle::default(),
                         Transform::from_xyz(0.0, BRAZIER_LIGHT - BRAZIER_TOP * 0.5, 0.0),
