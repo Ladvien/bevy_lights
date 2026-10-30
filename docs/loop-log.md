@@ -4380,3 +4380,23 @@ Bench not run (shader only). Hero GIF not re-encoded (showcase camera at 0°-45�
 
 Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`. Removed this pass: worktree `~/l209_base` (made, never built) and scratch `/tmp/l209`.
 Release: v0.2.19 published, https://crates.io/crates/bevy_lights/0.2.19 (tag v0.2.19; semver-checks: no update required).
+
+## Iteration 210 — 2026-10-30 — The flame from above is billows, not rays (overhead round 15)
+
+Outcome: the overhead disc's brightness noise reads position instead of direction, its edge ramp is `smoothstep(0, 0.42, disc)` and its core heat is round and mottled (`src/flame.wesl`). The starburst of rays out of the core at 76° and 90° is gone; frames at 45° are unchanged (AE 0.0013 over 1280x720, GPU noise); 66° differs only inside the cloud.
+
+Why: no open issues on bevy_lights (list read), no parked branch (only the old iteration-115 WIP), bevy_emerge #103 unchanged (pool budget, serde types and `problems()` already exist). Fresh-eye captures (default, ground, grazing, high, 44°-56° sweep at 2° steps, top-down) found no pop at the 50° facing switch and no other artifact; the one visible defect was the rays. Ranked: (1) rays in the top-down burst, (2) cited flicker amplitude, (3) flicker colour tracking brightness (distill search found no source, so not built), (4) flux/radiative-fraction source, (5) bearers/GIF banding. Sources: as `docs/research/flame-overhead.md` (Doğaner `10.7456_tojdac.1674124`, Gregory §11.4.3 + `s2011-advances-pdf-slides`, RTR4 §13.6.3); round 15 added there. Note and code are in one commit this pass, not two.
+
+Verdict (`/tmp/l210/{before,a4,td}`, seed 7, frame 90, EV 9): rays slice GREAT; overhead flame as a whole NOT YET (small against the bowl, no tongue structure from straight above). Also seen, not a flame defect: a flame in front of a capsule 1 m from it vanishes into the capsule (additive over a surface lit to white; exposure, not shader).
+
+Bench (`bench_lights`, CPU only, shader change does not touch it): p50_us 549, min_us 338, flicker 208, pool 378 on the starting build. Hero GIF not re-encoded (showcase camera at 0°-45°, unchanged). Gate green (build release and debug, test, serde test, examples, clippy, doc, fmt, wasm, wesl-check).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame: tongue structure from straight above; size against the bowl.
+2. A cited, luminance-measured flicker amplitude.
+3. A luminous-flux / radiative-fraction source for reach and height defaults; a source for flicker colour tracking brightness.
+4. Spatial gust coherence if a host reports it.
+5. Bearers placeholder capsules; GIF banding.
+
+Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`. Removed this pass: worktree `~/l210_base` (never built), scratch `/tmp/l210`.
