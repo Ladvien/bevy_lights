@@ -218,6 +218,185 @@ fn the_pools_light_settings_follow_the_resource() {
     assert!(shadows, "the shadow setting followed");
 }
 
+/// Every pool light, by slot: `(slot, translation, visibility, flicker base, casts a shadow)`.
+fn lights(app: &mut App) -> Vec<(usize, Vec3, Visibility, f32, bool)> {
+    let mut found: Vec<_> = app
+        .world_mut()
+        .query::<(&PoolLight, &Transform, &Visibility, &Flicker, &PointLight)>()
+        .iter(app.world())
+        .map(|(slot, transform, visibility, flicker, light)| {
+            (slot.slot, transform.translation, *visibility, flicker.base, light.shadow_maps_enabled)
+        })
+        .collect();
+    found.sort_by_key(|(slot, ..)| *slot);
+    found
+}
+
+/// The visible pool lights that cast a shadow, by where they stand.
+fn shadowed_at(app: &mut App) -> Vec<Vec3> {
+    lights(app)
+        .into_iter()
+        .filter(|(_, _, visibility, _, shadow)| *shadow && *visibility != Visibility::Hidden)
+        .map(|(_, at, ..)| at)
+        .collect()
+}
+
+/// A pool whose lights cast shadows, at most `cap` of them.
+fn shadowed_pool(size: usize, cap: usize, reserve: usize) -> LightPool {
+    let mut pool = LightPool { size, reach: 100.0, gain: 1.0, reserve, max_shadowed: Some(cap), ..default() };
+    pool.light.shadow_maps_enabled = true;
+    pool
+}
+
+/// The visible lights standing at `at`, summed: what a cross-fade at one place must hold.
+fn total_at(lights: &[(usize, Vec3, Visibility, f32, bool)], at: Vec3) -> f32 {
+    lights
+        .iter()
+        .filter(|light| light.2 != Visibility::Hidden && (light.1 - at).length() < 1e-4)
+        .map(|light| light.3)
+        .sum()
+}
+
+#[test]
+fn the_shadow_budget_goes_to_the_best_ranked_lights() {
+    // Eight real lights, three shadows: the three candidates nearest the focus (all burn alike, so
+    // nearest is brightest) cast shadows, the next three light without one, and the budget says so.
+    let mut app = app(shadowed_pool(8, 3, 1));
+    focus_at(&mut app, Vec3::ZERO);
+    // Spawned furthest first, so entity order cannot be what picks the shadows.
+    let mut by_distance: Vec<Entity> =
+        (1..=6).rev().map(|x| candidate(&mut app, Vec3::new(x as f32, 0.0, 0.0), 100.0)).collect();
+    by_distance.reverse();
+    settle(&mut app);
+    let mut xs: Vec<f32> = shadowed_at(&mut app).iter().map(|at| at.x).collect();
+    xs.sort_by(f32::total_cmp);
+    assert_eq!(xs, [1.0, 2.0, 3.0], "the three nearest cast the shadows: {:?}", lights(&mut app));
+    let budget = app.world().resource::<PoolBudget>().clone();
+    assert_eq!(budget.granted(), 6);
+    let mut named = budget.shadowed.clone();
+    named.sort();
+    let mut nearest = by_distance[..3].to_vec();
+    nearest.sort();
+    assert_eq!(named, nearest, "the budget names exactly the shadowed holders");
+    assert!(budget.casts_shadow(by_distance[0]) && !budget.casts_shadow(by_distance[3]));
+
+    // A change of the settings is a settings change, not a hand-off: it applies on the next frame.
+    app.world_mut().resource_mut::<LightPool>().max_shadowed = Some(1);
+    app.update();
+    let xs: Vec<f32> = shadowed_at(&mut app).iter().map(|at| at.x).collect();
+    assert_eq!(xs, [1.0], "a lowered cap keeps the nearest: {:?}", lights(&mut app));
+    app.world_mut().resource_mut::<LightPool>().light.shadow_maps_enabled = false;
+    app.update();
+    assert!(
+        shadowed_at(&mut app).is_empty(),
+        "the template's flag turns them all off: {:?}",
+        lights(&mut app)
+    );
+    assert!(app.world().resource::<PoolBudget>().shadowed.is_empty());
+}
+
+#[test]
+fn a_light_that_earns_a_shadow_gains_it_by_a_cross_fade() {
+    // One shadow, on the nearer of two torches. The nearer goes out, and the other earns the shadow
+    // without moving: a reserve light takes it as it stood (no shadow) and fades out while its own light
+    // fades back in with the shadow, so the ground it lights holds and the shadow deepens.
+    let mut app = app(shadowed_pool(2, 1, 2));
+    focus_at(&mut app, Vec3::ZERO);
+    let near = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    let far = candidate(&mut app, Vec3::new(3.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    assert_eq!(app.world().resource::<PoolBudget>().shadowed, [near]);
+    let at = Vec3::new(3.0, 2.0, 0.0);
+    app.world_mut().entity_mut(near).insert(Visibility::Hidden);
+    let mut frames = Vec::new();
+    for _ in 0..26 {
+        app.update();
+        frames.push(lights(&mut app));
+    }
+    let first = &frames[0];
+    let here: Vec<_> = first
+        .iter()
+        .filter(|light| light.2 != Visibility::Hidden && (light.1 - at).length() < 1e-4)
+        .collect();
+    assert_eq!(here.len(), 2, "the torch's light and a reserve carrying it as it was: {first:?}");
+    assert!(
+        here.iter().any(|light| light.0 < 2 && light.4 && light.3 < 1.0),
+        "its own light fades in, shadowed: {here:?}"
+    );
+    assert!(here.iter().any(|light| light.0 >= 2 && !light.4), "the reserve carries it unshadowed: {here:?}");
+    for (frame, lights) in frames.iter().enumerate() {
+        let total = total_at(lights, at);
+        assert!(
+            (90.0..=100.0 + 1e-3).contains(&total),
+            "frame {frame}: the lit ground moved, {total} ({lights:?})"
+        );
+    }
+    let last = &frames[25];
+    assert_eq!(shadowed_at(&mut app), [at], "settled with the shadow: {last:?}");
+    assert!((total_at(last, at) - 100.0).abs() < 1e-3, "at full brightness: {last:?}");
+    assert_eq!(app.world().resource::<PoolBudget>().shadowed, [far]);
+}
+
+#[test]
+fn without_a_reserve_a_change_of_shadow_dips_the_light() {
+    // With nothing to cross-fade behind, a shadow change does what a hand-off does: the light dips and
+    // comes back with the new shadow.
+    let mut app = app(shadowed_pool(2, 1, 0));
+    focus_at(&mut app, Vec3::ZERO);
+    let near = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    candidate(&mut app, Vec3::new(3.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    app.world_mut().entity_mut(near).insert(Visibility::Hidden);
+    app.update();
+    let at = Vec3::new(3.0, 2.0, 0.0);
+    let now = lights(&mut app);
+    assert_eq!(shadowed_at(&mut app), [at], "the shadow moved at once: {now:?}");
+    assert!(total_at(&now, at) < 1.0, "and the light dipped: {now:?}");
+    for _ in 0..24 {
+        app.update();
+    }
+    let later = lights(&mut app);
+    assert!((total_at(&later, at) - 100.0).abs() < 1e-3, "and came back: {later:?}");
+}
+
+#[test]
+fn a_nearer_light_takes_the_shadow_without_ever_exceeding_the_budget() {
+    // Two held lights and one shadow, on the nearer. Then the other walks in to a quarter of the
+    // distance and earns the shadow. The swap is a loss and a gain, each cross-faded through the one
+    // reserve, and at no frame do two slots cast shadows at once.
+    let mut app = app(shadowed_pool(2, 1, 1));
+    focus_at(&mut app, Vec3::ZERO);
+    let first = candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 100.0);
+    let second = candidate(&mut app, Vec3::new(4.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    assert!(app.world().resource::<PoolBudget>().casts_shadow(first));
+    move_candidate(&mut app, second, Vec3::new(1.0, 0.0, 0.0));
+    app.update();
+    // The loss goes first: the first torch's shadow lifts through a reserve standing in its light.
+    let lifted = lights(&mut app);
+    let reserve = lifted.iter().find(|light| light.0 >= 2).copied().expect("a reserve light");
+    assert!(
+        reserve.2 != Visibility::Hidden && reserve.4,
+        "the reserve fades the shadowed light out: {lifted:?}"
+    );
+    assert!((reserve.1 - Vec3::new(2.0, 2.0, 0.0)).length() < 1e-4, "where it stood: {lifted:?}");
+    for frame in 0..80 {
+        app.update();
+        let slots_casting = lights(&mut app)
+            .iter()
+            .filter(|light| light.0 < 2 && light.4 && light.2 != Visibility::Hidden)
+            .count();
+        assert!(
+            slots_casting <= 1,
+            "frame {frame}: {slots_casting} slots cast shadows, {:?}",
+            lights(&mut app)
+        );
+    }
+    let budget = app.world().resource::<PoolBudget>().clone();
+    assert_eq!(budget.shadowed, [second], "the nearer light took the shadow: {budget:?}");
+    assert!(budget.holds(first) && budget.holds(second), "and nobody lost a light: {budget:?}");
+}
+
 #[test]
 fn a_change_of_gain_leaves_a_slots_own_colour_alone() {
     // A host that tints its own fire lights (a palette recolouring everything carrying its marker)
@@ -905,11 +1084,13 @@ mod saved_pool {
             hysteresis: 1.3,
             fade_seconds: 0.0,
             reserve: 3,
+            max_shadowed: Some(3),
         };
         let json = serde_json::to_string(&pool).unwrap();
         let back: LightPool = serde_json::from_str(&json).unwrap();
         assert_eq!((back.size, back.reach, back.gain, back.rank), (6, 31.5, 0.4, Rank::Distance));
         assert_eq!((back.hysteresis, back.fade_seconds, back.reserve), (1.3, 0.0, 3));
+        assert_eq!(back.max_shadowed, Some(3), "the shadow budget is saved");
         assert_eq!(back.light.color, pool.light.color);
         assert_eq!((back.light.range, back.light.radius, back.light.shadow_maps_enabled), (7.0, 0.25, true));
         assert_eq!(

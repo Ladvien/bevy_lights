@@ -175,6 +175,33 @@ fn a_hidden_light_is_not_written() {
 }
 
 #[test]
+fn a_light_shown_this_frame_is_written_before_the_camera_has_seen_it() {
+    // A light switched on is extracted on the frame it is switched on, but its `ViewVisibility` is only
+    // recomputed after this crate runs: skipping it as culled drew it for one frame at a stale intensity
+    // (a pool's reserve light came on at 112 lm instead of 70 000).
+    let mut app = app();
+    with_camera(&mut app);
+    let light = app
+        .world_mut()
+        .spawn((
+            PointLight { intensity: 1234.0, ..default() },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None, ..default() },
+            Visibility::Hidden,
+            ViewVisibility::default(),
+        ))
+        .id();
+    for _ in 0..5 {
+        app.update();
+    }
+    let intensity = |app: &App| app.world().get::<PointLight>(light).map(|light| light.intensity);
+    assert_eq!(intensity(&app), Some(1234.0), "a hidden light is not written");
+    app.world_mut().entity_mut(light).insert(Visibility::Inherited);
+    app.update();
+    let shown = intensity(&app).unwrap_or_default();
+    assert!((700.0..=1000.0).contains(&shown), "the frame it is shown, it is written: {shown}");
+}
+
+#[test]
 fn re_inserting_the_kindle_writes_a_second_message() {
     let mut app = app();
     let light = app
