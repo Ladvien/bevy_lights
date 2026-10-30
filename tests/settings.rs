@@ -131,6 +131,22 @@ fn every_fire_kind_is_a_sound_fire_whose_light_and_flame_agree() {
     }
 }
 
+/// Sparks follow the fuel: the small clean flames shed none, every other kind's are sound and never fall with size.
+#[test]
+fn fire_kinds_shed_embers_by_size() {
+    assert_eq!(FireKind::Candle.embers(), None);
+    assert_eq!(FireKind::Lantern.embers(), None);
+    assert_eq!(FireKind::Brazier.embers(), Some(FlameEmbers::default()));
+    let rates: Vec<f32> = FireKind::ALL.iter().filter_map(|k| k.embers()).map(|e| e.rate).collect();
+    assert_eq!(rates.len(), 4);
+    assert!(rates.windows(2).all(|w| w[0] < w[1]), "{rates:?}");
+    for kind in FireKind::ALL {
+        if let Some(embers) = kind.embers() {
+            assert!(embers.problems().is_empty(), "{}", kind.name());
+        }
+    }
+}
+
 /// Bigger fires flicker slower, and the list runs smallest first.
 #[test]
 fn fire_kinds_slow_down_as_they_grow() {
