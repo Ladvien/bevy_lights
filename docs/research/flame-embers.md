@@ -71,6 +71,7 @@ The shader, `src/embers.wesl`:
 - A spark is visible against the flame's own light at ground level, at an elevated angle, from straight above, and at 30 m (sub-pixel floor: dim, not crawling).
 - A torch behind a wall (depth fade on) sheds no visible sparks.
 - Wind: a gust moves the sparks further downwind than the flame's lean.
+- GPU cost, measured 2026-10-30 (iteration 235, RTX 3090, courtyard 1920x1080, `LIGHTS_GPU_TIMING=1 LIGHTS_FRAMES=420`, mean of frames 100-400, one run each): `main_transparent_pass_3d` 11 µs with `LIGHTS_EMBERS=0`, 44 µs at rate 3 (the default), 168 µs at rate 12. The sparks cost about 30 µs a frame at the default, 1% of a 60 Hz frame at the worst rate; no cheaper quad is needed. Other passes moved by run-to-run noise only (clustering and auxiliary views swing by milliseconds between runs and are not the embers).
 
 ## What great looks like
 
