@@ -4807,3 +4807,13 @@ Release: v0.2.20 is ~3.5 h old, the 6-hour rule blocks v0.2.21 until ~08:03 CDT;
 Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: layered tongues from straight above (the cloud is still one billow), then 60-66° tongue-over-bare-coals; (3) file heat haze on bevy_elements; (4) luminance-amplitude source; (5) pool-to-grid fixture list.
 
 Removed: nothing outside the clone; scratch `/tmp/l240` removed. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 241 — 2026-10-30 — Overhead flame round 18: the disc flows outward, heat haze filed
+
+Outcome: worked issue #7 (the only open issue). Heat haze filed where it belongs: Ladvien/bevy_elements#50. Round 18 (`src/flame.wesl`): the overhead disc's brightness noise was scrolled one way (optical flow over the flame window: drift (-0.03, -0.21) px a frame, radial +0.014); it is now two cross-faded layers that swell about the axis, with the disc mottled from its middle. Measured after: drift (-0.03, +0.005), radial +0.031, mean luminance 67.4 against 67.8; 45° and 60° unchanged. Found while debugging: the hard facets seen through the disc at 90° are the coal bed's lumps under the additive flame, not a noise defect (recorded in the note). GPU `main_transparent_pass_3d` 32.1 µs against 28.2-28.8 µs before (one more `fbm`, overhead branch only); no CPU change, bench not run. Verdict: drift slice GREAT (measured defect gone, stills unchanged); overhead flame as a whole still NOT YET (radial flow weak; the mask's gain hides most of the layer's contrast). Gate: build, test, test --features serde, examples, clippy, doc, fmt, wasm, wesl-check green. Evidence: `/tmp/l241` (removed).
+
+Release: v0.2.20 tagged 02:03 CDT, 3.6 h old; 6-hour rule blocks v0.2.21 until ~08:03 CDT; it carries 231-241.
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: lower the mask's gain so the flow shows (gain is why the mottle barely reads), then layered tongues; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze lands in bevy_elements#50, hook here once it exists.
+
+Removed: nothing outside the clone; scratch `/tmp/l241`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
