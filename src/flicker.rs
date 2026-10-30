@@ -29,6 +29,7 @@ impl Plugin for FlickerPlugin {
             .add_systems(Update, flicker_lights.in_set(LightsSystems::Flicker));
         crate::report::watch::<Flicker>(app);
         crate::report::watch::<Snuff>(app);
+        crate::report::watch::<Kindle>(app);
     }
 }
 
