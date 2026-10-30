@@ -14,7 +14,9 @@
 //! - **The 48 torch-bearers** (`Bearer`): capsules walking circles of 3–15 m, each with a
 //!   [`PoolCandidate`] at +1.8 m and a flame at the same place. Only the eight nearest the focus are
 //!   real lights; the other forty are a flame and nothing else. Walk the camera and watch the pool
-//!   hand its lights over.
+//!   hand its lights over. The three best-ranked of the eight cast shadows
+//!   ([`LightPool::max_shadowed`]): a figure by a near torch throws a shadow away from it, and a shadow
+//!   moving to another torch deepens there over a third of a second instead of appearing.
 //! - **The focus** (`Focus`): orbits at 6 m radius on a 20 s period, so a sixty-second capture sees
 //!   the pool travel the whole courtyard.
 //!
@@ -35,7 +37,9 @@
 //! (the pool's total every frame, the only way to see a hand-off) are also this example's own.
 //!
 //! Six more are this example's own: `LIGHTS_RESERVE` (reserve lights for a cross-faded hand-off, default
-//! 1; `0` dips instead), `LIGHTS_HYSTERESIS` (the pool's overlap ratio, default 1.15),
+//! 2, one for hand-offs and one for shadows; `0` dips instead), `LIGHTS_SHADOWED` (how many of the pool's
+//! lights cast shadows, the best-ranked first; default 3, `0` for none), `LIGHTS_HYSTERESIS` (the pool's
+//! overlap ratio, default 1.15),
 //! `LIGHTS_FADE` (seconds a light takes to come back after a hand-off, default 0.35),
 //! `LIGHTS_BED` (the braziers' fuel-bed diameter in metres, default 0.34, which sizes their flicker
 //! through the puffing law) and `LIGHTS_UNSIZED=1` (ignore the bed and use the crate's inherited
@@ -331,6 +335,11 @@ const BRAZIERS: [Vec3; 4] = [
     Vec3::new(5.0, 0.0, -5.0),
 ];
 
+/// `LIGHTS_SHADOWED=N`: how many of the pool's lights cast shadows, the best-ranked first (default 3).
+fn shadowed_env() -> usize {
+    std::env::var("LIGHTS_SHADOWED").ok().and_then(|v| v.parse().ok()).unwrap_or(3)
+}
+
 /// `LIGHTS_GPU_TIMING=1` records the render graph's GPU timestamps and prints, once, the mean per pass
 /// (microseconds, frames 100 to 400) on stdout as `gpu_us <pass> <mean>`. It needs a Vulkan or DX12
 /// adapter with timestamp queries; without one the run prints nothing. Run it with `LIGHTS_FRAMES=420`.
@@ -394,8 +403,8 @@ fn main() {
         .add_plugins((ExampleHarness, FlickerPlugin, LightPoolPlugin::<Focus>::default(), FlamePlugin))
         .insert_resource(CameraPlacement(eye, look))
         // The pool is inserted before the plugin's `init_resource`, so these numbers win: eight real
-        // lights over a 20 m reach, each an 8 m point light with no shadow (the braziers are the
-        // shadow casters).
+        // lights over a 20 m reach, each an 8 m point light, the best-ranked three of them casting shadows
+        // (the braziers cast their own).
         .insert_resource(LightPool {
             size: std::env::var("LIGHTS_POOL").ok().and_then(|v| v.parse().ok()).unwrap_or(8),
             // `LIGHTS_RANK=distance` ranks by distance alone, the rule before the pool weighed a light's
@@ -404,8 +413,13 @@ fn main() {
                 Some("distance") => Rank::Distance,
                 _ => Rank::Illuminance,
             },
-            // `LIGHTS_RESERVE=0` makes a hand-off dip rather than cross-fade, which is the comparison.
-            reserve: std::env::var("LIGHTS_RESERVE").ok().and_then(|v| v.parse().ok()).unwrap_or(1),
+            // `LIGHTS_RESERVE=0` makes a hand-off dip rather than cross-fade, which is the comparison. Two by
+            // default: a pool with shadows shares its reserves between hand-offs and shadow changes, and one
+            // left three shadows filled in 40 % of frames on this courtyard where two fill them in 99 %.
+            reserve: std::env::var("LIGHTS_RESERVE").ok().and_then(|v| v.parse().ok()).unwrap_or(2),
+            // The pool's shadow budget: the best-ranked `LIGHTS_SHADOWED` fires throw shadows and the rest
+            // only light (the template's flag below turns them on at all).
+            max_shadowed: Some(shadowed_env()),
             hysteresis: std::env::var("LIGHTS_HYSTERESIS")
                 .ok()
                 .and_then(|v| v.parse().ok())
@@ -421,6 +435,7 @@ fn main() {
                 // metre of it is a real light rather than a flame.
                 range: TORCH_POOL * POOL_RANGE_MARGIN,
                 intensity: 0.0,
+                shadow_maps_enabled: shadowed_env() > 0,
                 ..default()
             },
             ..default()
@@ -498,10 +513,12 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
     let CameraPlacement(eye, look) = *placement;
     let mut camera = commands.spawn((
         camera(eye, look, 8.0),
-        // A cool fill the moon does not have to provide: without it the courtyard's pillars are
-        // black silhouettes and the fire has nothing to read against. Its colour is the sky's
-        // temperature, not a hand-picked blue.
-        AmbientLight { color: sky_colour(), brightness: 2.0, ..default() },
+        // A cool fill the moon does not have to provide: the sky dome under it, which lights the faces
+        // the moon's direction misses. Without it a figure's shadow thrown by a fire onto a wall the moon
+        // does not reach is a black hole (`srgb(1,1,5)` at 2 cd/m²); at 20 (about 63 lx, an eighth of the
+        // moon) it is a navy shadow (`lighting-look.md`). Its colour is the sky's temperature, not a
+        // hand-picked blue.
+        AmbientLight { color: sky_colour(), brightness: 20.0, ..default() },
         Exposure { ev100: exposure_ev100() },
     ));
     // The depth fade reads the depth prepass, so a camera that asks for it carries one.
@@ -823,17 +840,15 @@ fn spawn_scene(
                 Visibility::default(),
             ))
             .with_children(|bearer| {
-                bearer.spawn((
-                    Mesh3d(body.clone()),
-                    MeshMaterial3d(cloth.clone()),
-                    NotShadowCaster,
-                    NotShadowReceiver,
-                ));
+                // The figure throws a shadow, from the braziers and from the pool's shadowed lights (its
+                // own torch among them): a figure standing in firelight with no shadow under it reads
+                // as pasted on. It receives none: beside its own torch, a capsule would gain only shadow
+                // acne on the side the light already misses.
+                bearer.spawn((Mesh3d(body.clone()), MeshMaterial3d(cloth.clone()), NotShadowReceiver));
                 bearer.spawn((
                     Mesh3d(head.clone()),
                     MeshMaterial3d(skin.clone()),
                     Transform::from_xyz(0.0, 1.05, 0.0),
-                    NotShadowCaster,
                     NotShadowReceiver,
                 ));
                 // The carried fire: one entity, so the flame and the real light it is handed can never
@@ -1045,9 +1060,15 @@ fn report_flicker(
     let total: f32 = lights.iter().map(|light| light.intensity).sum();
     let count = lights.iter().count();
     // `LIGHTS_POOL_LOG=1` prints the pool's total **every frame** — the only way to see a hand-off, since
-    // a 0.35 s fade is invisible in a 30-frame sample and far below a frame's mean luminance.
+    // a 0.35 s fade is invisible in a 30-frame sample and far below a frame's mean luminance. A `*` marks
+    // a light casting a shadow (the braziers, and the pool's `LIGHTS_SHADOWED`).
     if std::env::var_os("LIGHTS_POOL_LOG").is_some() {
-        let by_slot: Vec<String> = lights.iter().map(|light| format!("{:.0}", light.intensity)).collect();
+        let by_slot: Vec<String> = lights
+            .iter()
+            .map(|light| {
+                format!("{:.0}{}", light.intensity, if light.shadow_maps_enabled { "*" } else { "" })
+            })
+            .collect();
         println!("pool {} {} {:.1} [{}]", *frame, count, total, by_slot.join(","));
     }
     if !frame.is_multiple_of(30) {

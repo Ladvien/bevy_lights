@@ -248,6 +248,30 @@ Fixed by the three set rules above and by `preferred`. Same capture, same camera
 The "+8.5 % mean total" is consequence 3 fixed: the bright lanterns now hold their lights instead of
 being starved by dim near torches.
 
+## Iteration 271's findings: one clock, and a reserve that goes out
+
+Measured while building the shadow budget (`pool-shadows.md`), on a still scene where only the pool
+changed, three defects of the cross-fade itself:
+
+- **The two ends ran one frame apart.** The reserve aged its fade before reading it, the arriving slot
+  read 0 on the frame of the hand-off, so the pair summed to `fade(t) + 1 - fade(t + 1/60)`: a dip of up
+  to 7 % of the light at the smoothstep's steepest, visible as a 2.5 % sag of the lit ground over a
+  third of a second once the flicker was turned off. The reserve now reads its fade before ageing it, and
+  the pair sums to the light exactly (`a_light_that_earns_a_shadow_gains_it_by_a_cross_fade` holds the sum
+  to 1e-3; at the old offset it reads 93).
+- **A finished reserve stayed on.** Its test was `out < 1.0`, true for a fade that had ended (out 0), so a
+  reserve, once used, stayed visible at zero intensity for the rest of the run. It is now hidden the frame
+  its fade ends, and drops any shadow it carried.
+- **A light switched on drew one stale frame.** `FlickerPlugin` skips a light whose `ViewVisibility` is
+  false, and on the frame a light is shown that is still last frame's value, so the light rendered once
+  at whatever it was left at. Hiding finished reserves exposed it on every cross-fade (a 6 % one-frame
+  drop of the pool's total); the flicker now writes a light whose `Visibility` changed this frame.
+
+After all three, on the courtyard's 620-frame run (frames 26+, default camera, the example's new
+`reserve: 2` and three shadows), the pool's total changes by at most 0.72 % between frames against
+0.87 % at the iteration's start; with `LIGHTS_FOCUS_WALK=14`, where torches stream across the reach,
+1.02 % against 2.2 %, and no frame over 2 % (one before).
+
 ## Pending index
 
 Nothing in this note is unindexed: every stem in *Sources* was read live from the running library on

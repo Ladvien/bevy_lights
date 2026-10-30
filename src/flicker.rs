@@ -254,7 +254,7 @@ type PointLightFrame<'w> = (
     Option<&'w mut Kindle>,
     Option<&'w mut Snuff>,
     Option<&'w ViewVisibility>,
-    Option<&'w Visibility>,
+    Option<Ref<'w, Visibility>>,
 );
 
 /// A spot light's frame of work: the same shape as [`PointLightFrame`].
@@ -265,7 +265,7 @@ type SpotLightFrame<'w> = (
     Option<&'w mut Kindle>,
     Option<&'w mut Snuff>,
     Option<&'w ViewVisibility>,
-    Option<&'w Visibility>,
+    Option<Ref<'w, Visibility>>,
 );
 
 /// Writes every [`Flicker`] light's intensity, and advances every [`Kindle`].
@@ -333,9 +333,21 @@ fn announce(
 /// A light the host put out (`Visibility::Hidden`) is not written, and neither is one a camera culled,
 /// because nothing is extracted for it. The culling test is skipped with no camera, where
 /// `ViewVisibility` says false for everything and there is nothing to cull from.
-fn is_hidden(visibility: Option<&Visibility>, seen: Option<&ViewVisibility>, watched: bool) -> bool {
-    visibility.is_some_and(|visibility| *visibility == Visibility::Hidden)
-        || (watched && seen.is_some_and(|seen| !seen.get()))
+///
+/// A light **shown this frame** (its `Visibility` changed, not just added, to something other than
+/// `Hidden`) is written even though its `ViewVisibility` is still last frame's false: `PostUpdate`
+/// recomputes it and the renderer extracts the light this same frame, so a skipped write drew it for
+/// one frame at whatever intensity it was left at. Measured on the pool: a reserve light taking a
+/// cross-fade came on at 112 lm, the tail of its last fade, instead of 70 000.
+fn is_hidden(visibility: Option<Ref<Visibility>>, seen: Option<&ViewVisibility>, watched: bool) -> bool {
+    let Some(visibility) = visibility else {
+        return watched && seen.is_some_and(|seen| !seen.get());
+    };
+    if *visibility == Visibility::Hidden {
+        return true;
+    }
+    let shown_now = visibility.is_changed() && !visibility.is_added();
+    watched && !shown_now && seen.is_some_and(|seen| !seen.get())
 }
 
 /// One light's frame: advance its kindle and snuff and write its intensity. Answers what the host should
