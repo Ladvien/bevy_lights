@@ -1,0 +1,23 @@
+diff --git a/src/flame.wesl b/src/flame.wesl
+index ae0c622..63c9677 100644
+--- a/src/flame.wesl
++++ b/src/flame.wesl
+@@ -355,11 +355,17 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
+         let radius = FLAME_HALF_WIDTH * (0.85 + 0.8 * (lobes - 0.5));
+         let disc = 1.0 - rq / radius;
+         let streak = fbm(q * 8.0 + vec2<f32>(5.1, -t * 1.5));
+-        let licks = mix(1.0, clamp(0.5 + 1.1 * streak, 0.0, 1.3), smoothstep(0.1, 0.6, rq / radius));
++        // Hot veins and dark gaps between them: a ridged noise of the position, rising and drifting, so the cloud has the
++        // layered structure of fire seen from above and not one smooth ball (round 16).
++        let ridge = smoothstep(0.35, 1.0, 1.0 - abs(2.0 * fbm(q * 3.2 + vec2<f32>(1.7, -t * 1.1)) - 1.0));
++        let veins = mix(0.6, 1.2, ridge);
++        let licks = mix(1.0, clamp(0.5 + 1.1 * streak, 0.0, 1.3), smoothstep(0.1, 0.6, rq / radius)) * mix(1.0, veins, smoothstep(0.05, 0.5, rq / radius));
+         mask = max(mask, smoothstep(0.0, 0.42, disc) * licks * in.overhead.x);
+         // The core is a round heat, only its outline is lobed: a heat that followed the lobes drew rays out of the centre.
+         let core_radius = 0.5 * (radius + FLAME_HALF_WIDTH);
+         heat = max(heat, clamp(1.0 - rq / core_radius, 0.0, 1.0) * (1.0 - 0.45 * rq / core_radius) * mix(0.75, 1.1, streak) * in.overhead.x);
++        // The veins carry their own heat, so the body is orange along them and red between and at the rim.
++        heat = max(heat, clamp(disc * 1.6, 0.0, 1.0) * ridge * 0.55 * in.overhead.x);
+     }
+     var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
+     colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));
