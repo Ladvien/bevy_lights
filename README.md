@@ -38,7 +38,8 @@ then re-lit (`Kindle`), and each flame grows out of its coals as its light flare
 - **A budgeted pool of real lights** (`LightPoolPlugin::<YourFocusMarker>`): a fixed number of real
   point lights handed to the best-ranked candidates around the one entity carrying your focus marker,
   with hysteresis, a cross-fade and a per-frame hand-off budget, so a light that changes owner does not
-  pop.
+  pop — and a shadow budget, so only the nearest few cast shadows and a shadow that moves fades rather
+  than pops.
 - **Flames drawn where the fire is** (`FlamePlugin`): one additive billboard material and one draw per
   flame, each breathing on the same curve as the light it motivates — and at that light's own rate,
   phase and depth when the site is given them, and catching again or going out when its light is re-lit or snuffed (`FlameSite::fire`).
@@ -187,7 +188,7 @@ best-ranked `PoolCandidate`s around the one entity carrying your focus marker, e
 candidate's position plus its own world-space offset. Everything else is a flame and nothing else. The
 assignment is deterministic: rank, then `Entity`.
 
-`PoolBudget` is the pool's lamp schedule, rewritten every frame: `holds(entity)` and `holder_of(slot)` say which candidates are real lights right now, and `starved()` counts the candidates that wanted one and are only flames, so an editor can show the budget and a game can see `size` is too small.
+`PoolBudget` is the pool's lamp schedule, rewritten every frame: `holds(entity)` and `holder_of(slot)` say which candidates are real lights right now, `casts_shadow(entity)` (and `shadowed`) which of those lights throw a shadow, and `starved()` counts the candidates that wanted one and are only flames, so an editor can show the budget and a game can see `size` is too small.
 
 A candidate is ranked by the **light it puts on the subject** (`intensity / distance²`), not by its
 distance alone, so a bright brazier at 3 m outranks a dim torch at 2 m; `LightPool::rank` switches to
@@ -205,6 +206,17 @@ rate and depth, so a light handed to a torch breathes as that torch's flame does
 `phase: None` leaves the slot's own `1.3 · slot` clock alone, `diameter: None` gives the pool's un-sized
 rate, and `depth: None` restores `FLICKER_DEPTH` — so a host that models no per-prop fire keeps the
 pool's uniform one.
+
+**Shadows are budgeted apart from lights.** The template's `shadow_maps_enabled` turns the pool's
+shadows on, and `LightPool::max_shadowed` caps them: `Some(3)` gives a shadow to the three best-ranked
+lights the pool holds (the closest and brightest, held with the same `hysteresis`) and lets the rest
+light without one; `None`, the default, shadows every light, as before. Every shadowed point light
+renders six shadow views a frame — about 0.6 ms a light on an RTX 3090 in the courtyard — so sixteen
+lights can afford three shadows where they could not afford sixteen. A light that earns or loses its
+shadow because the ranking moved is cross-faded to itself through a reserve light, so the shadow
+deepens over `fade_seconds` while the lit ground around it holds still; give a pool with shadows
+`reserve: 2`, since hand-offs and shadow changes share the reserves. A change to the cap or the flag
+applies at once, as a graphics setting should.
 
 ### Shader flames
 
@@ -284,7 +296,7 @@ engine-free.
 
 The components a game spawns or marks are `Reflect` and registered by the plugins — `Flicker`, `Kindle`,
 `PoolCandidate`, `FlameSite` — so a BRP front end can read and drive them, and so are the resources a
-host sets, `LightPool` (size, reach, gain, rank, hysteresis, fade, reserve, the slot light's template)
+host sets, `LightPool` (size, reach, gain, rank, hysteresis, fade, reserve, shadow cap, the slot light's template)
 `FlameLook` (colour, strength, the set-once `max_height`) and `FlameWind` / `FlameGust` (the wind the flames lean in, and a gusting one the plugin writes into it). The crate spawns `PoolLight` (registered
 too: recolour it for a palette; name its lights what you like) and `Flame`, a plain component a host
 finds or counts and never spawns. `Kindled { entity }` is the message a host hears when a fire catches.

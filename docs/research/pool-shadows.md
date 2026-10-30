@@ -81,10 +81,10 @@ The technical rule is RTR4's (§20.4, many lights):
 "Closest and brightest" is what the pool already ranks by (`Rank::Illuminance`, intensity over
 distance squared), so the shadowed lights are the best-ranked of the lights the pool holds.
 
-1. **`LightPool::shadowed: usize`** — how many of the pool's lights cast shadows. The pool owns every
-   slot's `shadow_maps_enabled`, as it owns its intensity: the template's flag is ignored, and
-   `LightPool::problems` names it when it is set, so a host that set it hears why its pool has no
-   shadows.
+1. **`LightPool::max_shadowed: Option<usize>`** caps how many of the pool's lights cast the shadow
+   the template asks for (`LightPool::light.shadow_maps_enabled`). `None` is no cap, which is the
+   pool's behaviour before this note: the template's flag on every slot. The pool now writes every
+   slot's flag itself, within the cap, as it writes its intensity.
 2. **Who gets one**: the best-ranked holders, by `LightPool::rank`'s own value. A holder keeps its
    shadow unless a shadowless holder is better than the worst shadowed one by `LightPool::hysteresis`,
    the same overlap rule (`preferred`) that holds a slot, so two torches at nearly the same distance
@@ -101,28 +101,35 @@ distance squared), so the shadowed lights are the best-ranked of the lights the 
    overlap zones gather results from both adjoining shadow maps and are blended."
 5. **It shares the hand-off budget.** A shadow change needs a free reserve, after the frame's owner
    changes have taken theirs; with none free it waits for the next frame (the same rule that stops a
-   move the pool cannot cross-fade). With `reserve: 0` there is nothing to fade behind, and a shadow
-   change dips the light and brings it back with the new flag, as a hand-off does.
-6. **`PoolBudget::shadowed`** lists the candidates whose light casts a shadow this frame, so an editor
+   move the pool cannot cross-fade), and so does a light still fading from its last change. Losses are
+   applied before gains, so a gain that waits never puts the pool over its cap. With `reserve: 0` there
+   is nothing to fade behind, and a shadow change dips the light and brings it back with the new flag,
+   as a hand-off does.
+6. **A change of the settings is not a hand-off.** Turning the template's flag on or off, or moving the
+   cap, applies to every light on the frame it is made, like the template's colour: a game's graphics
+   menu changes everything at once, and fading sixteen lights through one reserve would take six
+   seconds.
+7. **`PoolBudget::shadowed`** lists the candidates whose light casts a shadow this frame, so an editor
    can show which fires are shadowed beside which are real.
 
 ## Parameters
 
 | parameter | value | source |
 |---|---|---|
-| `LightPool::shadowed` | `0` | design default: the pool's cost and look are unchanged for every host that does not ask; RTR4's rule says *which* lights, not how many, and the count is the host's frame budget |
+| `LightPool::max_shadowed` | `None` (no cap: the template's flag on every light, as before) | design default: the pool's cost and look are unchanged for every host that does not ask; RTR4's rule says *which* lights, not how many, and the count is the host's frame budget |
 | who is shadowed | the best-ranked holders by `LightPool::rank` | RTR4 §20.4, "the closest and brightest lights" |
 | hysteresis on the shadow set | `LightPool::hysteresis` (1.15) | the pool's own overlap rule (`pool-hand-off.md`); one rule for holding a light and holding a shadow |
 | shadow fade | `LightPool::fade_seconds` (0.35 s), smoothstep | `pool-hand-off.md`: below the eye's fusion threshold, read as a change rather than a cut |
 | reserve flag | the departing light's | a shadow leaves with its light |
-| shadowed lights during a fade | up to `shadowed + reserve` | the cost of not popping, for one fade |
+| shadowed lights during a fade | up to `max_shadowed + reserve` | the cost of not popping, for one fade |
+| reserves for a pool with shadows | 2 (the courtyard's) | measured: at `reserve: 1` the courtyard's three shadows were all placed in 39 % of frames, at 2 in 99 % (see *Iteration 271's findings*); the crate's default stays 1 |
 
 ## Validation targets
 
-- **The budget holds**: with a pool of 8 and `shadowed: 3`, exactly 3 of the slots' lights have
-  `shadow_maps_enabled`, and they are the 3 best-ranked holders (test).
-- **The template's flag is not a second path**: a template with `shadow_maps_enabled: true` and
-  `shadowed: 0` gives no shadowed slot, and `problems()` names `light.shadow_maps_enabled` (test).
+- **The budget holds**: with a pool of 8 and `max_shadowed: Some(3)`, exactly 3 of the slots' lights
+  have `shadow_maps_enabled`, and they are the 3 best-ranked holders (test).
+- **The template's flag is the switch**: with it off no slot casts a shadow whatever the cap, and with
+  it on and no cap every slot does, as before (tests, the second the template test that predates this).
 - **Hysteresis**: a shadowless holder 10 % better than the worst shadowed one does not take its
   shadow; one 20 % better does (test).
 - **A shadow arrives by a cross-fade**: when a held light gains its shadow, a reserve light appears at
@@ -132,9 +139,9 @@ distance squared), so the shadowed lights are the best-ranked of the lights the 
 - **Capture**: with `LIGHTS_SHADOWED`, the near torches throw pillar and figure shadows that the far
   ones do not, and a frame sequence across a shadow change shows the shadow deepening over the fade,
   not appearing in one frame (largest consecutive-frame difference inside the shadow region).
-- **Cost**: GPU time of the shadow pass grows with `shadowed`, not with the pool's size; measured on
-  the courtyard with `LIGHTS_GPU_TIMING`.
-- **CPU**: `bench_lights` `pool_p50_us` within the run-to-run noise of the baseline at `shadowed: 0`.
+- **Cost**: GPU time of the shadow views grows with `max_shadowed`, not with the pool's size; measured
+  on the courtyard with `LIGHTS_GPU_TIMING`.
+- **CPU**: `bench_lights` `pool_p50_us` within the run-to-run noise of the baseline at no cap.
 
 ## What great looks like
 
