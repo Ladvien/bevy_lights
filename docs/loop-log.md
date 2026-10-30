@@ -4339,3 +4339,5 @@ Gate green: build (release and debug), test, serde test, examples, clippy, doc, 
 5. Bearers are placeholder capsules; GIF banding.
 
 Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13` (all detached, not mine). Removed this pass: scratch `/tmp/l207` (below).
+
+Release: v0.2.17 published, https://crates.io/crates/bevy_lights/0.2.17 (tag `v0.2.17`; semver-checks: no update required). Removed this pass: `/tmp/l207` (no baseline worktree was made: the before captures came from the starting build).
