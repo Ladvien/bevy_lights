@@ -4881,3 +4881,11 @@ Outcome: worked issue #7 (only open issue; no parked branches; no new research, 
 Top 5: (1) publish v0.2.21 after 08:03; (2) luminance-amplitude source (none citable so far); (3) pool-to-grid fixture list (plain-data export of lit fires beside `ground_ramp`); (4) heat haze hook once bevy_elements#50 lands; (5) overhead flame only on a reference image showing a defect.
 
 Removed: scratch `/tmp/l249`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 250 — 2026-10-30 — No change: nothing unblocked, release still inside the 6-hour window
+
+Outcome: log only. Tree clean on `main` at 28c40f7, no `wiggum/parked-*` branches. Open issues: #7 (overhead flame), stopped at iteration 249 by an assumed decision awaiting the owner; no new comment. bevy_emerge #103: newest comment is the `bevy_light_grid` 0.20 pin; no unmet crate-side need. bevy_elements#50 (heat haze) still open, no comment, so no hook can be written. Release: v0.2.20 tagged 02:03 CDT, 4.4 h old at 06:32, v0.2.21 blocked until ~08:03 CDT; carries 231-249.
+
+Ranked candidates: (1) publish v0.2.21 after 08:03; (2) pool-to-grid fixture list: rejected this pass, a host builds it in five lines from `PoolLight` + `PointLight` + `GlobalTransform` + `ground_ramp`, and no requester has asked, so a new public type would be speculative API; (3) luminance-amplitude source (none citable in the corpus); (4) heat haze hook (waits on bevy_elements#50); (5) overhead flame (waits on a reference image, per #7). Home-still, capture, bench and gate not run (no code changed).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
