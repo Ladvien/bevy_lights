@@ -5001,3 +5001,13 @@ Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `
 Outcome: log only. Tree clean on `main` at a80aaa4, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision (reopen needs a reference image); no owner comment since. 0.2.21 is not retried (429 at 08:41 CDT; window clears ~02:03 CDT on 2026-10-31). Candidates unchanged from 265: (1) publish 0.2.21 after the limit clears; (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester). Home-still, capture, bench and gate not run (no code changed).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 267 — 2026-10-30 — No change: amplitude research retried, home-still GPU busy, nothing unblocked
+
+Outcome: log only. Tree clean on `main` at 012e958, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision (reopen needs a reference image); no owner comment since. 0.2.21 is not retried (429 at 08:41 CDT; window clears ~02:03 CDT on 2026-10-31).
+
+Work: took candidate (2), the luminance-amplitude source. `hs status` at 09:45 CDT: scribe (two hosts) and distill up, 80 retryable failures, 901 queued. `distill_search` (three phrasings: photometer percent-flicker of an open flame, relative fluctuation of flame light output, firelight modulation spectrum) failed with `500 Embedding error: gpu busy: 4867 MB free < 5000 MB required to load bge-m3`, holders a 14.6 GB vLLM EngineCore and two llama-servers; so the GPU also has too little free VRAM for a capture this pass. `paper_search` (candle photodiode modulation, pool-fire radiative fluctuation, flickering firelight modulation depth) returned an fMRI amplitude paper, Raj & Prabhu 2018 (heptane pool-fire geometry and radiative properties, no DOI-listed download, mean values) and LED temporal-light-modulation reviews: none states a photometer-measured modulation depth for a flame. Maynard 2013 remains the only known source and is still unobtainable. No default moves; no note changes.
+
+Ranked candidates: (1) publish 0.2.21 after ~02:03 CDT 2026-10-31; (2) luminance-amplitude source (retry `distill_search` when the GPU frees 5 GB; Raj & Prabhu 2018 may carry a radiative-fluctuation figure, try `paper_download` then); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester). Capture, bench and gate not run (no code changed).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
