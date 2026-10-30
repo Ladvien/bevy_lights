@@ -218,6 +218,74 @@ fn the_pools_light_settings_follow_the_resource() {
     assert!(shadows, "the shadow setting followed");
 }
 
+/// The settings of a pool light that are the template's: everything but its intensity (its candidate's)
+/// and its shadow flag (the shadow budget's).
+fn shared_settings(light: &PointLight) -> (Color, f32, bool, bool, f32, f32, f32) {
+    (
+        light.color,
+        light.range,
+        light.contact_shadows_enabled,
+        light.affects_lightmapped_mesh_diffuse,
+        light.shadow_depth_bias,
+        light.shadow_normal_bias,
+        light.shadow_map_near_z,
+    )
+}
+
+#[test]
+fn every_setting_of_the_template_reaches_every_pool_light_live_and_a_later_light_matches() {
+    // An editor turns on contact shadows or moves the shadow bias while the pool burns: every light it
+    // owns, the reserve included, takes the change on the next frame — not only the lights spawned
+    // after it — and each keeps the shadow flag the budget gave it.
+    let mut app =
+        app(LightPool { size: 2, reserve: 1, reach: 10.0, gain: 1.0, max_shadowed: Some(1), ..default() });
+    app.world_mut().resource_mut::<LightPool>().light.shadow_maps_enabled = true;
+    focus_at(&mut app, Vec3::ZERO);
+    candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    let flags_before: Vec<bool> = lights(&mut app).iter().map(|light| light.4).collect();
+    assert_eq!(flags_before.iter().filter(|shadowed| **shadowed).count(), 1, "one shadow: {flags_before:?}");
+
+    let template = {
+        let mut pool = app.world_mut().resource_mut::<LightPool>();
+        pool.light.color = Color::srgb(1.0, 0.4, 0.1);
+        pool.light.range = 13.0;
+        pool.light.contact_shadows_enabled = true;
+        pool.light.affects_lightmapped_mesh_diffuse = false;
+        pool.light.shadow_depth_bias = 0.3;
+        pool.light.shadow_normal_bias = 1.1;
+        pool.light.shadow_map_near_z = 0.25;
+        shared_settings(&pool.light)
+    };
+    app.update();
+    let mut found: Vec<(usize, PointLight)> = app
+        .world_mut()
+        .query::<(&PoolLight, &PointLight)>()
+        .iter(app.world())
+        .map(|(slot, light)| (slot.slot, *light))
+        .collect();
+    found.sort_by_key(|(slot, _)| *slot);
+    assert_eq!(found.len(), 3, "two lights and a reserve");
+    for (slot, light) in &found {
+        assert_eq!(shared_settings(light), template, "slot {slot} kept an old setting");
+    }
+    let flags_after: Vec<bool> = found.iter().map(|(_, light)| light.shadow_maps_enabled).collect();
+    assert_eq!(flags_after, flags_before, "a template change is not a shadow change");
+
+    // One fixture: a light the pool spawns later is the same as the ones already burning.
+    app.world_mut().resource_mut::<LightPool>().size = 3;
+    settle(&mut app);
+    let spawned: Vec<_> = app
+        .world_mut()
+        .query::<(&PoolLight, &PointLight)>()
+        .iter(app.world())
+        .map(|(_, light)| shared_settings(light))
+        .collect();
+    assert_eq!(spawned.len(), 4);
+    assert!(spawned.iter().all(|settings| *settings == template), "{spawned:?}");
+}
+
 /// Every pool light, by slot: `(slot, translation, visibility, flicker base, casts a shadow)`.
 fn lights(app: &mut App) -> Vec<(usize, Vec3, Visibility, f32, bool)> {
     let mut found: Vec<_> = app
@@ -1096,6 +1164,45 @@ mod saved_pool {
             back.light.intensity, 0.0,
             "the template's intensity is ignored by the pool and not saved"
         );
+    }
+
+    /// Bevy's `soft_shadows_enabled` exists only with its `experimental_pbr_pcss` feature; `None` without it.
+    fn soft(light: &PointLight) -> Option<bool> {
+        light.field("soft_shadows_enabled").and_then(|f| f.try_downcast_ref::<bool>()).copied()
+    }
+
+    #[test]
+    fn a_pool_saves_every_setting_its_lights_take_from_the_template() {
+        let mut light = PointLight {
+            contact_shadows_enabled: true,
+            affects_lightmapped_mesh_diffuse: false,
+            shadow_depth_bias: 0.3,
+            shadow_normal_bias: 1.1,
+            shadow_map_near_z: 0.25,
+            ..LightPool::default().light
+        };
+        // Set where the build has it, so a build with Bevy's PCSS checks that it is saved too.
+        if let Some(soft) = light.field_mut("soft_shadows_enabled").and_then(|f| f.try_downcast_mut::<bool>())
+        {
+            *soft = true;
+        }
+        let pool = LightPool { light, ..default() };
+        let back: LightPool = serde_json::from_str(&serde_json::to_string(&pool).unwrap()).unwrap();
+        let saved = |l: &PointLight| {
+            (
+                l.contact_shadows_enabled,
+                l.affects_lightmapped_mesh_diffuse,
+                l.shadow_depth_bias,
+                l.shadow_normal_bias,
+                l.shadow_map_near_z,
+                soft(l),
+            )
+        };
+        assert_eq!(saved(&back.light), saved(&pool.light));
+
+        // A file that names none of them keeps Bevy's own defaults, not zeros.
+        let partial: LightPool = serde_json::from_str(r#"{"light": {"range": 12.0}}"#).unwrap();
+        assert_eq!(saved(&partial.light), saved(&PointLight::default()));
     }
 
     #[test]

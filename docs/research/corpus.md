@@ -113,6 +113,8 @@ Searched `clustered`, `tiled shading`, `light culling`, `many lights`, `z-binnin
 | `s2011-advances-pdf-slides-2` | SIGGRAPH 2011 *Advances*, tiled forward | the original tile-based pipeline |
 | `10.1007_978-3-319-24589-8_3` | Rodrigues & Clua 2015, real-time lighting for procedural 2D isometric game terrain | the same budget problem at a smaller scale |
 | `book_level_of_detail_3d_graphics_luebke` ch. ? | Luebke et al., *Level of Detail for 3D Graphics* | the perceptual budget argument |
+| `s2025-advances-materials-7` | *Fast as Hell: idTech 8 Global Illumination* (SIGGRAPH 2025) | "contact shadows for every light" in a shipped many-light renderer (`pool-template.md`) |
+| `s2025-advances-materials-12` | Narkowicz & Costa, *MegaLights* (UE5, SIGGRAPH 2025) | screen traces and contact shadows for many lights |
 
 Olsson, Billeter & Assarsson 2012, *Clustered deferred and forward shading* (HPG), **is not in the
 corpus**; Sanctuary cites it by DOI `10.1145/2343045.2343095`, and `paper_get` on that DOI returns
@@ -159,6 +161,7 @@ Searched `Purkinje`, `scotopic`, `tone mapping`, `exposure`, `night vision`.
 | `Evaluation-of-Reverse-Tone-Mapping-through-Varying-Exposure-Conditions` | the same, measured | |
 | `10.1109_tvcg.2019.2898741` | Denes et al. 2019, *Temporal resolution multiplexing* | critical flicker fusion: how fast a flicker must be to fuse |
 | `book_real_time_rendering_4th_akenine` ch. 8 | RTR4, light and colour | the survey |
+| `10.3758_bf03200497` | Meng & Sedgwick, *Distance perception mediated through nested contact relations among surfaces* | a cast shadow tells resting from floating (`pool-template.md`); `catalog_read` returns 404 |
 
 A practical's flicker at 1-2 Hz is *well below* critical flicker fusion, which is why it reads as
 movement and not as a strobe — and why an amplitude above ~20 % starts to hurt.

@@ -69,8 +69,8 @@ bevy_lights = { git = "https://github.com/Ladvien/bevy_lights", branch = "main" 
 The crate is pinned to Bevy 0.20; its MSRV is Rust 1.97.1. `serde` is an optional feature: it derives
 `serde` on the components and resources a host saves — `Flicker`, `Kindle`, `Snuff`, `PoolCandidate`, `PoolLight`,
 `FlameSite`, `FlameLook`, `Rank`, `LightPool` — and turns on Bevy's own `serialize` for the colours they carry.
-`PointLight` has no serde derive, so `LightPool` saves its slot template as the four fields the pool copies
-(`color`, `range`, `radius`, `shadow_maps_enabled`); every field is optional on the way in.
+`PointLight` has no serde derive, so `LightPool` saves its slot template as the fields the pool copies onto
+its lights — all of them but `intensity` — and every field is optional on the way in.
 
 ## Quick start
 
@@ -217,6 +217,15 @@ shadow because the ranking moved is cross-faded to itself through a reserve ligh
 deepens over `fade_seconds` while the lit ground around it holds still; give a pool with shadows
 `reserve: 2`, since hand-offs and shadow changes share the reserves. A change to the cap or the flag
 applies at once, as a graphics setting should.
+
+**One template, every light, live.** Every field of `LightPool::light` but `intensity` and
+`shadow_maps_enabled` is every pool light's: colour, range, radius, the shadow's biases and near plane,
+`contact_shadows_enabled`, and Bevy's `soft_shadows_enabled` where its `experimental_pbr_pcss` feature
+gives the light one. A change to the template reaches every light, reserves included, on the next frame,
+so an editor's slider moves the whole pool and a light spawned later matches the ones already burning.
+Contact and soft shadows are off by default: Bevy's contact shadows need a `ContactShadows` camera (and
+TAA, or they dot a lit wall), and its point-light soft shadows only soften at a `radius` of metres, which
+also widens every highlight.
 
 ### Shader flames
 

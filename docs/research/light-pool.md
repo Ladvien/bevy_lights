@@ -157,12 +157,13 @@ added until someone asks.
   field makes that a decision the host states rather than a fact it has to know.
 - **The crate's lights are `Visibility::Hidden` when unused**, not `intensity = 0`. A hidden light
   is not extracted at all; an intensity-0 one is.
-- **The template is applied when *its* four shared fields change, not whenever the resource
+- **The template is applied when *its* shared fields change, not whenever the resource
   does.** The first draft copied them on `pool.is_changed()`; Sanctuary's night glide writes `gain`
   every frame, and its palette tints every `FireLight` itself, so the first draft would have reset
   every slot to the template's colour on every frame and fought the palette. Found by reading
   Sanctuary's `apply_palette` before publishing; `a_change_of_gain_leaves_a_slots_own_colour_alone`
-  is the test.
+  is the test. Since iteration 272 the shared fields are every field but `intensity` and
+  `shadow_maps_enabled`, not four (`pool-template.md`).
 - **`gain <= 0` hides the pool** rather than multiplying to zero, for the same reason.
 - **Known defect, logged:** the hand-off pops. A light that moves from one candidate to another
   jumps. Fading it over a few frames is the loop log's second item.
@@ -195,6 +196,6 @@ A level editor that places torches has to show the author **which of them are re
 
 An editor that configures the pool live saves its settings with the project (bevy_emerge issue #103). `LightPool` was the one settings resource without serde because `PointLight` has none. No tuned number is involved, so nothing here is a default and nothing changes visually.
 
-**Craft.** A lamp schedule is a document that travels with the show: the same rig recalled on the next shoot day. **Production.** Engines save light budgets as project data next to the scene (the counters in `PoolBudget`'s section above are the same numbers read back). **Technical.** The pool copies exactly four fields of `light` onto its slots (`color`, `range`, `radius`, `shadow_maps_enabled`) and ignores `intensity`, so those four are the template's whole state; a `serde(with)` module writes them and rebuilds a `PointLight` from them with `intensity` 0. `#[serde(default)]` on the pool and the template means a file naming a few fields is complete.
+**Craft.** A lamp schedule is a document that travels with the show: the same rig recalled on the next shoot day. **Production.** Engines save light budgets as project data next to the scene (the counters in `PoolBudget`'s section above are the same numbers read back). **Technical.** The pool copies exactly four fields of `light` onto its slots (`color`, `range`, `radius`, `shadow_maps_enabled`) and ignores `intensity`, so those four are the template's whole state; a `serde(with)` module writes them and rebuilds a `PointLight` from them with `intensity` 0. `#[serde(default)]` on the pool and the template means a file naming a few fields is complete. *(Wrong, found in iteration 272: a light the pool spawned took the whole template, biases and contact-shadow flag included, so a project lost them on reload. The template now saves every field but `intensity`; `pool-template.md`.)*
 
 **Validation.** A round trip keeps every field and zeroes the template's intensity; a partial file takes the defaults. **Deviations.** None. **Pending index.** None; no new source was read.
