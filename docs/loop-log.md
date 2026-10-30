@@ -4753,3 +4753,11 @@ Outcome: log only. Tree clean, no open issues, no parked branches. Gate re-run o
 Ranked candidates (unchanged from iteration 233): (1) publish v0.2.21 once the tag is 6 h old; (2) overhead flame construction (twelve NOT YET rounds); (3) cheaper ember quad (needs GPU timing); (4) heat haze (outside the map); (5) luminance-amplitude source (none citable).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 235 — 2026-10-30 — Ember GPU cost measured: no cheaper quad needed
+
+Outcome: the backlog's "cheaper ember quad (GPU cost unmeasured)" was blocked on a tool that already exists (`LIGHTS_GPU_TIMING=1` in the courtyard). Measured on big's RTX 3090 at 1920x1080, frames 100-400, one run per setting: `main_transparent_pass_3d` 11 µs with embers off, 44 µs at the default rate 3, 168 µs at rate 12 (about 1% of a 60 Hz frame). The quad is cheap enough; the candidate is closed. Recorded under `docs/research/flame-embers.md` validation targets. Docs only: no code, no capture, no bench.
+
+Issues: none open. Parked: none. bevy_emerge #103: no new need. Release: v0.2.20 is 3 h old, the 6-hour rule blocks v0.2.21 until ~08:03 CDT; changes ride in it. Ranked candidates: (1) publish v0.2.21 after 08:03; (2) overhead flame construction (twelve NOT YET rounds); (3) heat haze (outside the map); (4) luminance-amplitude source (none citable); (5) ember quad closed.
+
+Removed: `/tmp/l235` (empty). Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
