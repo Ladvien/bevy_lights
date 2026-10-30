@@ -3,7 +3,7 @@
 use bevy::prelude::*;
 
 use crate::model::{CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, fire_lumens, flicker_rate};
-use crate::{FlameSite, Flicker, PoolCandidate};
+use crate::{FlameEmbers, FlameSite, Flicker, MAX_EMBER_RATE, PoolCandidate};
 
 /// A named kind of fire: its fuel-bed diameter, flicker depth and flame height together, so a
 /// picker (or a project file) stores one word instead of three loose numbers.
@@ -127,6 +127,21 @@ impl FireKind {
     /// How fast the fire flickers, in hertz: the puffing law at [`diameter`](Self::diameter).
     pub fn rate(self) -> f32 {
         flicker_rate(self.diameter())
+    }
+
+    /// The sparks this fire sheds, or `None` for one that sheds none (a candle, a lantern's wick: no
+    /// solid fuel to spit). Sparks scale with the fuel burned, so the rate rises with the fire's size
+    /// up to [`MAX_EMBER_RATE`]; the brazier's is [`FlameEmbers::default`]. Insert the value on the
+    /// [`FlameSite`] entity. A design default (`docs/research/fire-kinds.md`).
+    pub fn embers(self) -> Option<FlameEmbers> {
+        let rate = match self {
+            FireKind::Candle | FireKind::Lantern => return None,
+            FireKind::Torch => 2.0,
+            FireKind::Brazier => return Some(FlameEmbers::default()),
+            FireKind::Campfire => 5.0,
+            FireKind::Bonfire => MAX_EMBER_RATE,
+        };
+        Some(FlameEmbers { rate })
     }
 
     /// The fire's name, as a picker shows it.

@@ -8,6 +8,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 - **`FlameEmbers`: sparks that leave a flame.** Add the component (`rate`, sparks a second, `0..=MAX_EMBER_RATE`, default 3) to a `FlameSite` and its flame gets one more child, a camera-facing additive quad (`src/embers.wesl`) on which sixteen hashed slots each emit a spark per cycle: a capsule along its own velocity that climbs under drag, weaves, drifts downwind with the flame's lean and cools yellow to orange to red (Newton cooling). No particle state, no buffers; the quad inherits the flame's catch and lean, honours `depth_fade`, and sites without the component are unchanged. `FlameEmbers::problems()`, serde under the `serde` feature, `LIGHTS_EMBERS=r` in the courtyard. `docs/research/flame-embers.md`.
 
+- **`FireKind::embers()`**: the sparks a kind of fire sheds, `None` for the candle and the lantern, rising from the torch (2 a second) through the brazier (the default 3) and campfire (5) to the bonfire (`MAX_EMBER_RATE`). A design default; `docs/research/fire-kinds.md`.
+
 ### Documentation
 
 - The courtyard example's `LIGHTS_GPU_TIMING=1` prints mean GPU time per render pass; with it the ember quad measures about 0.1 ms a frame (transparent pass 11 µs without embers, 107 to 137 µs with, RTX 3090, 52 flames).
