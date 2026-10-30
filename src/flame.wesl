@@ -333,9 +333,11 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
     // fifth power of the blend so a flame still in view at 60-70 degrees keeps its brightness until the disc has taken over.
     // Straight down the upright flame is edge-on: a one-pixel slab of its widest row that pokes past the disc. It is gone by 85 degrees.
     let tongue = (1.0 - OVERHEAD_TONGUE * pow(in.overhead.x, 5.0)) * (1.0 - smoothstep(0.970, 0.996, in.overhead.z));
-    var mask = smoothstep(0.0, 0.30, body) * smoothstep(0.0, 0.06 + 0.30 * in.overhead.x, y) * tongue;
+    let foot = smoothstep(0.0, 0.06 + 0.30 * in.overhead.x, y);
+    var mask = smoothstep(0.0, 0.30, body) * foot * tongue;
     // Hottest along the axis and low down: red rim and tip, the host's fire, a yellow core.
-    var heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u);
+    // The tongue's heat leaves with its foot from above: a heat that stopped dead at the seat stepped the colour across the disc it overlaps.
+    var heat = clamp(body, 0.0, 1.0) * (1.0 - 0.85 * u) * mix(1.0, foot, in.overhead.x);
     // From above the plume's cross-section is what is seen: a horizontal disc of the plume's widest radius, rippled by the same
     // turbulence, drawn as the ellipse it projects to (`R` wide, `R * sin(elevation)` tall) and faded in with the camera's rise.
     if in.overhead.x > 0.0 {
