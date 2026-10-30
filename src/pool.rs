@@ -173,7 +173,10 @@ pub struct LightPool {
     /// up to `max_shadowed + reserve` lights cast shadows. A pool with shadows wants `reserve: 2`: on the
     /// courtyard, with one reserve shared by hand-offs and shadow changes, three shadows were all placed
     /// in 39 % of frames; with two, in 99 %. A change to this field or to the template's flag is a
-    /// settings change, and applies to every light at once.
+    /// settings change, and applies to every light at once, the reserves' included: with the flag off, or a
+    /// cap of `Some(0)`, a reserve fading a light out does so without its shadow, on that frame. A cap
+    /// lowered to a number above zero reaches the slots at once, and a reserve already fading a shadowed
+    /// light out keeps that shadow for the rest of its fade, inside the `max_shadowed + reserve` above.
     pub max_shadowed: Option<usize>,
 }
 
@@ -1052,13 +1055,16 @@ fn assign_pool<F: Component>(
                 transform.translation = last.at;
                 // The departing light keeps the flicker it had (the phase, rate and depth of the light that
                 // left), so the two ends of the cross-fade move together instead of beating against each
-                // other, and its shadow, so a shadow leaves with its light.
+                // other, and its shadow, so a shadow leaves with its light — while the pool has a shadow
+                // budget at all. The snapshot was taken under last frame's settings, so a template flag
+                // turned off, or a cap of nothing, reaches the reserve here, on the frame it is made.
                 flicker.phase = last.phase;
                 flicker.diameter = last.diameter;
                 flicker.depth = last.depth;
                 flicker.base = last.intensity * pool.gain * out;
-                if light.shadow_maps_enabled != last.shadow {
-                    light.shadow_maps_enabled = last.shadow;
+                let shadow = last.shadow && shadow_budget > 0;
+                if light.shadow_maps_enabled != shadow {
+                    light.shadow_maps_enabled = shadow;
                 }
                 visibility.set_if_neq(Visibility::Inherited);
             } else {

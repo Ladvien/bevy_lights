@@ -363,6 +363,75 @@ fn the_shadow_budget_goes_to_the_best_ranked_lights() {
     assert!(app.world().resource::<PoolBudget>().shadowed.is_empty());
 }
 
+/// The visible reserve lights (slot at or past the pool's size), by `(casts a shadow, flicker base)`.
+fn reserves_at(app: &mut App, size: usize) -> Vec<(bool, f32)> {
+    lights(app)
+        .into_iter()
+        .filter(|(slot, _, visibility, ..)| *slot >= size && *visibility != Visibility::Hidden)
+        .map(|(_, _, _, base, shadow)| (shadow, base))
+        .collect()
+}
+
+#[test]
+fn turning_the_pools_shadows_off_reaches_the_reserves_too() {
+    // Pool of one, cap one, one reserve. The torch leaves and the reserve fades its shadowed light out;
+    // while it does, the player turns shadows off, by the template's flag or by a cap of nothing. The
+    // settings say no pool light casts, so none may, the reserve's included, though its light fades on.
+    for turn_off in [
+        (|pool: &mut LightPool| pool.light.shadow_maps_enabled = false) as fn(&mut LightPool),
+        |pool: &mut LightPool| pool.max_shadowed = Some(0),
+    ] {
+        let mut app = app(shadowed_pool(1, 1, 1));
+        focus_at(&mut app, Vec3::ZERO);
+        let near = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+        settle(&mut app);
+        assert_eq!(shadowed_at(&mut app).len(), 1);
+        app.world_mut().entity_mut(near).insert(Visibility::Hidden);
+        app.update();
+        assert_eq!(
+            reserves_at(&mut app, 1).iter().filter(|(shadow, _)| *shadow).count(),
+            1,
+            "fixture: a reserve carries the shadow: {:?}",
+            lights(&mut app)
+        );
+        turn_off(&mut app.world_mut().resource_mut::<LightPool>());
+        app.update();
+        assert!(shadowed_at(&mut app).is_empty(), "shadows off, yet a light casts: {:?}", lights(&mut app));
+        let carrying = reserves_at(&mut app, 1);
+        assert!(
+            carrying.len() == 1 && carrying[0].1 > 0.0,
+            "the reserve still fades its light out, unshadowed: {:?}",
+            lights(&mut app)
+        );
+        // And it stays off for the whole of the fade.
+        for frame in 0..30 {
+            app.update();
+            assert!(shadowed_at(&mut app).is_empty(), "frame {frame}: {:?}", lights(&mut app));
+        }
+    }
+}
+
+#[test]
+fn a_departure_on_the_frame_shadows_go_off_starts_unshadowed() {
+    // The reserve's light is copied from last frame's look, which was shadowed. The frame the shadows go
+    // off it must not start casting from that copy.
+    let mut app = app(shadowed_pool(1, 1, 1));
+    focus_at(&mut app, Vec3::ZERO);
+    let near = candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    assert_eq!(shadowed_at(&mut app).len(), 1);
+    app.world_mut().entity_mut(near).insert(Visibility::Hidden);
+    app.world_mut().resource_mut::<LightPool>().light.shadow_maps_enabled = false;
+    app.update();
+    let carrying = reserves_at(&mut app, 1);
+    assert!(
+        carrying.len() == 1 && carrying[0].1 > 0.0,
+        "fixture: the departing light fades out: {:?}",
+        lights(&mut app)
+    );
+    assert!(shadowed_at(&mut app).is_empty(), "a reserve started a shadow: {:?}", lights(&mut app));
+}
+
 #[test]
 fn a_light_that_earns_a_shadow_gains_it_by_a_cross_fade() {
     // One shadow, on the nearer of two torches. The nearer goes out, and the other earns the shadow
