@@ -4849,3 +4849,11 @@ Outcome: worked issue #7 (only open issue; no parked branches). Round 21's untri
 Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: layered tongues; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
 
 Removed: scratch `/tmp/l245`. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 246 — 2026-10-30 — Overhead flame round 23: the disc's body heat
+
+Outcome: worked issue #7 (only open issue; no parked branches; no new research). The straight-down cloud's heat was its core alone, so the body was one flat orange inside a red rim; `src/flame.wesl` now adds a body heat `clamp(2·disc)·mix(0.18, 0.62, streak)`. Captures `/tmp/l246/{b,a}` (close 2.3 m, td, e66, e45; seed 7, EV 9, frame 90): close, a mottled orange-yellow gradient with a red outline replaces the flat ring; 66° and 45° AE 0; td 31 px (below resolution). Verdict: slice better at close range, modest; overhead flame as a whole still NOT YET (no layered tongues). Shader line only: bench not run. Gate green (see commit). Release: v0.2.20 tagged 02:03 CDT, under 6 h old at 06:12; v0.2.21 blocked until ~08:03 CDT; carries 231-246.
+
+Top 5: (1) publish v0.2.21 after 08:03; (2) overhead: layered tongues; (3) luminance-amplitude source; (4) pool-to-grid fixture list; (5) heat haze hook once bevy_elements#50 lands.
+
+Removed: scratch `/tmp/l246` after the pass. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.

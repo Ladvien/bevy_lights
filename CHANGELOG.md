@@ -22,6 +22,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Fixed
 
+- **The flame seen from straight above has a body, not a flat ring.** The overhead cloud's heat was its core alone, so the rest of the disc was one deep orange inside a red rim; it now has an orange-yellow body heat mottled by the flowing billows, red only at the rim. Visible from about 2-3 m above a fire; at 45 and 66 degrees every pixel is as before. Design default, judged in captures; `docs/research/flame-overhead.md`, round 23.
+
 - **The flame seen from above stands on its coals.** Between about 66 and 85 degrees of camera elevation the overhead cloud hovered half a flame above a bed that was lit and crisp below it. The cloud now has a second, smaller billow at the flame's foot, placed by the same screen offset the tongue's seat uses and faded in with the overhead blend; at or below 50 degrees every pixel is as before (AE 0.003 over 1280x720 at 30 and 45 degrees). Design defaults, judged in captures; `docs/research/flame-overhead.md`, round 17.
 
 - **A bad `Kindle` is reported when it arrives.** `Kindle` had `problems()` but was the one settings component the add-time warning (`Flicker`, `Snuff`, `FlameSite`, `FlameEmbers`, `PoolCandidate`) did not cover, so a saved scene's `NaN` or negative `elapsed` wrote a bad gain in silence. `FlickerPlugin` now checks it like the rest. Test `a_kindle_with_a_bad_elapsed_is_named_and_a_fresh_one_is_not`.

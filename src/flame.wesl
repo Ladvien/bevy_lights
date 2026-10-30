@@ -373,6 +373,8 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
         // The core is a round heat, only its outline is lobed: a heat that followed the lobes drew rays out of the centre.
         let core_radius = 0.5 * (radius + FLAME_HALF_WIDTH);
         heat = max(heat, clamp(1.0 - rq / core_radius, 0.0, 1.0) * (1.0 - 0.45 * rq / core_radius) * mix(0.75, 1.1, streak) * in.overhead.x);
+        // The body's own heat (round 23): orange through the middle ring, mottled by the billows, red only at the rim.
+        heat = max(heat, clamp(disc * 2.0, 0.0, 1.0) * mix(0.18, 0.62, streak) * in.overhead.x);
         // The flame's foot on the bed: a second, smaller billow where the plume stands on its coals, found by the same screen offset
         // the tongue's seat uses. Without it the cloud hovers half a flame above a bed that is lit and crisp below it (round 17).
         let qf = vec2<f32>(x, (sy + (SOURCE_HEIGHT - 0.04) * in.overhead.y) / max(in.overhead.z, OVERHEAD_SQUASH));
