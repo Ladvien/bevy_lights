@@ -1020,3 +1020,43 @@ fn a_pooled_light_follows_its_flames_lean() {
     assert!((moved - (still + want)).length() < 1e-4, "{moved:?} vs {still:?} + {want:?}");
     assert!((by(&mut app, bare) - Vec3::new(0.0, 2.0, -1.0)).length() < 1e-4, "no flame, no lean");
 }
+
+/// A torch whose light is a sibling of its flame (joined by `FlameSite::fire`) leans its light exactly as a
+/// light on the site entity does; a light no site names stays upright.
+#[test]
+fn a_pooled_light_linked_by_a_site_follows_the_lean() {
+    let mut app = app(LightPool { size: 3, ..default() });
+    app.insert_resource(FlameWind { velocity: Vec2::new(3.0, 0.0) });
+    let light = app
+        .world_mut()
+        .spawn((
+            PoolCandidate { offset: Vec3::Y * 0.5, intensity: 1000.0, ..default() },
+            Transform::from_xyz(0.0, 0.0, 1.0),
+        ))
+        .id();
+    app.world_mut().spawn((
+        FlameSite {
+            height: 1.0,
+            phase: 0.0,
+            kindle: 0.0,
+            diameter: None,
+            depth: 0.15,
+            depth_fade: false,
+            fire: Some(light),
+        },
+        Transform::from_xyz(0.0, 0.0, 1.0),
+    ));
+    let bare = candidate(&mut app, Vec3::new(0.0, 0.0, -1.0), 1000.0);
+    focus_at(&mut app, Vec3::ZERO);
+    settle(&mut app);
+    let at = |app: &mut App, z: f32| -> Vec3 {
+        slots(app).into_iter().map(|(_, t, ..)| t).find(|t| (t.z - z).abs() < 0.01).expect("a light")
+    };
+    let moved = at(&mut app, 1.0);
+    let want =
+        Vec3::new(0.0, 0.5, 1.0) + Vec3::from(lean_light_shift(1.0, 3.0, DEFAULT_FIRE_DIAMETER, [1.0, 0.0]));
+    assert!(moved.x > 0.2, "downwind: {moved:?}");
+    assert!((moved - want).length() < 1e-4, "{moved:?} vs {want:?}");
+    let _ = bare;
+    assert!((at(&mut app, -1.0) - Vec3::new(0.0, 2.0, -1.0)).length() < 1e-4, "no site, no lean");
+}

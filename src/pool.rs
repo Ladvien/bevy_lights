@@ -843,17 +843,29 @@ fn assign_pool<F: Component>(
         });
         match assigned {
             Some((at, intensity, entity)) => {
-                // A flame leaning in the wind has its middle, and so its light, off the upright axis.
-                let lean = match (&wind, sites.get(entity)) {
-                    (Some(wind), Ok(site)) if wind.velocity != Vec2::ZERO => {
-                        let speed = wind.velocity.length();
-                        let diameter = winners
-                            .get(&entity)
-                            .and_then(|(_, diameter, _)| *diameter)
-                            .or(site.diameter)
-                            .unwrap_or(DEFAULT_FIRE_DIAMETER);
-                        let toward = wind.velocity / speed;
-                        Vec3::from(lean_light_shift(site.height, speed, diameter, [toward.x, toward.y]))
+                // A flame leaning in the wind has its middle, and so its light, off the upright axis. The
+                // site is the candidate's own, or the one that names it as its `fire`.
+                let lean = match &wind {
+                    Some(wind) if wind.velocity != Vec2::ZERO => {
+                        match sites.get(entity).ok().or_else(|| sites.iter().find(|s| s.fire == Some(entity)))
+                        {
+                            Some(site) => {
+                                let speed = wind.velocity.length();
+                                let diameter = winners
+                                    .get(&entity)
+                                    .and_then(|(_, diameter, _)| *diameter)
+                                    .or(site.diameter)
+                                    .unwrap_or(DEFAULT_FIRE_DIAMETER);
+                                let toward = wind.velocity / speed;
+                                Vec3::from(lean_light_shift(
+                                    site.height,
+                                    speed,
+                                    diameter,
+                                    [toward.x, toward.y],
+                                ))
+                            }
+                            None => Vec3::ZERO,
+                        }
                     }
                     _ => Vec3::ZERO,
                 };
