@@ -4921,3 +4921,9 @@ State to know: crates.io still holds 0.2.19 as the newest published version. Tag
 Ranked candidates: (1) publish 0.2.21 when the 24-hour rate limit clears (do not retry before the next pass after ~12 h; the limit counts 24 h of publishes); (2) luminance-amplitude source (Maynard 2013 only); (3) heat haze hook (bevy_elements#50); (4) overhead flame (reference image, per #7); (5) pool-to-grid fixture list (no requester).
 
 Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 255 — 2026-10-30 — No change: publish rate limit not cleared, no unblocked item
+
+Outcome: log only. Tree clean on `main` at 34fabf7, no `wiggum/parked-*` branches. Open issues: #7 only, stopped by the iteration-249 assumed decision; no owner reply. Release: v0.2.21 was refused with 429 at 08:03 CDT (iteration 254); crates.io counts 24 h of publishes (0.2.18-0.2.20 went out 01:24-02:03 CDT), so it is not retried this pass. Candidates unchanged from 254 (publish 0.2.21 once the limit clears, publishing before tagging; luminance-amplitude source; heat haze hook on bevy_elements#50; overhead flame awaiting a reference image; pool-to-grid fixture list, no requester). Home-still, capture, bench and gate not run (no code changed).
+
+Removed: nothing created. Leftover worktrees, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
