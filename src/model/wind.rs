@@ -60,7 +60,7 @@ pub fn gust_unit(t: f64, seed: u32, timescale: f32) -> f32 {
         return 0.0;
     }
     let corner = 1.0 / (TAU * f64::from(timescale.max(MIN_TIMESCALE)));
-        let mut total = 0.0;
+    let mut total = 0.0;
     let mut sum = 0.0;
     let mut freq = LOWEST;
     let mut tones = [(0.0, 0.0); GUST_TERMS];
@@ -85,7 +85,7 @@ pub fn gust_unit(t: f64, seed: u32, timescale: f32) -> f32 {
 /// `|mean| · (1 + intensity · x)`, never negative, and the heading is turned by `intensity · y`
 /// radians, where `x` and `y` are independent [`gust_unit`] draws of `seed`.
 ///
-/// A zero mean stays zero (no heading to wander about). A non-finite mean, or an `intensity` that is
+/// No turbulence (`intensity` 0) is the mean exactly. A zero mean stays zero (no heading to wander about). A non-finite mean, or an `intensity` that is
 /// `NaN`, gives zero; a negative `intensity` is treated as 0.
 ///
 /// ```
@@ -100,6 +100,9 @@ pub fn gust_velocity(mean: (f32, f32), intensity: f32, timescale: f32, seed: u32
         return (0.0, 0.0);
     }
     let intensity = intensity.max(0.0);
+    if intensity == 0.0 {
+        return mean;
+    }
     let along = gust_unit(t, seed, timescale);
     let across = gust_unit(t, seed ^ 0x9e37_79b9, timescale);
     let speed = (speed * (1.0 + intensity * along)).max(0.0);
