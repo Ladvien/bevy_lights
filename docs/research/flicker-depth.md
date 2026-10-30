@@ -109,6 +109,10 @@ Chen, Guo, Jia & Xiao 2019, *Frequency and Phase Characteristics of Candle Flame
 
 The paper reports its luminance series only as dimensionless grey-level plots (its Fig. 2a, 3b) with no stated modulation depth, so it does **not** close the amplitude gap below. No default moves.
 
+## Second luminance check (iteration 253)
+
+Gergely et al. 2020 (`10.1038_s41598-020-78229-x`) is converted and indexed in home-still and was read in full this pass. It measures flame intensity as the Otsu-thresholded pixel count per frame over its mean ("The intensity of the flame for each frame is a relative value, defined as the ratio w_i / <w>", Fig. 7) and with a 2 kHz photoresistor, and reports 8-12 Hz, but states **no modulation depth**: Fig. 7 is a plotted series, and a pixel count is a flame-area gauge, not a luminance. It does not close the amplitude gap and no default moves. A `paper_search` for a photometer-measured candle or pool-fire modulation depth returned only vision-science flicker-threshold papers. Maynard 2013 remains the one known source.
+
 ## Pending index
 
 - Mandin & Most (IAFSS 6) is a PDF fetched for this note, not imported into the home-still corpus; the
