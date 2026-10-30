@@ -4218,3 +4218,5 @@ Sources: technical `book_real_time_rendering_4th_akenine` (inverse square, photo
 3. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
 4. Spatial gust coherence if a host reports it.
 5. Bearers are placeholder capsules; GIF banding.
+
+Release: v0.2.11 published, https://crates.io/crates/bevy_lights/0.2.11 (tag `v0.2.11`; semver-checks: no update required). Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). No worktrees or /tmp scratch made. Earlier baselines listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
