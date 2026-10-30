@@ -4273,3 +4273,23 @@ Why: no open issues, no parked branch. Editor-needs rule (bevy_emerge #103, the 
 
 Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). Scratch removed: `/tmp/blg_probe`. Earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
 Release: v0.2.14 published, https://crates.io/crates/bevy_lights/0.2.14 (tag `v0.2.14`; semver-checks: no update required).
+
+## Iteration 205 — 2026-10-30 — `Snuff` and `Snuffed`: a fire that goes out
+
+Outcome: `Snuff { elapsed }` on a `Flicker` light multiplies its intensity by `snuff_gain` over `SNUFF_SECONDS` (1.2 s) to exactly 0; a `FlameSite` whose `fire` names it shrinks on the same curve; `Snuffed { entity }` is written once when out. `Snuff` wins over `Kindle`; remove it and insert `Kindle` to re-light. Tests: `a_snuffed_fire_falls_from_one_to_exactly_zero_and_never_rises` (model), `a_snuffed_light_falls_to_exactly_nothing_is_heard_once_and_can_be_lit_again` and `a_snuff_beats_a_kindle_and_a_loaded_out_fire_says_nothing` (tests/flicker.rs), `a_snuffed_fire_takes_its_flame_out_with_its_light` (flame.rs), `Snuff::problems` in tests/settings.rs. Courtyard: `O` / `LIGHTS_SNUFF=<s>`.
+
+Why: no open issues, no parked branch (the `WIP(iteration 115, parked)` commits are old and long since superseded by the issue-#2 occlusion work on main). Editor/game need: the crate lit and re-lit fires but had no way to put one out, so a host dousing a torch cut light and flame in one frame. Runner-up: overhead flame at EV 9 (twelve NOT YET rounds, no new construction). Skipped issues: none filed. bevy_emerge #103: no new request since the light-map overlay pin. home-still live: distill answering (idle, Cuda), scribe up, `hs status` clean. Sources: craft `10.7456_tojdac.1674124` (Doğaner); production `s2011-advances-pdf-slides` ("Crossfade to a smokey particle over the lifetime"); technical `10.1038_s41598-020-78229-x` (Gergely: oscillation stops, then flame stops, as oxygen falls), `10.1017_jfm.2018.707` (Xia & Zhang). Note: `docs/research/flame-snuff.md`. No shader change (the flame's size already follows the instance scale).
+
+Critique and verdict (`/tmp/l205/critique.md`, frames `/tmp/l205/b`, `/tmp/l205/after`): GREAT. Ground patch near a brazier 59.5 -> 41.3 DN, monotone from frame 3 and flat at the end (no pop at 1.2 s); flame peak 204 -> 93 DN (bowl's ember rim remains, constant emissive); warm pool recedes into the cool fill; bearers' torches unaffected. Flaw noted: the flame is a sliver slightly ahead of its light (area goes with height squared); minor.
+
+Bench (same machine, 3 alternating runs): `flicker_p50_us` 148-151 -> 158-169 (+7-10%, ~6 ns per light: one more optional query column); `pool_p50_us` 308 unchanged; `p50_us` total 430-449 -> 451-500, `min_us` 263-270 -> 297-323 within run-to-run noise of the first pair. Trade accepted: the feature needs the column.
+
+Hero GIF: not re-encoded; nothing it shows changed (no existing look or default moved).
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. `Snuff`/`Kindle` for pool candidates (a candidate's pooled light has neither; needs a hand-off design).
+4. Index a luminous-flux / radiative-fraction source; replace reach and height design defaults.
+5. Bearers are placeholder capsules; GIF banding.
