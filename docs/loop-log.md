@@ -4452,3 +4452,19 @@ Checked: gate on clean `main` (`3a6c872`) is green: build release and debug, `ca
 5. Pool top-K selection if a host reports the pool over 0.5 ms.
 
 Removed this pass: scratch `/tmp/l214`. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 215 — 2026-10-30 — Audit pass: nothing shipped (release window closed; fallbacks 1–3 re-examined)
+
+Outcome: no code change. No open issues on bevy_lights, no new parked branch. bevy_emerge #103's newest comment (07:27 UTC check) is still the bevy_light_grid 0.20 pin; every crate-side item it names exists (`FireKind`, `PoolBudget`, serde types, `problems()`, `LightPool::granted/holder_of/holds`, `ground_lux`/`fire_lux` for a per-cell light map). Release: v0.2.20 tagged 23 minutes before this pass, so the 6-hour rule blocks a publish until about 12:45 UTC; none attempted.
+
+Fallbacks, with the concrete reason each yields no slice this pass: (1) editor needs: none unmet. (2) shipping-game features: the remaining ones (heat haze, sparks, smoke) need a screen-texture pass or a particle system, outside the ownership map. (3) weakest feature: overhead flame tongue (round 15), taste not defect, and flame-light lean offset computes to ~6 cm at 15° tilt on a 0.5 m flame, invisible. Pool top-K selection still unjustified (p50 0.7 ms at 5000 candidates, hand-off rules at risk).
+
+### Top 5 remaining, ranked
+
+1. Publish v0.2.20 (no re-bump, tag exists) at or after 12:45 UTC; crates.io URL here.
+2. Cited flicker amplitude: needs Maynard 2013 from a host with library access.
+3. Overhead flame: tongue structure from straight above.
+4. Per-fire flame colour, if a per-fuel colour-temperature table is found.
+5. Pool top-K selection if a host reports the pool over 0.5 ms.
+
+Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
