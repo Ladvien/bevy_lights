@@ -79,11 +79,13 @@
 
 pub mod model;
 
+mod embers;
 mod flame;
 mod flicker;
 mod kind;
 mod pool;
 
+pub use embers::{FlameEmbers, MAX_EMBER_RATE};
 pub use flame::{Flame, FlameGust, FlameLook, FlameMaterial, FlamePlugin, FlameSite, FlameWind};
 pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled, Snuff, Snuffed};
 pub use kind::{FireKind, UnknownFireKind};
