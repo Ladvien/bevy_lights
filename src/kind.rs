@@ -2,7 +2,7 @@
 
 use bevy::prelude::*;
 
-use crate::model::{CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, flicker_rate};
+use crate::model::{CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, fire_lumens, flicker_rate};
 use crate::{FlameSite, Flicker};
 
 /// A named kind of fire: its fuel-bed diameter, flicker depth and flame height together, so a
@@ -83,6 +83,33 @@ impl FireKind {
             FireKind::Campfire => 0.7,
             FireKind::Bonfire => 2.0,
         }
+    }
+
+    /// How far the fire lights the ground, in metres, to the edge of its pool: the size a host
+    /// budgets its light from. Brazier and Torch are the courtyard's own pools; the rest are design
+    /// defaults (`docs/research/fire-reach.md`). Never under `fire_lumens`' 1 m floor.
+    pub const fn reach(self) -> f32 {
+        match self {
+            FireKind::Candle => 1.0,
+            FireKind::Lantern => 1.5,
+            FireKind::Torch => 2.0,
+            FireKind::Brazier => 4.0,
+            FireKind::Campfire => 5.0,
+            FireKind::Bonfire => 9.0,
+        }
+    }
+
+    /// The lumens that put `lux` on the ground [`reach`](Self::reach) metres out, with the light
+    /// `over` metres above it: [`fire_lumens`] at this kind's reach. `lux` is the host's own look
+    /// number in its own exposure; nothing here converts units.
+    pub fn lumens(self, lux: f32, over: f32) -> f32 {
+        fire_lumens(lux, self.reach(), over)
+    }
+
+    /// The light's flicker, sized to light its [`reach`](Self::reach) to `lux`:
+    /// [`flicker`](Self::flicker) averaging [`lumens`](Self::lumens).
+    pub fn light(self, lux: f32, over: f32) -> Flicker {
+        self.flicker(self.lumens(lux, over))
     }
 
     /// How fast the fire flickers, in hertz: the puffing law at [`diameter`](Self::diameter).

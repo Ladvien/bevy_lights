@@ -4166,3 +4166,21 @@ Bench: no runtime path changed (a data enum), not re-run. Gate: build (release, 
 5. Bearers are placeholder capsules; GIF banding in the pool gradients.
 
 Release: v0.2.8 published, https://crates.io/crates/bevy_lights/0.2.8 (tag `v0.2.8`; semver-checks: no breaking change). Cleanup: removed `/tmp/l198`; no worktree made this pass. Earlier-pass baselines listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 199 — 2026-10-29 — fire reach (`FireKind::reach`, `lumens`, `light`)
+
+Outcome: each `FireKind` carries `reach()` (metres lit to the pool's edge: 1, 1.5, 2, 4, 5, 9), with `lumens(lux, over)` (= `fire_lumens` at that reach) and `light(lux, over)` (a `Flicker` averaging it). The courtyard's `BRAZIER_POOL` and `TORCH_POOL` now read `FireKind::{Brazier, Torch}.reach()` (4.0 and 2.0, numerically unchanged). Test `fire_kinds_light_more_ground_as_they_grow` in `tests/settings.rs`: reach strictly rises, is at least `fire_lumens`' 1 m floor, lumens equal `fire_lumens`, bonfire/candle budget ratio is 81 at equal lux.
+
+Why first: no open issues, no parked branch. bevy_emerge #103's picker had diameter/depth/height by name (iter 198) but still needed a lumen number per placed fire, the same guess that gave the baseline 60 000 lm. Runner-up: overhead flame at EV 9 (no new construction researched). Skipped issues: none filed.
+
+Sources: craft `10.23856_6105` Table 1 (source size : distance, via `lighting-look.md`); production `s2011-advances-pdf-slides`; technical `book_real_time_rendering_4th_akenine` photometry (inverse square). Home-still live 2026-10-29: distill/scribe healthy via `hs`; the MCP `distill_search`/`paper_search` timed out once, `hs distill search` worked. No corpus document on luminous flux of wood fires; `paper_search` found only paywalled pool-fire radiative-fraction papers (`Pending index` in `docs/research/fire-reach.md`). Candle/Lantern/Campfire/Bonfire reaches are design defaults.
+
+Verdict: no render path changed (a const table and two pure functions; the courtyard's constants are equal to before), so no recapture and no bench were run; GREAT/NOT YET does not apply to the data. Gate: build (release, dev), test, test --features serde, build --examples --all-features, clippy -D warnings, doc -D warnings, fmt --check, wasm, wesl-check green.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Index a luminous-flux / radiative-fraction source for fires and replace the reach and height design defaults.
+4. Spatial gust coherence if a host reports wind-in-step looking wrong.
+5. Bearers are placeholder capsules; GIF banding in the pool gradients.

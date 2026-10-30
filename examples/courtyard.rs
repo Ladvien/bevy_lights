@@ -247,10 +247,10 @@ fn brazier_kind() -> Option<FireKind> {
     FireKind::ALL.into_iter().find(|k| k.name().eq_ignore_ascii_case(&name))
 }
 /// How far a brazier's pool reaches, in metres: the ground it lights to [`POOL_LUX`].
-const BRAZIER_POOL: f32 = 4.0;
+const BRAZIER_POOL: f32 = FireKind::Brazier.reach();
 /// How far a carried torch's pool reaches. Smaller than a brazier's: a 0.35 m flame lighting a 4 m
 /// patch is the "flame too small for the ground it lights" defect `lighting-look.md` names.
-const TORCH_POOL: f32 = 2.0;
+const TORCH_POOL: f32 = FireKind::Torch.reach();
 /// The key-to-fill ratio the courtyard aims at: two to one, one stop. A fire's pool centre is the key
 /// and the moon is the fill; at 4:1 the moonlight left figures between pools at 3-9 DN, darker than
 /// the ground they stood on, which is worse than flat. One stop keeps a shadow side and keeps the
