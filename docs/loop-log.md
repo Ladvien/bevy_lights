@@ -4679,3 +4679,19 @@ Ranked candidates: (1) publish v0.2.21 (blocked until after ~08:05 CDT by the 6 
 Blocker for a feature pick: every remaining candidate is either a multi-round visual job beyond a single-pass slice, outside the ownership map, or needs a source the corpus does not hold. Nothing was invented to fill the pass.
 
 Removed: `/tmp/l228` scratch (mine). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 229 — 2026-10-30 — The pool's light follows a flame's lean
+
+Outcome: with a `FlameWind`, a pooled candidate on a `FlameSite` entity has its light moved to the leaning flame's middle by `lean_light_shift` (model/reach.rs): `(h/2)(sin θ · wind, cos θ − 1, …)`, `θ = flame_tilt`. Closes the Deviation recorded in `flame-wind.md` (a light left upright beside a leaning flame, a motivated-light defect). Two reads per winner in `assign_pool`, none per candidate. Note `docs/research/flame-lean-light.md` (committed first). Test `a_pooled_light_follows_its_flames_lean` (tests/pool.rs).
+
+Issues: none open (`gh` worked). Parked: none. Release: v0.2.20 tag 2 h old, the 6-hour rule blocks v0.2.21. Ranked candidates: (1) lean light (won: a visible-source inconsistency, small, testable); (2) overhead flame at EV 9 (twelve NOT YET rounds, no new construction); (3) cheaper ember quad; (4) heat haze (outside the map); (5) a luminance-amplitude source (none citable).
+
+Sources: craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technical Wen 2019 / DGMR via `flame-wind.md`. No new constant.
+
+Evidence (`/tmp/l229/{before,after}_{g,e}.png`, courtyard `LIGHTS_WIND=4,0`, ground eye 0,1.7,9 and elevated 0,9,6, frame 120): 0.27 % and 0.41 % of pixels differ, all in the warm pools; no artefact, no pop (the shift is a smooth function of the wind). Critique: the shift is under half a flame height, so the effect is subtle: pools slide a hand's breadth downwind with the flame. Correct and invisible when wrong; not a showcase change, so the hero GIF is not re-encoded. Verdict: GREAT for what it claims (agreement of light and flame), not a headline.
+
+Bench (`bench_lights`, pool 16, 5000 candidates, after only; no flames in it): p50 548 µs, min 315, pool_p50 345 (iteration 190: p50 545, min 340).
+
+Top 5 remaining: (1) publish v0.2.21 after ~08:05 CDT; (2) overhead flame construction; (3) cheaper ember quad; (4) heat haze; (5) a candidate linked by `FlameSite::fire` (not on the site entity) does not lean its light.
+
+Removed: nothing outside the repo besides `/tmp/l229` scratch (to remove). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
