@@ -4665,3 +4665,17 @@ Gate: build (release, debug), `cargo test`, `--features serde`, examples, clippy
 Top 5 remaining: (1) publish v0.2.21 after ~08:04 CDT; (2) cited flicker amplitude as luminance; (3) overhead tongue structure; (4) cheaper ember quad; (5) heat haze.
 
 Removed: nothing made outside the repo. Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 228 — 2026-10-30 — Audit; flicker-amplitude backlog item retired
+
+Outcome: no code change. Shipped nothing user-visible; this is the honest record of why, not a claim of progress.
+
+Issues: none open (`gh` worked). Parked: none for `wiggum/parked-*`. bevy_emerge #103: newest comment is the `bevy_light_grid` 0.20 pin; no unmet need from this crate. Release: v0.2.20 tag was 1 h 59 min old at the start, the 6-hour rule blocks v0.2.21 (embers, relight clip, timing, `FireKind` helpers, catch size, settings reports, `Flame` Reflect ride in it).
+
+Done: (a) backlog item "cited flicker amplitude as luminance" researched properly and **retired**. `distill_search` and a full read of `10.1038_s41598-018-36754-w` (Chen 2018, flame luminance by high-speed camera) show the luminance amplitude only in figures (Fig. 2a, 3b, 5b: "dimensionless" grey values, no tabulated peak-to-trough or percent); `10.1038_s41598-020-78229-x` (Gergely) likewise gives intensity normalised to the mean only in Fig. 7. No text-layer number exists to cite, so `docs/research/flicker-depth.md`'s bound (Mandin & Most temperature ceiling through `T^4`, marked `[INFERENCE]`) stays the best available. Do not retry from the corpus; only a figure-digitising pass or a new source changes it. (b) Source audit: no `unwrap`/`expect`/`panic!` outside tests; every system's `Res<T>` is a resource its own plugin inits; every public component is registered. (c) Capture sanity of the current build at ground (1.7 m), elevated and grazing angles (`/tmp/l228/before/{ground,elev,graze}.png`): no `failed to process shader` in any log; flames sit on their sources, warm pools against a blue fill, falloff has no visible cut-off. No regression found; no art number touched.
+
+Ranked candidates: (1) publish v0.2.21 (blocked until after ~08:05 CDT by the 6 h rule); (2) overhead flame tongue structure; (3) cheaper ember quad (no weak-GPU evidence); (4) heat haze (outside the ownership map); (5) a figure-digitised luminance amplitude if a source with a tabulated value is found.
+
+Blocker for a feature pick: every remaining candidate is either a multi-round visual job beyond a single-pass slice, outside the ownership map, or needs a source the corpus does not hold. Nothing was invented to fill the pass.
+
+Removed: `/tmp/l228` scratch (mine). Leftover worktrees from earlier passes, listed not removed: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
