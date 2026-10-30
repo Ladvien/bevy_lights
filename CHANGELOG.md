@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.2.17] - 2026-10-30
+
 ### Changed
 
 - **The flame holds its brightness through the 60-70° camera elevations.** The upright tongue's overhead dimming now follows the fifth power of the overhead blend instead of the blend itself, so the flame no longer goes pale before the cross-section has arrived; frames at or below 55° and at 76° and past are unchanged (`docs/research/flame-overhead.md`, round 12).
