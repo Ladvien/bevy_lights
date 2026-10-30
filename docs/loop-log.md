@@ -4144,3 +4144,23 @@ Gate: build (release, dev), test, test --features serde, build --examples --all-
 5. GIF banding in the pool gradients.
 
 Release: v0.2.7 published, https://crates.io/crates/bevy_lights/0.2.7 (tag `v0.2.7`, commit `c593eff`; semver-checks: no breaking change). Cleanup: removed `/tmp/l197` and `/tmp/wes.xml`; this pass made no worktree. Leftover baseline worktrees from earlier passes, listed and left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+
+## Iteration 198 — 2026-10-29 — fire kinds (`FireKind`)
+
+Outcome: `FireKind::{Candle, Lantern, Torch, Brazier, Campfire, Bonfire}` (`ALL`, `Reflect`, serde as the name) bundles `diameter()`, `depth()`, `height()` with `rate()`, `name()`, `flicker(mean)` and `site()`, built from the same numbers so a light and its flame agree. `courtyard` takes `LIGHTS_KIND=<name>`. Tests in `tests/settings.rs`: every kind has no `problems()`, the mean is the requested budget, light and flame agree on diameter and depth, heights fit the default `max_height`, rate falls from candle to bonfire, serde round-trips the name.
+
+Why first: no open issues, no parked branch. The editor-needs rule (bevy_emerge issue #103: placed fires, "Flicker, Kindle and Flame" chosen in a panel) had serde, `problems()` and `intensity_at` already; the missing piece was a named picker list. Runner-up: overhead flame at EV 9 (no researched construction). Skipped issues: none filed.
+
+Sources: craft `10.7456_tojdac.1674124`; production `s2011-advances-pdf-slides`; technical Chen et al. 2019 `10.1038_s41598-018-36754-w` (candle bed and rate) and Heskestad's flame-height law as restated in PMC6463528 (sanity bound only; the paper is not in the corpus: `Pending index` in `docs/research/fire-kinds.md`). Distill was up (`hs status`: distill, scribe, qdrant healthy); a corpus search for flame-height correlations returned nothing relevant.
+
+Critique and verdict (`/tmp/l198/m.png`, removed): braziers dressed as Candle / Torch / Brazier / Bonfire at eye level (1.7 m, 4 m from the brazier, 1280x720, frame 90). Four sizes read as four fires: a thin candle sliver, a torch tongue, the existing brazier flame, a 2 m bonfire heave, flames clean, no clipping or detachment. Flaws: the courtyard's bowl is not scaled with the kind, so the bonfire stands in a brazier bowl and the candle floats over it (scene, not crate); the light's lumens are not rescaled by kind (host's budget). Verdict: GREAT for the presets as data, NOT a claim about how a scaled prop looks. Only Brazier is pinned to shipped numbers; the other four are design defaults.
+
+Bench: no runtime path changed (a data enum), not re-run. Gate: build (release, dev), test, test --features serde, build --examples --all-features, clippy -D warnings (caught a needless `..default()` in the courtyard), doc -D warnings, fmt --check, wasm, wesl-check green.
+
+### Top 5 remaining, ranked
+
+1. Overhead flame at EV 9: a construction that is not the round 8/9 disc stack.
+2. A cited, luminance-measured flicker amplitude.
+3. Fetch Heskestad's flame-height paper into the corpus and replace the preset heights' design defaults.
+4. Spatial gust coherence if a host reports wind-in-step looking wrong.
+5. Bearers are placeholder capsules; GIF banding in the pool gradients.
