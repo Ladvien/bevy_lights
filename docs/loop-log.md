@@ -4272,3 +4272,4 @@ Why: no open issues, no parked branch. Editor-needs rule (bevy_emerge #103, the 
 5. Bearers are placeholder capsules; GIF banding.
 
 Gate green (build, test, serde test, examples, clippy, doc, fmt, wasm). Scratch removed: `/tmp/blg_probe`. Earlier baselines left: `~/bl_base`, `~/l128_base`, `~/l13/base`, `~/l13/base13`.
+Release: v0.2.14 published, https://crates.io/crates/bevy_lights/0.2.14 (tag `v0.2.14`; semver-checks: no update required).
