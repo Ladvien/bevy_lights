@@ -17,11 +17,17 @@ lights placed over thousands of virtual ones, and billboard shader flames.
 `Kindle` and a 0.34 m coal bed, which the puffing law sizes to `1.5/√0.34 ≈ 2.57 Hz` — and 48
 torch-bearers, each a `PoolCandidate`, sharing the example's eight pooled real lights; each brazier also throws `FlameEmbers` (`LIGHTS_EMBERS=4` in the capture, the example's default is off). The clip opens
 while the courtyard is still lighting up and the fires breathe from there; the coals are the
-`char_field` texture the example builds at startup. What it cannot show is a **flame** catching: a
+`char_field` texture the example builds at startup. The opening cannot show a **flame** catching: a
 flame's catch runs on `Time<Real>`, and on a headless capture the material's first pipeline compile
-outlasts `KINDLE_SECONDS`. [`docs/DEMOS.md`](docs/DEMOS.md) has that trap, the recipe that would catch
-one, and the frequencies measured in this file. The same courtyard at 640 × 360 is
-[`courtyard.gif`](docs/media/courtyard.gif).
+outlasts `KINDLE_SECONDS`. A *re*-light does not have that problem, so the catch is the next clip.
+[`docs/DEMOS.md`](docs/DEMOS.md) has that trap and the frequencies measured in this file. The same
+courtyard at 640 × 360 is [`courtyard.gif`](docs/media/courtyard.gif).
+
+![The courtyard's fires put out and lit again: the light and the flame fall away together, then catch together](docs/media/relight.gif)
+
+*`LIGHTS_SNUFF=1.0 LIGHTS_RELIGHT=2.3` on the same courtyard, 400 × 225 at 30 fps, 64 frames (about 2.1 s): every
+brazier and torch is snuffed (`Snuff`, 1.2 s) so the stone falls to the cool moonlight with only the coals glowing,
+then re-lit (`Kindle`), and each flame grows out of its coals as its light flares up; sparks are `FlameEmbers`.
 
 ## What you get
 

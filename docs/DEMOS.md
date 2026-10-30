@@ -113,6 +113,23 @@ spawn the `FlameSite` **after** the run has warmed up (a site added at frame 40 
 already-compiled pipeline, and its kindle starts then), which is how iteration 18 measured it:
 `/home/ladvien/l18/kindle2/` (before) and `kindle2_after/` (after).
 
+### The relight clip (`docs/media/relight.gif`)
+
+A re-light after the pipeline is warm is the catch the trap above cannot reach. The courtyard's
+`LIGHTS_SNUFF` and `LIGHTS_RELIGHT` do it unattended; the frame mean (`magick f.png -colorspace Gray
+-format '%[fx:mean*255]' info:`) is the honest clock, 53.7 at the start, 27.2 at the darkest (saved frame 37-41), back to
+54.6 by frame 53:
+
+```sh
+LIGHTS_SNUFF=1.0 LIGHTS_RELIGHT=2.3 LIGHTS_EMBERS=4 LIGHTS_FRAMES=200 LIGHTS_SHOT_DIR=$HOME/tmp-lights/relight \
+  LIGHTS_SHOT_FROM=57 LIGHTS_SHOT_EVERY=2 LIGHTS_FOCUS_WALK=18 \
+  xvfb-run -n 151 -s "-screen 0 1920x1080x24" ./target/release/examples/courtyard
+# keep saved frames 0-63 (2.1 s at 30 fps; all 72 is 2.0 MB), then tools/gif.sh as for the showcase, WIDTH=400
+```
+
+A crop of one brazier at saved frames 40, 43, 45, 47, 49, 53 shows the flame growing out of the coals
+while the light flares (a tongue at 45, full height by 49).
+
 ## The bench's two lines
 
 `bench_lights` prints two lines now. The first is the whole frame; the second separates the crate's two hot

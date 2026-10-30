@@ -8,6 +8,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 - **`FlameEmbers`: sparks that leave a flame.** Add the component (`rate`, sparks a second, `0..=MAX_EMBER_RATE`, default 3) to a `FlameSite` and its flame gets one more child, a camera-facing additive quad (`src/embers.wesl`) on which sixteen hashed slots each emit a spark per cycle: a capsule along its own velocity that climbs under drag, weaves, drifts downwind with the flame's lean and cools yellow to orange to red (Newton cooling). No particle state, no buffers; the quad inherits the flame's catch and lean, honours `depth_fade`, and sites without the component are unchanged. `FlameEmbers::problems()`, serde under the `serde` feature, `LIGHTS_EMBERS=r` in the courtyard. `docs/research/flame-embers.md`.
 
+### Documentation
+
+- `docs/media/relight.gif`: the courtyard put out and lit again (`LIGHTS_SNUFF`, `LIGHTS_RELIGHT`), the first README media that shows a flame catching with its light. The README's note that a flame's catch cannot be shown is narrowed to the opening clip.
+
 ## [0.2.20] - 2026-10-30
 
 ### Fixed
