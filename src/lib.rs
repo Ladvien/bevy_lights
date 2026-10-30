@@ -83,7 +83,7 @@ mod flame;
 mod flicker;
 mod pool;
 
-pub use flame::{Flame, FlameLook, FlameMaterial, FlamePlugin, FlameSite, FlameWind};
+pub use flame::{Flame, FlameGust, FlameLook, FlameMaterial, FlamePlugin, FlameSite, FlameWind};
 pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled};
 pub use model::{
     CALM_FLICKER_DEPTH, DEFAULT_FIRE_DIAMETER, EMBER_AT, FADE_SECONDS, FLAME_TILT_LIMIT, FLICKER_DEPTH,

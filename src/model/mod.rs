@@ -12,6 +12,7 @@ pub mod pool;
 pub mod problem;
 pub mod reach;
 pub mod tag;
+pub mod wind;
 
 pub use char::{EMBER_AT, char_field, char_radiance, coal_radiance};
 pub use cinematography::{
@@ -27,3 +28,4 @@ pub use pool::{FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, hand_off,
 pub use problem::{Problem, ProblemKind};
 pub use reach::{RANGE_MARGIN, flame_light_offset, raised_light};
 pub use tag::{pack_flame_tag, set_flame_brightness, unpack_flame_tag};
+pub use wind::{GUST_INTENSITY, GUST_TERMS, GUST_TIMESCALE, gust_unit, gust_velocity};
