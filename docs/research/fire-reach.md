@@ -62,6 +62,16 @@ The same inverse-square law (`E = Φ / 4π / slant²`, `book_real_time_rendering
 
 A light at or below the ground (`over <= 0`) puts no light on it: both functions answer 0, there is no clamp to a minimum height (a fire's height is the host's).
 
+## A linear-ramp footprint: `ground_ramp`
+
+A host that keeps a coarse illuminance grid (a stealth or AI tile map; `bevy_light_grid`'s `bake` takes `(cell, intensity, range)` and adds `intensity * (1 - dist/range)` to each visible cell inside `range`) has no way to say "this fire" in those terms, so it guesses a pair per fire and the guess drifts from what the renderer draws. The obvious pair, the peak under the light and the `ground_reach` of a floor lux, is *wrong* (checked 2026-10-30 before building it): the true ground curve `I·h/(d²+h²)^1.5` is a sharp spike over a long tail, and a ramp from its peak to zero at the floor circle over-reads the middle of the pool several-fold (ramp/true 4.8 at half reach for a 0.05 lx floor, `over` 0.9, I = 100 cd). A flux-preserving ramp is no better (3.8-6.6x at half reach for floors 0.1-0.02 lx). A linear ramp cannot follow inverse-square, so the fit is instead made where a grid is *read*: a tile is called lit above a dim threshold and bright above a bright one.
+
+`ground_ramp(lumens, over, dim_lux, bright_lux) -> (peak, reach)` returns the line through the two true points `(ground_reach(dim_lux), dim_lux)` and `(ground_reach(bright_lux), bright_lux)`, so the ramp `peak * (1 - d/reach)` crosses *exactly* the dim and the bright circle the renderer's ground shows, and is the chord between them. Outside the bright circle it under-reads the spike (a creature standing at the flame is not "brighter than bright" in a three-state map, so this is the safe side); beyond the dim circle it keeps falling to zero at `reach`, past the dim circle. `peak` is in lux; `reach` in world units (the host divides by its cell size and scales `peak` to its own grid units, so the crate converts nothing and names no grid).
+
+Craft principle, `10.23856_6105` Table 1 (quoted in `lighting-look.md`): "soft with smooth transitions" is the 1:3-1:6 ratio, i.e. the pool's edge is where the eye decides lit from dark, and that edge is what a stealth map must agree with. Production, `s2011-advances-pdf-slides`: a fire's emission is a property of the fire, so its footprint comes from its own lumens. Technical, `book_real_time_rendering_4th_akenine`: the inverse-square and cosine laws behind `ground_lux`.
+
+Degenerate inputs give `(0.0, 0.0)`: a light at or below the ground, a non-positive or `NaN` threshold, `bright_lux <= dim_lux`, or a bright circle that does not exist (`bright_lux` above the spot under the light).
+
 ## Deviations
 
 None: Brazier and Torch are the shipped constants. The other four are design defaults, flagged above.

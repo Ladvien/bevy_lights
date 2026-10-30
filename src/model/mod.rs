@@ -17,7 +17,7 @@ pub mod wind;
 pub use char::{EMBER_AT, char_field, char_radiance, coal_radiance};
 pub use cinematography::{
     HIGH_KEY, LOW_KEY, MOON_KEY, blackbody_colour, blackbody_luminance, fill_for, fire_lumens, fire_lux,
-    fire_reach, ground_lux, ground_reach, key_to_fill, stops, white_balanced,
+    fire_reach, ground_lux, ground_ramp, ground_reach, key_to_fill, stops, white_balanced,
 };
 pub use fire::{
     CALM_FLICKER_DEPTH, DEFAULT_FIRE_DIAMETER, FLAME_TILT_LIMIT, FLICKER_DEPTH, KINDLE_SECONDS,
