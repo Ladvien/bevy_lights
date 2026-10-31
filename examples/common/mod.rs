@@ -17,6 +17,8 @@
 //!   the flames; unset is still air.
 //! - `LIGHTS_GUST=I` makes that wind gust with turbulence intensity `I` (0.25 is a lively courtyard);
 //!   `LIGHTS_WIND` is then the mean, and `LIGHTS_SEED` picks the wind.
+//! - `LIGHTS_MOTION=g` (courtyard): how much of a fire's own velocity counts as wind (`FlameMotion::gain`); `0` is every flame upright
+//!   however it is carried.
 //! - `LIGHTS_KIND=<name>` (courtyard): the braziers burn as that `FireKind`.
 //! - `LIGHTS_EMBERS=r` (courtyard): every flame sheds `r` sparks a second (`FlameEmbers`); unset, none.
 //!
@@ -48,6 +50,11 @@ pub fn wind_env() -> Option<Vec2> {
     let v: Vec<f32> =
         std::env::var("LIGHTS_WIND").ok()?.split(',').filter_map(|p| p.trim().parse().ok()).collect();
     (v.len() == 2).then(|| Vec2::new(v[0], v[1]))
+}
+
+/// The motion gain from `LIGHTS_MOTION=g`; `None` is the crate's default (a fire feels its own velocity in full).
+pub fn motion_env() -> Option<f32> {
+    std::env::var("LIGHTS_MOTION").ok()?.trim().parse().ok()
 }
 
 /// The turbulence intensity from `LIGHTS_GUST=I`; `None` is a steady wind.

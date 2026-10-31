@@ -43,6 +43,7 @@ checked!(
     crate::FlameLook,
     crate::FlameWind,
     crate::FlameGust,
+    crate::FlameMotion,
 );
 
 /// Warns about the first bad `C` this observer sees, then stays quiet: a scene of a thousand identical

@@ -367,6 +367,21 @@ What was checked, and how:
 - **Known limits.** The coals stay coal-coloured under a coloured flame (a green fire on orange coals): turn the bed off for a magic fire. A `Fire` is pooled: a host with no `LightPoolPlugin` gets the flame and a logged error, not a light.
 - **What it costs.** `BENCH_FIRE=1` against `BENCH_FIRE=2` (the same parts written by hand), 5 000 torches, 15 in view, four rounds interleaved, `p50_ms` 3.89 to 4.65 against 3.78 to 3.97 (and one by-hand outlier round at 7.87, min 3.96, on a loaded machine) and `min_ms` 2.82 to 3.11 against 2.79 to 3.01: the component's own cost is at most a tenth of a millisecond at 5 000 fires (about 0.02 µs a fire a frame, inside the noise), and the work a fire does (the linked flame, the sparks, the smoke) is the same either way. `bench_lights` base against new, three rounds, `min_us` 405, 404, 325 against 322, 335, 325, `p50_us` 687, 729, 509 against 558, 713, 542: the same (nothing it runs was touched); `bench_flames` with no `Fire` and with sparks and smoke, base against new, p50 2.47 to 3.28 against 2.40 to 3.96 and 4.30 to 6.16 against 4.68 to 6.12 over three rounds at load average 14: the same.
 
+## Seeing a fire that moves (`FlameMotion`)
+
+`examples/fires.rs` carries its fire with `LIGHTS_WALK=v` (metres per second along +X) for `LIGHTS_WALK_FOR=s` seconds (default 1.5), centred on where it was placed, and then stands it still; the camera stands back 3.5 m. A frame sequence shows the flame lie back while it is carried and stand up again after (`docs/media/carried.png` is six frames of it):
+
+```sh
+LIGHTS_FRAMES=190 LIGHTS_KIND=torch LIGHTS_WALK=1.4 LIGHTS_WALK_FOR=1.5 LIGHTS_EYE=0,0.65,3.2 LIGHTS_LOOK=0,0.3,0 \
+  LIGHTS_SHOT_DIR=$HOME/walk LIGHTS_SHOT_FROM=20 LIGHTS_SHOT_EVERY=10 ./target/release/examples/fires
+```
+
+Measured on those frames (the principal axis of the flame's bright, warm pixels against the vertical): 57° at frame 50 and 50° at frame 90 while carried at 1.4 m/s (`flame_tilt(1.4, 0.1)` is 54.7°), 20° a third of a second after the stop and under 10° from half a second on (the filter's 0.15 s is `exp(-t / 0.15)`: 0.15 m/s left at 0.33 s, which `flame_tilt` lays over 22°). On the courtyard `LIGHTS_MOTION=0` is the courtyard as it was before a fire's own motion counted, and it is **zero pixels different** from the build before in eight views (default, ground, edge, mid, top, graze, seed 3 with pools of 4 and 16, 300 frames each; one pixel off by 1 DN in two of them, the GPU's own noise): a fire that stands still, or a gain of zero, is the picture it was. With the gain at its default the braziers (which stand still) are unchanged and the walking torch-bearers' flames and the light and shadows they throw differ.
+
+**The hand-off is not disturbed by it**: 141 consecutive courtyard frames (`LIGHTS_SEED=3 LIGHTS_POOL=4 LIGHTS_FOCUS_WALK=18 LIGHTS_HYSTERESIS=1.0`, frames 100 to 240), each frame's mean red-green-blue departure from the average of its two neighbours, whole frame and each half: at most 0.20 DN with the lean and 0.19 before, 99th percentile 0.08 both (a pop is a DN or more).
+
+**What it costs** (CPU, interleaved against the build before it on a machine at load average 19-34): `bench_lights` (no `FlameSite`, so nothing it runs was touched) `min_us` 337-348 against 342-360 and `p50_us` 527-543 against 533-569 over three alternating runs each; `bench_flames` with 5 000 torches that stand still, `p50_ms` 2.38-2.55 against 2.30-2.50 (a fire at rest costs the tracker one position compare, about 0.02 µs a frame); with all 5 000 walking (`BENCH_MOVING=1.4`) the lean itself (`BENCH_MOTION=1` against `0`) costs up to 0.3 ms at 5 000 moving fires, about 0.06 µs a fire, in the noise of the load.
+
 ## The still
 
 ```sh
@@ -390,8 +405,8 @@ FPS=30 WIDTH=640 \
 sequence (frame 0 is black: the pipelines are still compiling), renumbered from 0 and encoded with `WIDTH=640`. 48 frames,
 3.2 MB. `docs/media/courtyard.png` is the still above. Both were re-taken on 2026-10-28 with the bowl braziers and the
 ember bed (the earlier files showed box braziers and a pink bed), and on 2026-10-30 with every figure casting a shadow,
-the pool's three shadowed lights and the 20 cd/m² sky fill; that capture, and the showcase and relight clips, used
-`LIGHTS_EMBERS=4`.
+the pool's three shadowed lights and the 20 cd/m² sky fill, and on 2026-10-31 with the torch-bearers' flames leaning behind them as they
+walk (`FlameMotion`); that capture, and the showcase and relight clips, used `LIGHTS_EMBERS=4`.
 
 **No default font path, deliberately.** `/System/Library/Fonts/...` exists on exactly one of the
 machines this repo is built on and fails on the others — and it fails in `magick`, after ffmpeg has
