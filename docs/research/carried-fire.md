@@ -180,7 +180,7 @@ Judged at the courtyard's ground-level camera, the close torch camera, and the h
   cross-fade are the same numbers as before; only the geometry they are applied at moved.
 - **Cheap.** One helper function; no new system, no new per-frame work.
 
-[`FlameSite`]: ../src/flame.rs
+[`FlameSite`]: ../../src/flame.rs
 
 ## Amendment (iteration 60): a carried flame needs something carrying it
 
