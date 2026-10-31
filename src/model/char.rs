@@ -143,7 +143,7 @@ fn edge_noise(x: f32, y: f32, seed: u32) -> f32 {
 /// lump is a rotated rectangle rather than a circle: a coal's edges are straight. Two octaves of noise
 /// cut into the radius then give the edge its fracture. `docs/research/fuel-bed.md` records the renders
 /// this replaced, including the honeycomb two partitions produced.
-fn heap(u: f32, v: f32, cells: f32, share: f32, seed: u32) -> f32 {
+fn heap(u: f32, v: f32, cells: f32, share: f32, seed: u32, period: Option<i32>) -> f32 {
     let (x, y) = (u * cells, v * cells);
     let (ix, iy) = (x.floor() as i32, y.floor() as i32);
     let mut brightest = 0.0f32;
@@ -152,34 +152,40 @@ fn heap(u: f32, v: f32, cells: f32, share: f32, seed: u32) -> f32 {
     for dy in -2..=2 {
         for dx in -2..=2 {
             let (cx, cy) = (ix + dx, iy + dy);
+            // A tile repeats every `period` cells: the lump a cell holds is the one its wrapped index holds, and its place is the cell's own
+            // (`cx`, unwrapped), so the lumps of the cell past the edge are the first column's, one tile over.
+            let (hx, hy) = match period {
+                Some(period) => (cx.rem_euclid(period), cy.rem_euclid(period)),
+                None => (cx, cy),
+            };
             // Not every cell holds a coal: where a lump settled away there is only ash.
-            if lattice(cx, cy, seed ^ 0xabcd) < SPARSE {
+            if lattice(hx, hy, seed ^ 0xabcd) < SPARSE {
                 continue;
             }
-            let angle = lattice(cx, cy, seed ^ 0x77a1) * core::f32::consts::PI;
+            let angle = lattice(hx, hy, seed ^ 0x77a1) * core::f32::consts::PI;
             let (sin, cos) = angle.sin_cos();
-            let stretch = STRETCH.0 + (STRETCH.1 - STRETCH.0) * lattice(cx, cy, seed ^ 0x33d1);
-            let radius = RADIUS.0 + (RADIUS.1 - RADIUS.0) * lattice(cx, cy, seed ^ 0x1b3f);
-            let px = cx as f32 + 0.5 + (lattice(cx, cy, seed) - 0.5) * 2.0 * JITTER;
-            let py = cy as f32 + 0.5 + (lattice(cx, cy, seed ^ 0x9e37) - 0.5) * 2.0 * JITTER;
+            let stretch = STRETCH.0 + (STRETCH.1 - STRETCH.0) * lattice(hx, hy, seed ^ 0x33d1);
+            let radius = RADIUS.0 + (RADIUS.1 - RADIUS.0) * lattice(hx, hy, seed ^ 0x1b3f);
+            let px = cx as f32 + 0.5 + (lattice(hx, hy, seed) - 0.5) * 2.0 * JITTER;
+            let py = cy as f32 + 0.5 + (lattice(hx, hy, seed ^ 0x9e37) - 0.5) * 2.0 * JITTER;
             let (vx, vy) = (x - px, y - py);
             let (ux, uy) = (vx * cos + vy * sin, -vx * sin + vy * cos);
             let mut distance = (ux * stretch).abs().max((uy * (2.0 - stretch)).abs());
             // The fracture: two scales of noise cutting into the radius, so the edge is not a box.
             distance *= 1.0
                 + EDGE.0
-                    * (edge_noise(ux * 2.2 + cx as f32 * 9.0, uy * 2.2 + cy as f32 * 9.0, seed ^ 0x1f1f)
+                    * (edge_noise(ux * 2.2 + hx as f32 * 9.0, uy * 2.2 + hy as f32 * 9.0, seed ^ 0x1f1f)
                         - 0.5)
                     * 2.0;
             distance *= 1.0
                 + EDGE.1
-                    * (edge_noise(ux * 5.5 + cx as f32 * 31.0, uy * 5.5 + cy as f32 * 31.0, seed ^ 0x2b2b)
+                    * (edge_noise(ux * 5.5 + hx as f32 * 31.0, uy * 5.5 + hy as f32 * 31.0, seed ^ 0x2b2b)
                         - 0.5)
                     * 2.0;
             let reach = distance / radius;
             if reach < 1.0 {
                 // Each lump is at its own stage of the burn, and cools from its middle to its edge.
-                let own = LUMP_FLOOR + (1.0 - LUMP_FLOOR) * lattice(cx, cy, seed ^ 0x51ed);
+                let own = LUMP_FLOOR + (1.0 - LUMP_FLOOR) * lattice(hx, hy, seed ^ 0x51ed);
                 let body = own * (1.0 - (1.0 - PLATEAU) * smooth(reach));
                 if body * share > brightest {
                     brightest = body * share;
@@ -219,14 +225,47 @@ fn heap(u: f32, v: f32, cells: f32, share: f32, seed: u32) -> f32 {
 /// assert_ne!(char_field(0.3, 0.7, 1), char_field(0.3, 0.7, 2));
 /// ```
 pub fn char_field(u: f32, v: f32, seed: u32) -> f32 {
-    let coarse = heap(u, v, LUMPS, 1.0, seed);
-    let fine = heap(u, v, FINE_LUMPS, FINE_SHARE, seed ^ 0x2545);
+    let coarse = heap(u, v, LUMPS, 1.0, seed, None);
+    let fine = heap(u, v, FINE_LUMPS, FINE_SHARE, seed ^ 0x2545, None);
     let brightest = coarse.max(fine);
     // The bed cools from the plume's axis to its rim: `d` is 0 at the middle of the texture and 1 at
     // its corners.
     let d = (u - 0.5).hypot(v - 0.5) / core::f32::consts::FRAC_1_SQRT_2;
     let cool = 1.0 - (1.0 - CORE_COOL.0) * smooth(d.powf(CORE_COOL.1));
     (brightest * cool).clamp(0.0, 1.0)
+}
+
+/// The lumps across one tile of [`char_tile`]: six coarse and ten fine, whole numbers, because a heap that repeats needs an integer count
+/// of cells (the bed [`char_field`] covers has 5.6 and 9.4). With a tile 0.36 m across a coarse lump is 6 cm and a fine one 3.6 cm, the
+/// coals `docs/research/fuel-bed.md` sizes the bed by.
+pub const TILE_LUMPS: (u8, u8) = (6, 10);
+
+/// A **tileable** char field at `(u, v)`: the same heap of shards as [`char_field`] (a union of overlapping lumps at two scales, bright
+/// middles and ash between them), periodic in both axes, so `char_tile(u + 1.0, v, seed) == char_tile(u, v, seed)` and one texture covers a
+/// bed of any width at the coals' own physical size by repeating.
+///
+/// There is no cooling from the middle to the rim here, because a tile has no middle: a bed's own shape (its centre, its rim) is a property
+/// of the bed, applied where the tile is laid. Seeded as [`char_field`] is. `docs/research/fuel-bed-heat.md`.
+///
+/// ```
+/// # use bevy_lights::model::char::*;
+/// for (u, v) in [(0.1, 0.2), (0.73, 0.4), (0.0, 0.99)] {
+///     let a = char_tile(u, v, 7);
+///     assert!((a - char_tile(u + 1.0, v, 7)).abs() < 1e-3);
+///     assert!((a - char_tile(u, v - 1.0, 7)).abs() < 1e-3);
+/// }
+/// ```
+pub fn char_tile(u: f32, v: f32, seed: u32) -> f32 {
+    let (coarse, fine) = (i32::from(TILE_LUMPS.0), i32::from(TILE_LUMPS.1));
+    let brightest = heap(u, v, coarse as f32, 1.0, seed, Some(coarse)).max(heap(
+        u,
+        v,
+        fine as f32,
+        FINE_SHARE,
+        seed ^ 0x2545,
+        Some(fine),
+    ));
+    brightest.clamp(0.0, 1.0)
 }
 
 /// A coal's radiance at [`char_field`] sample `field`, in **candelas per square metre**, as linear

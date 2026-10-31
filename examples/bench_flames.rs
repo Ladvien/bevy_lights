@@ -8,7 +8,7 @@
 //! window and no display; and prints one line:
 //!
 //! ```text
-//! bench_flames flames=5000 visible=21 embers=0 embers_visible=0 smoke=0 smoke_visible=0 tongues=0 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
+//! bench_flames flames=5000 visible=21 embers=0 embers_visible=0 smoke=0 smoke_visible=0 tongues=0 beds=0 beds_visible=0 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
 //! ```
 //!
 //! `visible` is the number of flames the renderer counted as in view at the last frame (a fire's tongues are flames too), which is what
@@ -20,7 +20,8 @@
 //! box every frame. `BENCH_EMBERS=1` gives every torch `FlameEmbers` (a second quad a flame), and `embers_visible` is
 //! how many of those quads the renderer counted as in view. `BENCH_SMOKE=1` gives every torch `FlameSmoke` (one more quad,
 //! the smoke's), and `smoke_visible` counts those the same way. `BENCH_TONGUES=n` gives every torch `FlameTongues` of `n` tongues
-//! (`n - 1` more flames a fire, each its own draw).
+//! (`n - 1` more flames a fire, each its own draw). `BENCH_BEDS=1` gives every torch a `FuelBed` (one more disc a fire, an opaque
+//! cut-out), and `beds_visible` counts the discs the renderer counted as in view.
 
 use std::time::Instant;
 
@@ -47,6 +48,7 @@ fn main() {
     let embers = env_usize("BENCH_EMBERS", 0) != 0;
     let smoke = env_usize("BENCH_SMOKE", 0) != 0;
     let tongues = u8::try_from(env_usize("BENCH_TONGUES", 0)).unwrap_or(u8::MAX);
+    let beds = env_usize("BENCH_BEDS", 0) != 0;
     let frames = env_usize("BENCH_FRAMES", 400);
     let wind = std::env::var("BENCH_WIND").ok().and_then(|v| {
         let v: Vec<f32> = v.split(',').filter_map(|p| p.trim().parse().ok()).collect();
@@ -63,7 +65,7 @@ fn main() {
     ))
     .insert_resource(FlameWind { velocity: wind.unwrap_or_default() })
     .add_systems(Startup, move |commands: Commands, images: ResMut<Assets<Image>>| {
-        scene(commands, images, flames, embers, smoke, tongues)
+        scene(commands, images, flames, embers, smoke, tongues, beds)
     });
     app.finish();
     app.cleanup();
@@ -89,15 +91,17 @@ fn main() {
     let flames_visible = visible(app.world_mut(), None);
     let embers_visible = visible(app.world_mut(), Some("Embers"));
     let smoke_visible = visible(app.world_mut(), Some("Smoke"));
+    let beds_visible = visible(app.world_mut(), Some("Fuel bed"));
 
     samples.sort_by(f64::total_cmp);
     let mean = samples.iter().sum::<f64>() / samples.len().max(1) as f64;
     let at = |i: usize| samples.get(i).copied().unwrap_or(0.0);
     let wind = wind.unwrap_or_default();
     println!(
-        "bench_flames flames={flames} visible={flames_visible} embers={} embers_visible={embers_visible} smoke={} smoke_visible={smoke_visible} tongues={tongues} wind={},{} frames={} mean_ms={mean:.3} p50_ms={:.3} min_ms={:.3}",
+        "bench_flames flames={flames} visible={flames_visible} embers={} embers_visible={embers_visible} smoke={} smoke_visible={smoke_visible} tongues={tongues} beds={} beds_visible={beds_visible} wind={},{} frames={} mean_ms={mean:.3} p50_ms={:.3} min_ms={:.3}",
         u8::from(embers),
         u8::from(smoke),
+        u8::from(beds),
         wind.x,
         wind.y,
         samples.len(),
@@ -114,6 +118,7 @@ fn scene(
     embers: bool,
     smoke: bool,
     tongues: u8,
+    beds: bool,
 ) {
     let mut target = Image::new_fill(
         Extent3d { width: 1280, height: 720, depth_or_array_layers: 1 },
@@ -137,6 +142,9 @@ fn scene(
         }
         if tongues > 1 {
             torch.insert(FlameTongues { count: tongues, spread: 0.55 });
+        }
+        if beds {
+            torch.insert(FuelBed::default());
         }
     }
     commands.spawn((

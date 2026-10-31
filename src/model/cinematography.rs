@@ -461,6 +461,51 @@ pub fn blackbody_luminance(kelvin: f32) -> f32 {
     LUMINOUS_EFFICACY * SPECTRAL_SCALE * luminous
 }
 
+/// The lowest temperature [`blackbody_radiance`] takes, in kelvin: well under the point (about 800 K, the Draper point) where a body first
+/// glows visibly red, so a surface cooling past that point can be followed to where it is dark.
+pub const MIN_RADIANCE_KELVIN: f32 = 500.0;
+
+/// A blackbody's **radiance** at `kelvin` as linear sRGB, in candelas per square metre: its luminance and its hue in one triple, down to
+/// [`MIN_RADIANCE_KELVIN`].
+///
+/// [`blackbody_luminance`] and [`blackbody_colour`] stop at 1000 K, where a coal bed's lowest stop sits, because they describe a fire's own
+/// colour. A bed of coals *cooling* goes through the range below it (the glow is red, then a deeper red, then nothing), so this one
+/// integrates the same Planck spectrum against all three colour-matching functions and keeps the magnitude: the XYZ tristimulus in cd/m²,
+/// turned to linear sRGB and clamped at zero where a deep red leaves the gamut (a blue channel below zero is no light, not negative light).
+///
+/// ```
+/// # use bevy_lights::model::cinematography::*;
+/// let hot = blackbody_radiance(1300.0);
+/// let cool = blackbody_radiance(900.0);
+/// // 400 K is three orders of magnitude, and the cooler body is the redder one.
+/// assert!(hot[0] > cool[0] * 300.0);
+/// assert!(cool[1] <= cool[0] * 0.1 && cool[2] <= cool[0] * 0.01);
+/// // Under 1000 K it keeps falling where `blackbody_luminance` has stopped.
+/// assert!(blackbody_radiance(800.0)[0] < cool[0]);
+/// assert_eq!(blackbody_luminance(800.0), blackbody_luminance(1000.0));
+/// ```
+pub fn blackbody_radiance(kelvin: f32) -> [f32; 3] {
+    const LUMINOUS_EFFICACY: f32 = 683.0;
+    const SPECTRAL_SCALE: f32 = 1.191_043e-16 * 1e9 * 1e-8;
+
+    let kelvin = if kelvin.is_nan() { 6500.0 } else { kelvin.clamp(MIN_RADIANCE_KELVIN, 40_000.0) };
+    let (mut x, mut y, mut z) = (0.0f32, 0.0f32, 0.0f32);
+    for step in 0..=40 {
+        let nm = 380.0 + step as f32 * 10.0;
+        let radiance = planck(kelvin, nm * 1e-9);
+        x += radiance * cie_x(nm);
+        y += radiance * cie_y(nm);
+        z += radiance * cie_z(nm);
+    }
+    let scale = LUMINOUS_EFFICACY * SPECTRAL_SCALE;
+    let (x, y, z) = (x * scale, y * scale, z * scale);
+    [
+        (3.2406 * x - 1.5372 * y - 0.4986 * z).max(0.0),
+        (-0.9689 * x + 1.8758 * y + 0.0415 * z).max(0.0),
+        (0.0557 * x - 0.2040 * y + 1.0570 * z).max(0.0),
+    ]
+}
+
 /// A turn in radians, so a caller passing a circle's fraction does not import a constant.
 pub const TURN: f32 = TAU;
 

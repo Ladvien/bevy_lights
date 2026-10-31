@@ -46,6 +46,7 @@ impl Plugin for FlamePlugin {
         embedded_asset!(app, "flame.wesl");
         crate::embers::build(app);
         crate::smoke::build(app);
+        crate::bed::build(app);
         app.add_plugins(MaterialPlugin::<FlameMaterial>::default())
             .init_resource::<FlameLook>()
             .init_resource::<FlameAssets>()
@@ -69,6 +70,8 @@ impl Plugin for FlamePlugin {
                     crate::smoke::update_smoke,
                     crate::smoke::begin_smoke_tails,
                     crate::smoke::update_smoke_tails,
+                    crate::bed::build_bed_assets.run_if(crate::bed::wanted),
+                    crate::bed::update_beds,
                 )
                     .chain()
                     .in_set(LightsSystems::Flame),
@@ -78,6 +81,7 @@ impl Plugin for FlamePlugin {
         crate::report::watch::<crate::FlameEmbers>(app);
         crate::report::watch::<crate::FlameSmoke>(app);
         crate::report::watch::<crate::FlameTongues>(app);
+        crate::report::watch::<crate::FuelBed>(app);
         crate::report::watch_resource::<FlameLook>(app);
         crate::report::watch_resource::<FlameWind>(app);
         crate::report::watch_resource::<FlameGust>(app);
@@ -924,7 +928,7 @@ pub(crate) struct Sites<'w, 's> {
 
 impl Sites<'_, '_> {
     /// The `elapsed` of the [`Kindle`] on the entity a site's [`FlameSite::fire`] names, when it has one.
-    fn kindle_of(&self, site: &FlameSite) -> Option<f32> {
+    pub(crate) fn kindle_of(&self, site: &FlameSite) -> Option<f32> {
         self.kindles.get(site.fire?).ok().map(|kindle| kindle.elapsed)
     }
 
@@ -937,7 +941,7 @@ impl Sites<'_, '_> {
     }
 
     /// The `elapsed` of the [`Snuff`] on the entity a site's [`FlameSite::fire`] names, when it has one.
-    fn snuff_of(&self, site: &FlameSite) -> Option<f32> {
+    pub(crate) fn snuff_of(&self, site: &FlameSite) -> Option<f32> {
         self.snuffs.get(site.fire?).ok().map(|snuff| snuff.elapsed)
     }
 
@@ -945,7 +949,7 @@ impl Sites<'_, '_> {
     /// has a [`Flicker`] or a [`PoolCandidate`], otherwise the site's own. A `Flicker` wins over a candidate on the same
     /// entity, since the pool's own light is the `Flicker`. A candidate's missing depth is [`FLICKER_DEPTH`] and its missing
     /// phase the site's, as the pool reads them.
-    fn fire_of(&self, site: &FlameSite) -> (Option<f32>, f32, f32) {
+    pub(crate) fn fire_of(&self, site: &FlameSite) -> (Option<f32>, f32, f32) {
         let own = (site.diameter, site.depth, site.phase);
         let Some((flicker, candidate)) = site.fire.and_then(|light| self.lights.get(light).ok()) else {
             return own;

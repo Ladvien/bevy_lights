@@ -319,6 +319,29 @@ What to look for, and what to measure:
 - **A scene that does not use the component is unchanged.** The default courtyard in ten views (ground, edge, top and graze, two seeds with a pool of 4 and of 16, and three far views at 45 and 95 m, one with sparks and smoke) against the build before: seven are zero pixels different and three have one or two pixels off by 1 DN (the GPU's own noise, as in iteration 282); counted with numpy on the two PNGs.
 - **What it costs.** CPU: `BENCH_TONGUES=6 cargo run --release --example bench_flames` (5 000 fires of 6 tongues, 30 000 flames in the world, 88 in view) reads 7.1 to 7.4 ms a frame against 2.6 to 2.9 for 5 000 plain flames: the 25 000 extra flames cost about 0.18 µs each a frame, so a campfire's five extra tongues are about 0.9 µs. GPU: `LIGHTS_GPU_TIMING=1 LIGHTS_FRAMES=420` with the bonfire 5 m from the camera (both fires in view, a third of the screen) reads the transparent pass at 340 and 302 µs without tongues and 504 and 436 µs with them (two rounds, interleaved), the opaque pass unchanged: about 0.15 ms a frame for the two fires, 13 draws more.
 
+## Seeing a bed of coals live
+
+`examples/campfire.rs` lays each of its two fires on its kind's `FuelBed` (`FireKind::bed()`: a campfire's 0.7 m, a bonfire's 1.9 m; `docs/research/fuel-bed-heat.md`). `LIGHTS_BED=0` leaves the coals out (the comparison) and `LIGHTS_COOLING=s` sets their cooling time constant, so a fire put out (`LIGHTS_SNUFF`) can be captured cooling in seconds instead of minutes:
+
+```sh
+# the campfire from straight above, with and without coals, and a frame every 75 frames of a fire put out at 1.0 s
+E="LIGHTS_FRAMES=240 LIGHTS_EYE=-2.6,2.4,0.5 LIGHTS_LOOK=-2.6,0,0"
+env $E LIGHTS_SHOT=/tmp/bed_on.png cargo run --release --example campfire
+env $E LIGHTS_BED=0 LIGHTS_SHOT=/tmp/bed_off.png cargo run --release --example campfire
+LIGHTS_FRAMES=1050 LIGHTS_SHOT_DIR=/tmp/bed_snuff LIGHTS_SHOT_FROM=30 LIGHTS_SHOT_EVERY=75 \
+  LIGHTS_EYE=-2.6,2.4,0.5 LIGHTS_LOOK=-2.6,0,0 LIGHTS_SNUFF=1.0 LIGHTS_COOLING=6 cargo run --release --example campfire
+```
+
+`docs/media/fuel-bed.png` is frames 0, 1, 2 and 4 of that last run (frames 30, 105, 180 and 330), each cropped to 420 x 330 round the bed with the captions burned in: `magick frameNNNN.png -crop 420x330+430+180 +repage -gravity south -background black -fill white -pointsize 18 -splice 0x34 -annotate +0+8 "caption"`, then `+append` and `-append` into a 2 x 2 sheet (a truecolor PNG: 128 colours bands the dark ground).
+
+What to look for, and what to measure:
+
+- **A bed read against dark.** The first build was an additive glow over the ground the same fire had lit, and read as a cloud with nothing dark between the lumps; the disc is an opaque cut-out with its own ash (`ASH` in `src/bed.wesl`), so the lumps are patches of orange and deep red on near-black, with a ragged rim, not a plate. Judge it from 2.4 m straight down, at 45°, and from 1.2 m; at the viewer's eye and at a graze the logs and the stones cover most of it, as they would.
+- **It goes on glowing.** The flame and the light are gone 1.2 s after the douse (`SNUFF_SECONDS`) and the coals stay, orange then red then nothing, with the logs dark against them: the strongest frame of the set is the one 2 s after the douse (frame 2 above). At the default 60 s time constant the hottest coal is under a thousandth of its burning brightness after 104 s (`bed_visible_heat`, 0.18 of the heat).
+- **It breathes.** 61 consecutive frames of a burning bed (`LIGHTS_SHOT_DIR` with `LIGHTS_SHOT_EVERY=1 LIGHTS_SHOT_FROM=100`), the mean grey level of a 40 x 50 patch of bed with no flame over it: 110 to 128 (a standard deviation of 5, about 7 % of its level), rising with the flame's own swing over the same frames.
+- **A scene that does not use the component is unchanged.** The default courtyard in ten views (default, ground, edge, top, graze, seed 3 with a pool of 4 and of 16, far at 45 and 95 m, and the close camera with sparks and smoke, 300 frames, `magick compare -metric AE`) against the build before: eight are zero pixels different and two (seed 3 pool 16, the sparks and smoke view) are one pixel off by 1 DN, the GPU's own noise. The courtyard does not use `FuelBed`.
+- **What it costs.** CPU, interleaved against the build before it on a machine at load average 14-20: a scene with no bed is the same (`bench_lights`, seven alternating runs each: `min_us` 328-378 against 343-385, `p50_us` 534-638 against 553-642). `BENCH_BEDS=1 cargo run --release --example bench_flames` (every torch of 5 000 has a bed, 15 in view; needs a GPU adapter) reads 3.5 ms a frame at best against 2.4 without, about 0.2 µs a bed, and 6.0 and 6.8 in the other two runs of three on the same load; a bed is an entity like a flame, and `update_beds` alone is about 0.06 µs a bed a frame in a headless app (5 000 beds, 300 frames). GPU: `LIGHTS_GPU_TIMING=1 LIGHTS_FRAMES=420` with the bonfire 5 m from the camera reads the opaque pass at 303 and 280 µs before and 333 and 292 µs with two beds (two rounds, interleaved), the transparent pass unchanged within the noise (426 and 392 against 435 and 394): 12 to 30 µs for two beds. A host that never asks for a bed builds nothing: the colour table and the coal field (a 128 x 128 tile, about 40 ms in a release build) are made the first time a site has a `FuelBed`.
+
 ## The still
 
 ```sh

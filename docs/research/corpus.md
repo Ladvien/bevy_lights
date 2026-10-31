@@ -271,3 +271,15 @@ Not in the corpus: Morton, Taylor & Turner 1956 on plumes (cited second-hand thr
 | `10.3210_fst.26.1` | Delichatsios 2007, *A Correlation for the Flame Height in "Group" Fires* (Fire Sci. Technol. 26, 1) | flames of burners `S` apart merge above `Z_m = 3 S` (eqs. 6b and 7b, "L_f / S = 3 - 3.3"): the clamp on a side tongue's height in `docs/research/flame-tongues.md` |
 | `10.13140_marples.nav.lighting.thesis` (lines 3426-3440) | Marples 2017 (already listed) | "the motion of flame, this can be in the form of lanterns, flaming barrels, or burning objects" draws the player's gaze: a flame is looked at |
 | GPU Gems 1, ch. 6.2 (`GP/GPU Gems- Programming Techniques ...md`, lines 2925-2935) | Nguyen, *Fire in the "Vulcan" Demo* | "We started with a single animation, and it worked even better with two or more", a random difference in "size, position, rate of decay, animation start frame": a fire is several flames that differ |
+
+## Added by the 2026-10-31 re-scan (iteration 284)
+
+`catalog_recent` (200 rows, newest 10:33 UTC) is clinical-psychology and software re-embeds, the SIGGRAPH re-embed iterations 278-283 scanned, and the two candle-flame papers (`10.1038_s41598-018-36754-w`, `10.1038_s41598-020-78229-x`) iteration 283 already listed as in the library and bearing on the flicker's rate: no new lighting stem. The fuel-bed note read these from the on-disk corpus (not new, listed here because none was in the table for this system):
+
+| stem | what it is | use |
+|---|---|---|
+| `s2/s2011-advances-pdf-slides.md` (lines 1425-1435) | SIGGRAPH 2011 *Advances*, the fire talk | "hot objects splat their shape into the light volume textures to create local 'glow' lights", and "was quite difficult to hide the 'particle' nature of the system": a fire's hot surface is a light of its own that carries the fire's state |
+| `si/sig2024_Scintilla_Simulating_Combustible_Vegetation_for_Wildfires.md` (line 687) | Scintilla, SIGGRAPH 2024, Sec. 5.7 | "according to Stefan-Boltzmann and Newton cooling laws, we estimated the ember temperature change": the cooling law of a glowing coal after its flame is out, exponential in the excess temperature |
+| `10/10.32657_10220_48312.md` (line 1145) | Doyle's colour and lighting design (already listed) | "Doyle uses diegetic colour that originates within the narrative to provide motivation for the incandescent spot": the glow must have a source in the frame |
+
+Not in the corpus: Rein 2009, *Smouldering Combustion Phenomena in Science and Technology* (IRECHE 1; found by `paper_search`, no DOI, `hdl.handle.net/1842/2678`, so `paper_download` cannot take it): the length of a real bed's glow after its flame is out. `docs/research/fuel-bed-heat.md` lists it under `Pending index`. The corpus has no source on coal-bed cooling times; the default `FuelBed::cooling` is a design default for that reason.
