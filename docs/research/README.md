@@ -49,6 +49,8 @@ plainly that it is a design default.
 - [`fire-component.md`](fire-component.md) — a whole fire as one component (`Fire`): a kind, a brightness and a colour become the
   flame, its pooled light and the kind's sparks, smoke, tongues and bed, each fire on a clock of its own, what a host spawns
   beside it winning and a change to it rewriting every part.
+- [`flame-motion.md`](flame-motion.md) — a fire that moves leans against its own motion: the flame's lean comes from the air relative to the
+  fire (the wind less the site's own smoothed ground velocity), so a carried torch streams behind its bearer, settles when they stop and takes its pooled light with it.
 - [`corpus.md`](corpus.md) — what the home-still library actually holds for cinematography,
   photography, CG and animation lighting, game-lighting craft, many-light rendering, fire physics and
   perception, with the stems to read and the gaps to fill.
