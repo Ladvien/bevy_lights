@@ -59,35 +59,41 @@ smoke now at `h` was made `τ - age(h)` seconds after the douse began: negative 
 column, which is simply carried up), and positive below it, where it was made by a source that is dying. That is the whole model, and it
 is stateless: the shader needs only `τ`.
 
-- **The emission history** is `1` before the douse and falls to `0` by `SMOKE_EMISSION_SECONDS` after it (`1 - smoothstep(0, E, τ_made)`):
+- **The emission history** is `1` before the douse and falls to `0` by `EMISSION_SECONDS` after it (`1 - smoothstep(0, E, τ_made)`):
   the wick smoulders on for a short while, and the smoke it makes is thinner each second. The base of the column therefore lifts off the
-  fire at `v` with a soft lower edge `E · v` thick, and nothing is made below it.
+  fire at `v` with a soft lower edge `E · v` thick, and nothing is made below it. A weak source also makes a *thinner* wisp, not only
+  a fainter one (a candle's trail is a thread, a torch's plume a column): the half-width of what a dying source made is scaled by
+  `0.5 + 0.5 · emission`, so the base of the trail is narrow and widens up to the old column's width.
 - **The base of the visible column drops with the flame.** The steady plume is hidden below `rise 0.55..1.15` flame heights (the flame
   occupies that space); as the flame sinks (`1 - snuff_gain(τ)`) that window slides down to the wick (`0.10..0.45`), so the thin wisp of a
   smouldering wick is seen leaving the wick and not a flame's tip that is no longer there.
 - **The light on the column** is the dying flame's, `snuff_gain(τ)` times the steady column's inverse square, plus the coals' glow:
-  `SMOKE_AFTERGLOW / (1 + (away / 2)²)`, a broad, weak law (`away` as in the steady plume), weighted by how much of the flame is gone.
-  At `τ = 0` this is the steady column exactly.
-- **The end** is a fade over the last 30 % of `SMOKE_TAIL_SECONDS` so the trail is exactly dark when its clock stops and nothing pops.
+  `AFTERGLOW / (1 + (away / 2)²)`, a broad, weak law (`away` as in the steady plume), weighted by how much of the flame is gone.
+  At `τ = 0` this is the steady column exactly. The first build had a glow of 0.30, which left the packet as bright at 3 s as the
+  steady plume while the ground beneath it had gone dark (smoke lit by a dead fire: the one disagreement a viewer checks); 0.18 is
+  about a third of the steady column's light at the heights the packet climbs through.
+- **The end** is a fade over the last 70 % of `SMOKE_TAIL_SECONDS` (`1 - smoothstep(0.3, 1, τ / T)`), so the trail thins as it ages, is
+  exactly dark when its clock stops and nothing pops.
 - **The clock** is `SmokeTail::elapsed` on the smoke quad, advanced on **virtual** time (the douse is the fire's state, as the flame's
   snuff is, so a paused world's trail holds still while the wisps in it keep moving on real time, the split `AGENTS.md` describes), and
   begun when a `Snuff` is added to the light a smoking `FlameSite::fire` names. It ends when its time is up, or when `Snuff` is removed (the
   fire is re-lit: the plume goes back to following the catch).
 - **The quad carries `τ` in the scale it inherits**, the way it already carries the catch: the flame's scale `x` is its catch, which is
-  `0.001` once the flame is out, so the trail quad's local scale is set to make its *world* `x` equal `1 - 0.9 τ / SMOKE_TAIL_SECONDS`
-  (a number, not a size; floored at `0.1` so its culling box stays finite), and one bit of the quad's tag (the low bit of its height)
-  says "read it as a trail". A trail is drawn at the burnt size (the catch reads as 1): the column is where it was, it does not shrink.
+  `0.001` once the flame is out, so the trail quad's local scale is set to make its *world* `x` equal `1 / (1 + τ)` (a number, not a
+  size; no less than `1 / (1 + SMOKE_TAIL_SECONDS)`, so its culling box stays finite, and the shader inverts it with no copy of the
+  trail's length), and one bit of the quad's tag (the low bit of its height, which a steady quad's tag always clears) says "read it
+  as a trail". A trail is drawn at the burnt size (the catch reads as 1): the column is where it was, it does not shrink.
 
 ## Parameters
 
 | parameter | value | source |
 |---|---|---|
 | `SMOKE_TAIL_SECONDS` | 5.0 s | design default: Saig, "the first few seconds"; long enough for the lifted base to leave the top of the column (`RISE_MAX - 1` flame heights at `v` ≈ 5 s) |
-| `SMOKE_EMISSION_SECONDS` | 2.4 s | design default: twice the 1.2 s flame snuff (`SNUFF_SECONDS`), the wick smouldering a while after its flame |
+| `EMISSION_SECONDS` | 2.4 s | design default: twice the 1.2 s flame snuff (`SNUFF_SECONDS`), the wick smouldering a while after its flame |
 | `v`, the lift speed | 0.7 / 2.2 = 0.318 flame heights a second | the steady column's own wisp speed in `src/smoke.wesl`, so the cut edge travels with the pattern |
-| `SMOKE_AFTERGLOW` | 0.30 | design default: the coals' glow against the flame's unit light; judged in captures |
+| `AFTERGLOW` | 0.18 | design default: the coals' glow against the flame's unit light; judged in captures (0.30 was too bright, above) |
 | the base window while the flame sinks | `0.55..1.15` → `0.10..0.45` flame heights | design default: from the steady column's to the wick's (`SOURCE` is 0.35) |
-| the end fade | last 30 % of the tail | design default |
+| the end fade | from 30 % of the tail to its end | design default |
 
 ## Validation targets
 
@@ -111,8 +117,8 @@ lights it; and nothing of it in a scene that put no fire out.
 
 ## Deviations
 
-None from an earlier default: a site without `FlameSmoke` and a fire that is never put out draw exactly as before. `SMOKE_TAIL_SECONDS`,
-`SMOKE_EMISSION_SECONDS`, `SMOKE_AFTERGLOW` and the window and fade constants are design defaults, marked above.
+None from an earlier default: a site without `FlameSmoke` and a fire that is never put out draw exactly as before. `SMOKE_TAIL_SECONDS`
+(public), `EMISSION_SECONDS`, `AFTERGLOW` and the window and fade constants are design defaults, marked above.
 
 ## Pending index
 

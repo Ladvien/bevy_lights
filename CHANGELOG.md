@@ -4,7 +4,7 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
-No API break: the new items are additive (`FlameSmoke` is a new component, `FireKind::smoke` a new method, and `FlameLook`, `FlameSite` and `PoolCandidate` are untouched).
+No API break: the new items are additive (`FlameSmoke` is a new component, `FireKind::smoke` a new method, `SMOKE_TAIL_SECONDS` a new constant, and `FlameLook`, `FlameSite` and `PoolCandidate` are untouched).
 
 ### Added
 
@@ -13,10 +13,12 @@ No API break: the new items are additive (`FlameSmoke` is a new component, `Fire
 - **What it costs** (`docs/DEMOS.md`, interleaved against the build before it): a scene with no smoke is the same (`bench_flames`, 5 000 flames 2.23 → 2.23 ms a frame, 20 000 4.22 → 4.27); a smoking fire costs about 0.16 µs a frame on the CPU, the per-entity cost of the sparks' quad, and an on-screen column costs the GPU about 11 µs of the transparent pass at a 3 m close-up with 52 fires.
 - **`MAX_SMOKE_DENSITY`, `FlameSmoke::problems`** (reported when a bad component is added, like the sparks').
 - **`LIGHTS_SMOKE=d` for the courtyard example and `BENCH_SMOKE=1` for `examples/bench_flames.rs`**; the bench's line gains `smoke=` and `smoke_visible=`, the renderer's own count of the smoke quads it did not cull.
+- **A fire that is put out leaves a trail of smoke.** The smoke of a fire shrank with its flame, so a `Snuff` took the whole column down to the bowl in under a second and the frame after the flame had nothing above it. Smoke density is advected (`GPU Gems` ch. 38), so what a fire has made travels on when its source stops: when the light a site's `FlameSite::fire` names gets a `Snuff`, a `FlameSmoke` flame goes out over `SNUFF_SECONDS` as it did, and its smoke stays at the size the fire burned at, the base of the column lifts off the wick at the speed its wisps already travel at, a wick that smoulders on for 2.4 s makes a thinner, fainter wisp each second, and after `SMOKE_TAIL_SECONDS` (5 s, new, public, design default) the trail has thinned to nothing. It is lit by the dying flame and then by a weak, broad glow from the coals, not by a light that has gone out. It runs on virtual time (a paused world's trail holds still), a site that names no fire and a fire loaded as already out begin none, and re-lighting a fire (removing its `Snuff`) ends the trail at once. The shader is stateless: the quad's world scale `x` carries `1 / (1 + seconds since the douse)` and the lowest bit of its tag's height says "trail". A scene that puts nothing out is zero pixels different from the build before (the default courtyard and the close camera with smoke and wind), and a trail costs the one quad the fire already had: `bench_flames` is the same with and without it (5 000 flames, best p50 in ms, three interleaved rounds against the build before: 2.79 → 2.49 with no smoke, 4.73 → 3.89 with smoke and sparks on every torch). `docs/research/flame-smoke-tail.md`, `docs/media/smoke-tail.png`, `docs/DEMOS.md`.
 
 ### Changed
 
 - `tools/wesl-check` also compiles `src/smoke.wesl`, with and without the depth prepass.
+- **A snuffed fire's smoke no longer stops with its flame** (the smoke quad took the flame's catch, so it shrank to the bowl in step with it): it lifts off and thins over `SMOKE_TAIL_SECONDS`, as the trail above. A site without `FlameSmoke`, a site that names no fire and a fire that is never put out draw exactly as before.
 
 ## [0.4.0] - 2026-10-31
 

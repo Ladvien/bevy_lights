@@ -36,7 +36,7 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `src/flame.rs` — `FlamePlugin`, `FlameMaterial`, `FlameLook`, `FlameSite`, `Flame`, `dress_flames`, `update_flames`.
 - `src/flame.wesl` — the flame shader, embedded with `embedded_asset!`.
 - `src/embers.rs`, `src/embers.wesl` — `FlameEmbers` and the spark quad (a child of the `Flame`, registered by `FlamePlugin`).
-- `src/smoke.rs`, `src/smoke.wesl` — `FlameSmoke` and the smoke quad (a child of the `Flame`, the spark quad's geometry and culling box, additive only).
+- `src/smoke.rs`, `src/smoke.wesl` — `FlameSmoke` and the smoke quad (a child of the `Flame`, the spark quad's geometry and culling box, additive only), and the trail that quad becomes when its fire is put out (`SmokeTail`, `begin_smoke_tails`, `update_smoke_tails`; `docs/research/flame-smoke-tail.md`).
 - `examples/common/mod.rs` — the `LIGHTS_*` run switches and the fly camera.
 - `examples/courtyard.rs` — the showcase and capture scene: four braziers, 48 torch-bearers, an orbit focus.
 - `examples/bench_lights.rs` — the CPU bench, no window and no GPU.
@@ -231,5 +231,6 @@ is an art decision, so it needs the same treatment as a physics constant.
   and the ember mirrors change together, or the smoke of a fire at the screen's edge pops. A smoke column is **additive only**: a blended
   smoke sorts against every other transparent surface of the host (`docs/research/flame-smoke.md`), and a column drawn thinner than a pixel
   crawls, so `smoke.wesl` floors its width at a pixel and a quarter and fades its noise out when it cannot be resolved.
+- **A smoke trail rides two data channels, and a bit stolen from a field must be cleared on the normal path.** A put-out fire's smoke (`docs/research/flame-smoke-tail.md`) is the same quad in another mode: the quad's world scale `x` is `1 / (1 + seconds since the douse)` (the flame's own `x` is `0.001` by then, so `update_smoke_tails` sets the quad's *local* scale to `x / flame.x`; a world scale is the flame's times the quad's, and the culling box is divided by the world product, `tail_cull_box`), and the lowest bit of the tag's 16 height bits says "trail". Half of all packed heights have that bit set, so `steady_tag` clears it (`a_steady_quads_tag_is_never_read_as_a_trail_whatever_its_height`): the first build read every odd-height quad as a trail and the capture diff passed by luck, because a trail at `τ = 0` is the steady plume. `begin_smoke_tails` runs its quad loop only on a frame with a new `Snuff` somewhere (`Added<Snuff>` is the early out), and `update_smoke`'s clock tick must not sit behind a test for "does this system own any quad", because a trail quad is excluded from its query.
 - **`cargo test` hides holes in a trimmed feature list**, because the full-`bevy` dev-dependency
   unifies features into the library graph. `cargo build` alone compiles a consumer's view.
