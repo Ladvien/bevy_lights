@@ -11,7 +11,7 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ### Changed
 
-- **A fire whose sparks are off the screen no longer draws them.** The ember quad carried `NoFrustumCulling`, so every `FlameEmbers` fire in the world was extracted, sorted and drawn every frame, on screen or not. With every torch embered and about twenty in view, `bench_flames` read (best of three alternating runs, in milliseconds a frame, on a machine at load average 20-36) 4.0, 12.5, 32.8 at 1 000, 5 000 and 20 000 flames before and 2.6, 3.5, 11.5 after (3 m/s wind: 10.0 and 40.8 before, 4.2 and 11.5 after), and the quads in view fell from every one in the world to 18-21. The quad now has a box of its own that `update_embers` rewrites on the frame the flame's scale changes. Nothing visible changes. `docs/research/flame-culling.md` has the geometry and the numbers.
+- **A fire whose sparks are off the screen no longer draws them.** The ember quad carried `NoFrustumCulling`, so every `FlameEmbers` fire in the world was extracted, sorted and drawn every frame, on screen or not. With every torch embered and about twenty in view, `bench_flames` read (best of three alternating runs, in milliseconds a frame, on a machine at load average 15-26) 11.5 and 37.2 at 5 000 and 20 000 flames before and 4.2 and 9.2 after (3 m/s wind, 5 000 flames: 8.8 before, 3.6 after), and the quads in view fell from every one in the world to 18-21. The quad now has a box of its own that `update_embers` rewrites on the frame the flame's scale changes. Nothing visible changes: the courtyard's captures with sparks on are bit-identical to the old build's. `docs/research/flame-culling.md` has the geometry and the numbers.
 
 ## [0.3.1] - 2026-10-30
 
