@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-10-30
+
+No API break (`cargo semver-checks` against 0.3.0: 202 checks pass); two public items added. Carries the fixes of issues #8, #9, #10 and #11 and flame culling.
+
 ### Added
 
 - **`examples/bench_flames.rs`: what thousands of flames cost when few are on screen.** `BENCH_FLAMES` torches (default 5000) on a 3 m grid, one camera looking at a corner of it (about twenty in view), rendered off-screen for `BENCH_FRAMES` frames with no window; it prints `bench_flames flames=… visible=… wind=… frames=… mean_ms=… p50_ms=… min_ms=…`. `visible` is the renderer's own count of the flames it did not cull. `BENCH_WIND=x,z` makes every flame lean, which rewrites each one's scale and culling box every frame. It needs a GPU adapter (`bench_lights` has no renderer and cannot see a flame).
