@@ -2,7 +2,7 @@
 
 Iteration 225 made the five settings *components* report a bad value as they arrive (`docs/research/settings-report.md`) and left the four settings *resources* out: `LightPool`, `FlameLook`, `FlameWind`, `FlameGust`. Their reason was "no single entry point". Bevy has one: a resource's change tick. This note adds the same single line for them. It sets no lighting number and refuses or clamps nothing.
 
-These four are exactly what an editor panel edits live (bevy_emerge configures this crate "from its own panels"), so a field typed as `NaN` or a negative `reach` is the likeliest bad value to reach the crate, and it shows as a dark pool or a flame leaning nowhere with no line in the log.
+These four are exactly what an editor panel edits live (bevy_grimoire configures this crate "from its own panels"), so a field typed as `NaN` or a negative `reach` is the likeliest bad value to reach the crate, and it shows as a dark pool or a flame leaning nowhere with no line in the log.
 
 ## Sources
 

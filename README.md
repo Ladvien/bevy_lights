@@ -3,7 +3,7 @@
 Practical lights for Bevy 0.20: fires that flicker and flare as they kindle, a budgeted pool of real
 lights placed over thousands of virtual ones, and billboard shader flames.
 
-[![CI](https://github.com/Ladvien/bevy_lights/actions/workflows/ci.yml/badge.svg)](https://github.com/Ladvien/bevy_lights/actions/workflows/ci.yml)
+[![CI](https://github.com/bevy-coven/bevy_lights/actions/workflows/ci.yml/badge.svg)](https://github.com/bevy-coven/bevy_lights/actions/workflows/ci.yml)
 
 > ⚠️ **Vibe Coded**
 >
@@ -66,7 +66,7 @@ Everything this README describes is in that release. `main` may be ahead of it (
 
 ```toml
 [dependencies]
-bevy_lights = { git = "https://github.com/Ladvien/bevy_lights", branch = "main" }
+bevy_lights = { git = "https://github.com/bevy-coven/bevy_lights", branch = "main" }
 ```
 
 The crate is pinned to Bevy 0.20; its MSRV is Rust 1.97.1. `serde` is an optional feature: it derives
@@ -368,10 +368,10 @@ This crate owns **practical lights** and nothing else.
 
 | what | whose |
 |---|---|
-| Sun, moon, sky, exposure, weather, the lightning flash | [`bevy_elements`](https://github.com/Ladvien/bevy_elements) (this crate never meters exposure and never adds a `DirectionalLight`) |
-| A gameplay illuminance grid (how lit a tile is, for AI or stealth); feed it a fire with `ground_ramp`, a linear ramp fitted to the two lux circles the grid is read at | [`bevy_light_grid`](https://github.com/Ladvien/bevy_light_grid) |
-| Trees, forest-fire spread | [`bevy_flora`](https://github.com/Ladvien/bevy_flora) |
-| Who lights a lamp, and when | [`bevy_society`](https://github.com/Ladvien/bevy_society) or the game |
+| Sun, moon, sky, exposure, weather, the lightning flash | [`bevy_elements`](https://github.com/bevy-coven/bevy_elements) (this crate never meters exposure and never adds a `DirectionalLight`) |
+| A gameplay illuminance grid (how lit a tile is, for AI or stealth); feed it a fire with `ground_ramp`, a linear ramp fitted to the two lux circles the grid is read at | [`bevy_light_grid`](https://github.com/bevy-coven/bevy_light_grid) |
+| Trees, forest-fire spread | [`bevy_flora`](https://github.com/bevy-coven/bevy_flora) |
+| Who lights a lamp, and when | [`bevy_society`](https://github.com/bevy-coven/bevy_society) or the game |
 | Flicker, kindle, the pool of real lights, the shader flames, the placement helpers | **this crate** |
 
 A pool light is a light in mid-air with no source of its own: a host styles it (recolour it for the

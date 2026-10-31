@@ -17,7 +17,7 @@ When one of these seems necessary, stop and ask. Name the exact command, what it
 
 ## Source of truth
 
-This repository, [`Ladvien/bevy_lights`](https://github.com/Ladvien/bevy_lights), is canonical. MIT OR Apache-2.0. Sanctuary (`/Users/ladvien/sanctuary`) consumes it **by crates.io version**. A fix or a feature lands here first, in its own commit with tests, and is never patched into the game. The ladvien dependencies are crates.io versions, and the family moves together.
+This repository, [`bevy-coven/bevy_lights`](https://github.com/bevy-coven/bevy_lights), is canonical. MIT OR Apache-2.0. Sanctuary (`/Users/ladvien/sanctuary`) consumes it **by crates.io version**. A fix or a feature lands here first, in its own commit with tests, and is never patched into the game. The ladvien dependencies are crates.io versions, and the family moves together.
 
 ## Version pin
 
@@ -117,7 +117,7 @@ is an art decision, so it needs the same treatment as a physics constant.
    (`elements`, `flora`, `society`) that reads the sibling's public resources. It never makes a
    sibling depend on this crate.
 4. **A needed sibling change** lands in the sibling's repo as an issue or PR. For `bevy_elements` that
-   is always an issue (`gh issue create -R Ladvien/bevy_elements`), never a patch.
+   is always an issue (`gh issue create -R bevy-coven/bevy_elements`), never a patch.
 5. **Units.** Intensities are Bevy's: lumens for a point or spot light. Distances are the host's world
    units, and this crate converts nothing. Interop with `bevy_elements`' SI-metre
    `light_intensity`/`display_value` goes through `bevy_elements::ElementsUnits`, in the host.

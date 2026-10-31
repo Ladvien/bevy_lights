@@ -1,6 +1,6 @@
 # Fire kinds: named presets for the numbers a fire is made of
 
-An editor (`bevy_emerge`, family issue F7 / #103) places "fires, torches and braziers", and a game author reaching for `Flicker`, `FlameSite` and the pool's candidate has to choose a fuel-bed `diameter`, a `depth` and a flame `height` for each, with the right answer scattered over four research notes. `FireKind` is those answers by name: a closed list, serialisable, that a picker can show and a game can store in a project file instead of three loose numbers.
+An editor (`bevy_grimoire`, family issue F7 / #103) places "fires, torches and braziers", and a game author reaching for `Flicker`, `FlameSite` and the pool's candidate has to choose a fuel-bed `diameter`, a `depth` and a flame `height` for each, with the right answer scattered over four research notes. `FireKind` is those answers by name: a closed list, serialisable, that a picker can show and a game can store in a project file instead of three loose numbers.
 
 ## Sources
 
