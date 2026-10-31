@@ -58,9 +58,23 @@ What was tried and not done: skipping the brightness write of a flame that is no
 
 - **No culled flame is on screen.** For 40 000 random flames (height 0.04-3 m, catch 0.001-1, lean to the shader's clamp, parents turned any way) and random cameras (any elevation, aimed so the flame lands from the middle of the frame to well outside it), a flame with any of 25 sampled points of its drawn quad inside the frame is never culled by Bevy's own sphere and oriented-box test. Fails with `FLAME_REACH` below 1.64 and with the scale left undivided.
 - **The box keeps its world size through a catch and a lean**: on every frame of a kindle in a 3 m/s wind, the box the frustum test builds is the cube round the drawn flame (y and z exactly; x within the flare's overshoot, never short).
-- **Off-screen flames are nearly free**: with about twenty flames in view, the frame at 20 000 flames costs less than 3.5x the frame at none, and the frame at 5 000 less than 1.6x (it was 12.8x and 4.1x).
-- **Nothing visible changes**: the courtyard's captures at the default, ground, graze and top-down cameras, and at a camera that puts a brazier and a torch on the frame's edge, differ by GPU noise only.
+- **Off-screen flames are cheap**: with about twenty flames in view, `bench_flames` at 5 000 flames costs at most a third of what it did and at 20 000 at most a quarter, and its `visible` count is the flames in view and not the flames in the world.
+- **Nothing visible changes**: the courtyard's captures at the default, ground, graze, top-down, closefire and two seeded cameras, and two sweeps of the camera's aim that carry every fire across both frame edges (one in a 3 m/s gusting wind with every fire put out and re-lit), differ from the old build by GPU noise only.
 - **The bench's other lines** (`bench_lights`) do not move.
+
+### Results (iteration 277)
+
+`bench_flames`, mean ms a frame, best of three alternating runs on a machine at load average 18-50 (so every figure is inflated and the ratios are the finding), base `e693df8` against this change:
+
+| flames | 0 | 1 000 | 5 000 | 20 000 | 5 000, 3 m/s | 20 000, 3 m/s |
+|---|---|---|---|---|---|---|
+| before | 1.3 | 2.2 | 7.8 | 30.0 | 8.0 | 28.1 |
+| after | 1.7 | 1.9 | 2.2 | 6.4 | 3.1 | 5.9 |
+| flames the renderer counted in view, after | 0 | 15 | 15 | 15 | 15 | 15 |
+
+The 0-flame cell is noise (six more runs with the order reversed read 2.4-5.2 for the new build and 2.5-7.4 for the old). A quiet run of the first build against the probe it came from read 2.1, 2.7, 8.6, 27.1 before and 2.3, 2.9, 6.5 after at 0, 5 000 and 20 000. All three targets are met: 3.5x and 4.7x cheaper at 5 000 and 20 000, `visible=15` of 20 000. Pixels: eight static cameras and the two sweeps (94 frames each, 1280 x 720, every third frame from 20) differ by at most 1 DN, with no pixel over 8 DN; the `flicker frame` and `pool total` log lines of five scenes are byte-identical. `bench_lights` (six alternating runs, 5 000 candidates, 2 000 lights, pool 16): `min_us` 315-396 before and 320-405 after, `p50_us` 591-703 and 576-750: the bench has no flame in it and does not move.
+
+What is left at 20 000 flames is about 0.25 µs a flame, all of it in the main world and the visibility pass: `update_flames`' per-flame work (a parent lookup, the flicker's sines, the tilt law when there is wind) and Bevy's sphere and box test over the boxes. Skipping a hidden flame's brightness saved only 0.5 ms of the 4.3 ms and was dropped (above); a memo of the tilt law by diameter changed nothing measurable under a 3 m/s wind (three alternating runs at 5 000 flames: 2.6-3.4 ms without it, 3.0-3.4 with it) and was dropped too.
 
 ## What great looks like
 
