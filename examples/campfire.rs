@@ -27,10 +27,17 @@ const POOL_LUX: f32 = 30.0;
 
 fn main() {
     let (eye, look) = camera_placement(Vec3::new(0.4, 1.6, 6.4), Vec3::new(0.4, 1.0, 0.0));
-    let fire = blackbody_colour(1900.0, 1.0);
+    let fire = blackbody_colour(FIRE_KELVIN, 1.0);
     App::new()
         .add_plugins(DefaultPlugins.set(render_plugin()))
-        .add_plugins((ExampleHarness, FlickerPlugin, FlamePlugin, GpuTiming))
+        .add_plugins((
+            ExampleHarness,
+            FlickerPlugin,
+            LightPoolPlugin::<Viewer>::default(),
+            FlamePlugin,
+            FirePlugin,
+            GpuTiming,
+        ))
         .insert_resource(ClearColor(Color::srgb(0.010, 0.014, 0.034)))
         .insert_resource(FlameLook {
             color: LinearRgba::rgb(fire[0], fire[1], fire[2]),
@@ -39,6 +46,18 @@ fn main() {
         })
         .insert_resource(FlameWind { velocity: wind_env().unwrap_or_default() })
         .insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 0.0, ..default() })
+        // The pool's two lights: every fire is handed one, in the colour a `Fire` gives its light (a 1900 K blackbody, `FIRE_KELVIN`), so
+        // the template only needs a reach that holds the bonfire's pool (a point light's range cuts it off well past where it is dark).
+        .insert_resource(LightPool {
+            size: 2,
+            reach: 100.0,
+            light: PointLight {
+                range: FireKind::Bonfire.reach() * 3.0,
+                shadow_maps_enabled: false,
+                ..default()
+            },
+            ..default()
+        })
         .insert_resource(View(eye, look))
         .add_systems(Startup, spawn)
         .add_systems(Update, snuff_both)
@@ -75,9 +94,9 @@ fn bed_for(kind: FireKind) -> Option<FuelBed> {
     kind.bed().map(|bed| FuelBed { cooling: cooling.unwrap_or(bed.cooling), ..bed })
 }
 
-/// Every fire's light, so `snuff_both` can put them out.
+/// What the pool measures from: the camera's place.
 #[derive(Component)]
-struct Fire;
+struct Viewer;
 
 fn spawn(
     mut commands: Commands,
@@ -110,10 +129,8 @@ fn spawn(
         perceptual_roughness: 0.85,
         ..default()
     });
-    let colour = {
-        let [r, g, b] = blackbody_colour(1900.0, 1.0);
-        Color::from(LinearRgba::rgb(r, g, b))
-    };
+    // The pool measures from where the camera starts: both fires are inside its reach.
+    commands.spawn((Viewer, Transform::from_translation(view.0)));
     for (kind, at) in [(FireKind::Campfire, CAMPFIRE), (FireKind::Bonfire, BONFIRE)] {
         let bed = kind.diameter();
         // The stones round the bed (a campfire's ring; a bonfire's pyre has the logs).
@@ -147,38 +164,25 @@ fn spawn(
                 ),
             ));
         }
-        // The light: one fire, a light at the middle of the flame, sized to its pool, and the flame that is its fire.
-        let light = commands
-            .spawn((
-                Name::new("Fire light"),
-                Fire,
-                PointLight {
-                    intensity: kind.lumens(POOL_LUX, kind.height() * 0.5),
-                    range: kind.reach() * 3.0,
-                    color: colour,
-                    shadow_maps_enabled: false,
-                    ..default()
-                },
-                kind.flicker(kind.lumens(POOL_LUX, kind.height() * 0.5)),
-                Transform::from_translation(at + Vec3::Y * kind.height() * 0.5),
-            ))
-            .id();
-        let mut site = commands.spawn((
-            Name::new("Flame site"),
-            FlameSite { fire: Some(light), ..kind.site() },
+        // One component is the whole fire: the flame, the light the pool hands it, and the kind's sparks and smoke. What is spawned beside it
+        // wins, so the tongues and the bed, which the environment may change (`LIGHTS_TONGUES`, `LIGHTS_COOLING`), are this example's own. Both fires
+        // start at phase 0 so a capture is comparable with the builds that wrote their lights by hand.
+        let (tongues, bed) = (tongues_for(kind), bed_for(kind));
+        let mut fire = commands.spawn((
+            Name::new("Fire"),
+            Fire {
+                phase: Some(0.0),
+                tongues: tongues.is_some(),
+                bed: bed.is_some(),
+                ..Fire::lit(kind, POOL_LUX, kind.height() * 0.5)
+            },
             Transform::from_translation(at),
         ));
-        if let Some(embers) = kind.embers() {
-            site.insert(embers);
+        if let Some(tongues) = tongues {
+            fire.insert(tongues);
         }
-        if let Some(smoke) = kind.smoke() {
-            site.insert(smoke);
-        }
-        if let Some(bed) = bed_for(kind) {
-            site.insert(bed);
-        }
-        if let Some(tongues) = tongues_for(kind) {
-            site.insert(tongues);
+        if let Some(bed) = bed {
+            fire.insert(bed);
         }
     }
 }
