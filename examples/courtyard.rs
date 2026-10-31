@@ -617,8 +617,8 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
 /// 1.7 times as far from the courtyard's middle, looking in at the stone about the focus.
 fn follow_viewers(
     windows: Query<&Window, With<PrimaryWindow>>,
-    foci: Query<(&Viewer, &Transform), (With<Focus>, Without<ViewerCamera>)>,
-    mut cameras: Query<(&ViewerCamera, &mut Camera, &mut Transform), Without<Focus>>,
+    foci: Query<(&Viewer, &Transform), Without<ViewerCamera>>,
+    mut cameras: Query<(&ViewerCamera, &mut Camera, &mut Transform), Without<Viewer>>,
 ) {
     let Ok(window) = windows.single() else { return };
     let size = window.physical_size();
