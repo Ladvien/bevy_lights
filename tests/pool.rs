@@ -1343,6 +1343,51 @@ fn a_pooled_fire_that_is_snuffed_dims_its_light_to_nothing_and_frees_the_slot() 
     assert_eq!(app.world().resource::<Heard>().out, 1);
 }
 
+/// A scene saved with its torches out loads each with a finished `Snuff`: a town at dawn is thousands of them,
+/// and the pool meets every one every frame. A finished `Snuff` is a fire that is out, so it holds no light and
+/// is not announced again; one still in progress holds a dimmed light; and a fire that was never snuffed holds a
+/// full one.
+#[test]
+fn fires_loaded_already_out_hold_no_light_and_one_loaded_mid_snuff_holds_a_dim_one() {
+    let mut app = app(LightPool { size: 3, reserve: 0, reach: 30.0, gain: 1.0, ..default() });
+    listen(&mut app);
+    focus_at(&mut app, Vec3::ZERO);
+    let out: Vec<Entity> = (1..=4)
+        .map(|near| {
+            let fire = candidate(&mut app, Vec3::new(near as f32, 0.0, 0.0), 1000.0);
+            app.world_mut().entity_mut(fire).insert(Snuff { elapsed: SNUFF_SECONDS });
+            fire
+        })
+        .collect();
+    let dying = candidate(&mut app, Vec3::new(6.0, 0.0, 0.0), 1000.0);
+    app.world_mut().entity_mut(dying).insert(Snuff { elapsed: SNUFF_SECONDS / 2.0 });
+    let burning = candidate(&mut app, Vec3::new(9.0, 0.0, 0.0), 1000.0);
+    settle(&mut app);
+
+    let budget = app.world().resource::<PoolBudget>();
+    let holders: Vec<Option<Entity>> = (0..3).map(|slot| budget.holder_of(slot)).collect();
+    assert!(
+        holders.iter().flatten().all(|held| !out.contains(held)),
+        "a fire that is out holds a light: {holders:?}"
+    );
+    assert!(holders.contains(&Some(dying)) && holders.contains(&Some(burning)), "{holders:?}");
+    assert_eq!(holders.iter().flatten().count(), 2, "the third light has nobody to light: {holders:?}");
+    assert_eq!(budget.wanting, 2, "four fires that are out want nothing");
+
+    let base_of = |app: &mut App, fire: Entity| {
+        let slot = (0..3).find(|slot| app.world().resource::<PoolBudget>().holder_of(*slot) == Some(fire));
+        slot.map(|slot| assigned(app, 3)[slot].3)
+    };
+    let burning_base = base_of(&mut app, burning);
+    let dying_base = base_of(&mut app, dying);
+    assert_eq!(burning_base, Some(1000.0), "a fire that was never snuffed is at full");
+    assert!(
+        dying_base.is_some_and(|base| 0.0 < base && base < 1000.0),
+        "a fire loaded half way out is dim, not out and not full: {dying_base:?}"
+    );
+    assert_eq!(app.world().resource::<Heard>().out, 0, "a fire loaded out is not announced");
+}
+
 #[test]
 fn a_pooled_fire_that_is_kindled_lends_a_light_that_flares_up_and_is_heard_once() {
     let mut app = app(LightPool { size: 1, reserve: 0, reach: 30.0, gain: 1.0, ..default() });

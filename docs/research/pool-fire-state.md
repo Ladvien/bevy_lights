@@ -73,3 +73,89 @@ None to a default.
 ## Pending index
 
 None.
+
+## Iteration 276's findings (issue #11)
+
+### Sources
+
+| source | what it is | use |
+|---|---|---|
+| `10.26503_dl.v2005i1.147` — *Shadowplay: simulated illumination in game worlds* (the Silent Hill 2 analysis) | craft: lighting as a scripted time of day | a scene whose practicals are mostly out is a *designed* state, not an edge case |
+| `s2020-advances-pdf-slides` — SIGGRAPH 2020 *Advances*, id Tech 7 (Doom Eternal) | shipping production: why a CPU-side light scan became the bill | the per-light cost a host's artists can multiply is the cost that matters |
+| `book_real_time_rendering_4th_akenine`, ch. 20 (*Efficient Shading*), the light-culling summary | technical: a culling step that is paid whether or not it helps | a per-candidate step must cost no more in the quiet state than in the busy one |
+| `bevy_ecs-0.20.0/src/query/fetch.rs:3249-3264` (`Option<T>` `set_archetype` / `set_table`) | the engine: an optional column is matched once per table | the cost of reading `Option<&Snuff>` on a candidate that has none |
+
+### Craft principle
+
+> "A grey dawn permeates the final stage of the game at the Lake Side hotel; thus "Silent Hill 2" is played out over one day."
+> (`10.26503_dl.v2005i1.147`)
+
+A designer scripts the hours of a scene, and the hour a torch is put out is the one the player reads as *morning*. The crate
+gives a host exactly that move (`Snuff` on a pooled candidate) and keeps the fire out until the host removes it, so a town
+at dawn, or a saved scene whose torches were put out, holds thousands of candidates that each carry a finished `Snuff`.
+That is the state the pool meets most often in a day-night game, and the one where nothing is lit: it must cost no more than
+the night did.
+
+### How shipping games do it
+
+> "Used Clustered Binning in Doom [Olson12]" / "Wanted to move to GPU culling to reduce CPU load" / "Artists wanted to place
+> more lights and decals" (`s2020-advances-pdf-slides`, id Tech 7)
+
+Artists raise the light count until the CPU-side scan over them is the bill, and the studio's answer was to make the
+per-light step a constant, not to ask for fewer lights. This crate's scan is the CPU one: `assign_pool` visits every
+candidate (5000 in the bench, "5000 entries a frame" in `src/pool.rs`), so a step that is O(fires out) *per candidate* is
+the quadratic the studio would have had to remove.
+
+### Technical
+
+> "Just as frustum culling will cost additional time with no benefit if all objects are always in view, so will some
+> techniques provide little benefit under various conditions." (RTR4, ch. 20)
+
+The same holds for a reject test: it must be the cheap half of the filter. `assign_pool` collected every candidate whose
+`Snuff` had finished into a `Vec<Entity>` and ran `Vec::contains` on it for **every** candidate, before the reach filter. That
+is N·|out| entity comparisons a frame: with all 5000 out, N(N+1)/2 = 12.5 million.
+
+**Measured** on big (load average 51, so compare ratios): the bench at 5000 candidates, 2000 lights, pool 16, three
+interleaved rounds of the unfixed code with the new `BENCH_SNUFFED` switch. `pool_p50_us`: 426 / 1448 / 435 µs with no fire
+out; 5051 / 4465 / 4832 µs with 2500 out; 11338 / 7685 / 6771 µs with all 5000 out. Whole frame `min_us`: 430 / 407 / 430 µs
+against 5590 / 5652 / 5586 µs, 13 times. The pool's own frame is the 0.5 ms the notes budget; a dawn made it 5 to 11 ms.
+
+### Model adopted
+
+The candidate scan reads the fire's state where it reads the candidate: `CandidateRead` gains `Option<&'static Snuff>`, and the
+filter drops a candidate whose `Snuff` has `elapsed >= SNUFF_SECONDS`. The `snuffs` query and the `out: Vec<Entity>` go. The
+semantics are unchanged (a candidate with a `Snuff` in progress keeps its slot, rank still uses the plain `intensity`, a
+finished one wants nothing); only the lookup changes, from a search over a list to a read of the row being visited.
+
+Why not `fires.get(entity)` (the issue's other suggestion): it is a random access per candidate (an entity-location lookup,
+then the table row), 5000 of them a frame for the sake of the rare fire that is out. `Option<&Snuff>` is decided once per
+*table* (`set_table` sets `matches`, `fetch` returns `None` for a row of a table without the column), so a world with no
+`Snuff` anywhere pays one boolean per row and one with every fire out pays one pointer read.
+
+### Measured after
+
+Same machine and load, `bench_before` (b2d38f3 plus the switch) and `bench_after` (the fix) run interleaved. `BENCH_SNUFFED=5000`:
+`pool_p50_us` 6088 / 6712 / 10604 / 6249 µs before, 233 / 216 / 216 / 222 µs after; whole frame `min_us` 5589 / 5586 / 5577 / 5594 µs
+before, 251 / 274 / 268 / 273 µs after. `BENCH_SNUFFED=0`, twelve interleaved runs: `pool_p50_us` best 417 / median 464 µs before,
+419 / 451 µs after; `min_us` best 416 / median 432 µs before, 410 / 432 µs after. The all-out frame is cheaper than the lit one (0.22 ms
+against 0.42 ms) because there is nothing in reach to sort, so the issue's 1.25x acceptance holds with room. The courtyard, captured at
+1280x720 over eight scenes (four with every brazier snuffed from 3 s), differs by at most 1 DN in at most 3 pixels, and its pool-total
+log through the snuff (`flicker frame 180` to `240`, 1062148 to 112412 lm) is identical to the last digit before and after.
+
+### Validation targets
+
+- `BENCH_SNUFFED=5000` `pool_p50_us` within 1.25x of `BENCH_SNUFFED=0` (the issue's acceptance), same machine, interleaved.
+- `BENCH_SNUFFED=0` unchanged from the unfixed binary, within the noise of the same interleaving.
+- `a_pooled_fire_that_is_snuffed_dims_its_light_to_nothing_and_frees_the_slot` passes unchanged; a fire loaded already out
+  never holds a light and is not announced.
+
+### Deviations
+
+The target above under *Validation targets* ("no new column on the candidate scan") is kept in its intent and not its letter:
+the column is new, and it is the table-level `Option` that makes it free for a host that never uses `Snuff` (the first
+bullet of this section's targets measures that). No default changes.
+
+### Pending index
+
+None. Home-still was up (distill on Cuda, scribe on both hosts) on 2026-10-30; the four sources were read from the local
+corpus and the vendored Bevy source.

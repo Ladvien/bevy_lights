@@ -136,7 +136,7 @@ while the light flares (a tongue at 45, full height by 49).
 system sets, because a total tells you a change cost something and not *what*:
 
 ```text
-bench_lights candidates=5000 lights=2000 pool=16 frames=600 mean_us=… p50_us=… min_us=… max_us=…
+bench_lights candidates=5000 lights=2000 pool=16 snuffed=0 frames=600 mean_us=… p50_us=… min_us=… max_us=…
 bench_lights_systems flicker_p50_us=170 pool_p50_us=306
 ```
 
@@ -147,6 +147,10 @@ no intensity — because a per-system line from a switch that does nothing would
 
 At 5 000 candidates and 2 000 lights the split is roughly **170 µs flicker, 310 µs pool**: the pool is the
 expensive half, which is what a change to the pool's sort should move.
+
+`BENCH_SNUFFED=<n>` puts the first `n` candidates out, each with a finished `Snuff`: the pool at dawn, or a saved scene
+whose torches were put out. Run it at 0 and at `BENCH_CANDIDATES` alternately; the two `pool_p50_us` should agree
+(the pool must meet a fire that is out at no more than the cost of a lit one).
 
 ## The bench, and the host
 

@@ -6,12 +6,14 @@
 //! a fixed 1/60 s step, and prints one line:
 //!
 //! ```text
-//! bench_lights candidates=5000 lights=2000 pool=16 frames=600 mean_us=… p50_us=… min_us=… max_us=…
+//! bench_lights candidates=5000 lights=2000 pool=16 snuffed=0 frames=600 mean_us=… p50_us=… min_us=… max_us=…
 //! ```
 //!
-//! `BENCH_CANDIDATES` (default 5000) and `BENCH_LIGHTS` (default 2000) set the scale. Every number is
-//! one frame's `App::update()`, so it includes the ECS's own scheduling: compare a run with a change
-//! against a run without, on the same machine and the same load, never against another host.
+//! `BENCH_CANDIDATES` (default 5000) and `BENCH_LIGHTS` (default 2000) set the scale, and `BENCH_SNUFFED`
+//! (default 0) puts that many of the candidates out, each with a finished [`Snuff`] — a town at dawn, a saved
+//! scene whose torches were put out — which a pool must meet every frame at no more than the cost of lit ones.
+//! Every number is one frame's `App::update()`, so it includes the ECS's own scheduling: compare a run with a
+//! change against a run without, on the same machine and the same load, never against another host.
 //!
 //! **It also measures each system alone.** A total tells you a change cost something; it does not tell you
 //! *what*. So after the timed run the two hot systems are timed in isolation — `flicker_lights` over the
@@ -42,6 +44,9 @@ fn main() {
     let lights = env_usize("BENCH_LIGHTS", 2_000);
     let frames: usize = env_usize("BENCH_FRAMES", 600);
     let pool_size: usize = env_usize("BENCH_POOL", 16);
+    // How many of the candidates are fires that are out: a town at dawn, a saved scene whose torches were put out.
+    // Each keeps its `Snuff` for as long as the host leaves it out, so the pool meets them every frame.
+    let snuffed = env_usize("BENCH_SNUFFED", 0).min(candidates);
 
     let mut app = App::new();
     app.add_plugins(MinimalPlugins)
@@ -67,10 +72,13 @@ fn main() {
     for index in 0..candidates {
         let x = (index as i32 % side) as f32;
         let z = (index as i32 / side) as f32;
-        app.world_mut().spawn((
+        let mut candidate = app.world_mut().spawn((
             PoolCandidate { offset: Vec3::Y * 1.8, intensity: 8_000.0, ..default() },
             Transform::from_xyz(x, 0.0, z),
         ));
+        if index < snuffed {
+            candidate.insert(Snuff { elapsed: SNUFF_SECONDS });
+        }
     }
     // The lights the flicker drives: not candidates, so the two systems' costs are separable.
     for index in 0..lights {
@@ -102,7 +110,7 @@ fn main() {
     let max = sorted.last().copied().unwrap_or(0);
     let pool = app.world().resource::<LightPool>().size;
     println!(
-        "bench_lights candidates={candidates} lights={lights} pool={pool} frames={} mean_us={mean} p50_us={p50} min_us={min} max_us={max}",
+        "bench_lights candidates={candidates} lights={lights} pool={pool} snuffed={snuffed} frames={} mean_us={mean} p50_us={p50} min_us={min} max_us={max}",
         samples.len()
     );
     per_system(&mut app, frames.min(300));

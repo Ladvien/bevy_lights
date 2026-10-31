@@ -34,7 +34,8 @@ then re-lit (`Kindle`), and each flame grows out of its coals as its light flare
 - **Flickering, kindling fires** (`FlickerPlugin`): a point or spot light modulated below its base by a
   summed sine, at a rate its fuel bed sets and a depth the host chooses, plus a `Kindle` that flares a
   fire up over 0.6 s and a `Kindled` message for the sound of it, and a `Snuff` that puts one out over 1.2 s
-  (light and linked flame together) with a `Snuffed` message for the hiss; both work on a pooled torch too, via its `PoolCandidate`.
+  (light and linked flame together) with a `Snuffed` message for the hiss; both work on a pooled torch too, via its `PoolCandidate`,
+  and a pooled fire that stays out costs the pool less than one that is lit, however many there are.
 - **A budgeted pool of real lights** (`LightPoolPlugin::<YourFocusMarker>`): a fixed number of real
   point lights handed to the best-ranked candidates around the one entity carrying your focus marker,
   with hysteresis, a cross-fade and a per-frame hand-off budget, so a light that changes owner does not
