@@ -4,6 +4,10 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-31
+
+API break (`cargo semver-checks` against 0.3.1: 201 of 202 checks pass; `constructible_struct_adds_field` fails for `FlameSite.color`, `LightPool.focus` and `PoolCandidate.color`): a host that builds one of those three naming every field adds the new one (`color: None`, `focus: FocusRule::One`); a host that spreads `..default()` or `..FireKind::Torch.site()` is unaffected. Carries a fire's own colour, the pool for more than one viewer, the come-into-view flash fix, the pop fix for a light handed on mid-fade-in and the ember culling.
+
 ### Added
 
 - **`FlameSite::color: Option<Color>` and `PoolCandidate::color: Option<Color>`: a fire of its own colour.** Every flame was the scene's one colour (`FlameLook::color`), its sparks a fixed orange, and every pooled light the template's, so a blue gas lantern, a green witch-fire or a violet shrine brazier among orange torches could not be drawn with its flame and its light one colour. `FlameSite::color` is the middle of that flame's ramp and the rest is the same flame in that hue: a rim darker and more saturated, a core paler, the catch's colour and the sparks' three colours too. `PoolCandidate::color` is the colour of the light the pool hands the prop: the light takes it on the frame it changes owner (it is fading in from nothing then), the light fading out keeps its owner's, and a candidate with none gets back the colour the light had (the template's, or a host's palette). `None` on both is exactly what was drawn before, to the pixel. Every distinct colour is one more material, shared by its flames and released with the last of them (`docs/research/fire-colour.md`).

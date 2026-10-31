@@ -52,11 +52,11 @@ then re-lit (`Kindle`), and each flame grows out of its coals as its light flare
 
 ## Install
 
-`0.3` is on crates.io:
+`0.4` is on crates.io:
 
 ```toml
 [dependencies]
-bevy_lights = "0.3"
+bevy_lights = "0.4"
 ```
 
 Everything this README describes is in that release. `main` may be ahead of it (`CHANGELOG.md`'s
