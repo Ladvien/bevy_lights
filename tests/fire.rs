@@ -60,7 +60,11 @@ fn a_fire_of_each_kind_becomes_the_parts_its_kind_names_on_the_frame_it_arrives(
             (want.offset, want.diameter, want.depth, want.intensity),
             "{kind}: the light stands in the flame, at the kind's own rate, depth and brightness"
         );
-        assert_eq!(candidate.phase, Some(site.phase), "{kind}: the flame and its light breathe from one clock");
+        assert_eq!(
+            candidate.phase,
+            Some(site.phase),
+            "{kind}: the flame and its light breathe from one clock"
+        );
         assert_eq!(
             [
                 has::<FlameEmbers>(&app, fire),
@@ -115,7 +119,10 @@ fn a_changed_fire_writes_every_part_again_and_removes_what_it_no_longer_names() 
     app.world_mut().get_mut::<Fire>(fire).unwrap().kind = FireKind::Lantern;
     app.update();
     let site = get::<FlameSite>(&app, fire);
-    assert_eq!((site.height, site.diameter), (FireKind::Lantern.height(), Some(FireKind::Lantern.diameter())));
+    assert_eq!(
+        (site.height, site.diameter),
+        (FireKind::Lantern.height(), Some(FireKind::Lantern.diameter()))
+    );
     assert_eq!(get::<PoolCandidate>(&app, fire).diameter, Some(FireKind::Lantern.diameter()));
     for left_behind in
         [has::<FlameTongues>(&app, fire), has::<FuelBed>(&app, fire), has::<FlameEmbers>(&app, fire)]
@@ -143,15 +150,23 @@ fn what_a_host_edits_on_a_part_stands_until_the_fire_changes() {
     assert_eq!(get::<FlameSite>(&app, fire).depth, 0.4, "nothing rewrote it");
     app.world_mut().get_mut::<Fire>(fire).unwrap().lumens = Some(9_000.0);
     app.update();
-    assert_eq!(get::<FlameSite>(&app, fire).depth, FireKind::Torch.depth(), "the fire changed, so the preset is written again");
-    assert!((get::<PoolCandidate>(&app, fire).intensity * flicker_mean(FireKind::Torch.depth()) - 9_000.0).abs() < 1.0);
+    assert_eq!(
+        get::<FlameSite>(&app, fire).depth,
+        FireKind::Torch.depth(),
+        "the fire changed, so the preset is written again"
+    );
+    assert!(
+        (get::<PoolCandidate>(&app, fire).intensity * flicker_mean(FireKind::Torch.depth()) - 9_000.0).abs()
+            < 1.0
+    );
 }
 
 #[test]
 fn fires_placed_alike_do_not_breathe_together_and_a_phase_given_is_kept() {
     let mut app = app();
-    let fires: Vec<Entity> =
-        (0..20).map(|_| app.world_mut().spawn((Fire::new(FireKind::Torch), Transform::default())).id()).collect();
+    let fires: Vec<Entity> = (0..20)
+        .map(|_| app.world_mut().spawn((Fire::new(FireKind::Torch), Transform::default())).id())
+        .collect();
     let pinned = app
         .world_mut()
         .spawn((Fire { phase: Some(1.25), ..Fire::new(FireKind::Torch) }, Transform::default()))
