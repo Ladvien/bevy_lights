@@ -66,13 +66,12 @@ pub struct FlameTongue {
     pub lean: Vec2,
 }
 
-/// What a site's extra tongues were last built from, so a frame in which nothing changed does nothing.
-#[derive(Component, Clone, Copy, PartialEq)]
+/// What a site's extra tongues were last built from (the count the layout can honour, and the bits of the spread, so a `NaN` equals itself),
+/// so a frame in which nothing changed does nothing.
+#[derive(Component, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Tongued {
     count: u8,
-    spread: f32,
-    height: f32,
-    phase: f32,
+    spread: u32,
 }
 
 /// A site whose tongues [`dress_tongues`] keeps: itself, its settings, what its extras were built from and its children.
@@ -80,7 +79,8 @@ type TonguedSite =
     (Entity, &'static FlameSite, &'static FlameTongues, Option<&'static Tongued>, Option<&'static Children>);
 
 /// Keeps every [`FlameTongues`] site's extra tongues in step with the component: builds them when a site has been dressed, rebuilds them
-/// when the count, the spread or the site's height or phase changes, and takes them away when the component is removed.
+/// when the count or the spread changes, and takes them away when the component is removed. A spread that is not a positive number has
+/// no bed to stand on, so the fire is its middle flame alone.
 ///
 /// The extras are spawned through `queue_silenced`, like the site's own flame: a site despawned in the frame it was dressed must not
 /// panic. A new tongue starts with the middle flame's catch clock, so a fire still catching has its tongues catch together and a fire that
@@ -110,8 +110,12 @@ pub(crate) fn dress_tongues(
     }
     let t = time.elapsed_secs();
     for (entity, site, wanted, built, kids) in &sites {
-        let count = wanted.count.clamp(1, MAX_TONGUES);
-        let now = Tongued { count, spread: wanted.spread, height: site.height, phase: site.phase };
+        let count = if wanted.spread.is_finite() && wanted.spread > 0.0 {
+            wanted.count.clamp(1, MAX_TONGUES)
+        } else {
+            1
+        };
+        let now = Tongued { count, spread: wanted.spread.to_bits() };
         if built == Some(&now) {
             continue;
         }
@@ -286,6 +290,25 @@ mod tests {
             first,
             "the same entities"
         );
+    }
+
+    #[test]
+    fn a_spread_that_is_not_a_number_is_the_middle_flame_alone_and_is_not_rebuilt_every_frame() {
+        let mut app = tongue_app();
+        let at = app.world_mut().spawn((site(0.7, 0.4), FlameTongues { count: 5, spread: f32::NAN })).id();
+        for _ in 0..3 {
+            app.update();
+        }
+        let flames = flames_of(&mut app, at);
+        assert_eq!(flames.len(), 1, "no bed, no tongues");
+        // Mending the setting grows the tongues, and from then on nothing churns.
+        app.world_mut().entity_mut(at).get_mut::<FlameTongues>().unwrap().spread = 0.5;
+        app.update();
+        app.update();
+        let grown: Vec<Entity> = flames_of(&mut app, at).iter().map(|f| f.0).collect();
+        assert_eq!(grown.len(), 5);
+        app.update();
+        assert_eq!(flames_of(&mut app, at).iter().map(|f| f.0).collect::<Vec<_>>(), grown);
     }
 
     #[test]
