@@ -30,6 +30,9 @@ plainly that it is a design default.
   fade, so a light that changes owner does not pop.
 - [`pool-template.md`](pool-template.md) — every setting of the pool's template on every pool light,
   live and saved; Bevy's soft-shadow and contact-shadow levers, measured.
+- [`pool-foci.md`](pool-foci.md) — the pool for more than one viewer: a shared budget with one focus per
+  viewer, why a plain nearest-focus distance starves the sparse viewer, and the light a moving camera
+  turns to.
 - [`corpus.md`](corpus.md) — what the home-still library actually holds for cinematography,
   photography, CG and animation lighting, game-lighting craft, many-light rendering, fire physics and
   perception, with the stems to read and the gaps to fill.
