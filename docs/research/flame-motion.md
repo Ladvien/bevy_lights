@@ -56,6 +56,8 @@ A torch-bearer crossing the courtyard: the flame streams behind the walker at an
 - Capture: the courtyard against the build before, at the same seeds and views: a bearer at the same place and phase at the same frame has a flame leaning behind its heading, a bearer at rest and the braziers are zero pixels different. A frame sequence of one bearer starting and stopping (an example switch) shows the lean building and settling, not snapping.
 - Cost (`bench_flames`, 5 000 torches): a fire at rest costs the tracker no more than about 0.02 µs a frame; a moving one a tilt law's two `powf`s.
 
+**Measured** (iteration 286, `docs/DEMOS.md`, "Seeing a fire that moves"): a torch carried at 1.4 m/s has its flame's bright axis 57° and 50° from vertical in two frames (the law: 54.7°), 20° a third of a second after it stops (the filter leaves 0.15 m/s, which the law lays over 22°) and under 10° from half a second on; the courtyard with `FlameMotion { gain: 0.0 }` is zero pixels different from the build before in eight views; the braziers, which stand still, are unchanged with the default gain; 141 consecutive frames of a moving pool differ from their neighbours' average by at most 0.20 DN (0.19 before), so the light that follows the lean pops no more than it did; the tracker costs a fire at rest about 0.02 µs a frame and the lean of a walking one about 0.06 µs.
+
 ## Deviations
 
 - The lean is horizontal: the flame is a billboard whose lean channel is on the ground plane, as for a wind.
