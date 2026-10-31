@@ -64,7 +64,7 @@ What was tried and not done: skipping the brightness write of a flame that is no
 
 ### Results (iteration 277)
 
-`bench_flames`, mean ms a frame, best of three alternating runs on a machine at load average 18-50 (so every figure is inflated and the ratios are the finding), base `e693df8` against this change:
+`bench_flames`, mean ms a frame, best of three alternating runs on a machine at load average 18-39 (so every figure is inflated and the ratios are the finding), base `e693df8` against this change:
 
 | flames | 0 | 1 000 | 5 000 | 20 000 | 5 000, 3 m/s | 20 000, 3 m/s |
 |---|---|---|---|---|---|---|
