@@ -108,3 +108,5 @@ Design default, as `carried-fire.md`'s: `FireKind::candidate`'s `offset` changes
 Heskestad's paper is not in the corpus (searched 2026-10-29: distill returns nothing on flame height correlations); cited from its publisher's open PDF via a secondary restatement. `paper_search` for it is a candidate for a later pass.
 
 Iteration 274: `distill_search` for a flame's point-source placement failed at 17:30 CDT with `gpu busy: 4648 MB free < 5000 MB required to load bge-m3` (a vLLM engine held 14.6 GB); the three sources above come from the local corpus (`~/.cache/bevy_lights_corpus/markdown`) and were quoted from the files, not from the index. Nothing new to index.
+
+Iteration 285: `FireKind::fire`, named in the issue #9 record above (a `(FlameSite, PoolCandidate)` pair), was removed for [`Fire`](fire-component.md), the component that writes those two parts and the kind's sparks, smoke, tongues and bed. The test that spawned it (`a_fire_kinds_pooled_light_stands_in_its_flame_and_leans_with_it`) spawns `kind.site()` and `kind.candidate(..)`, the same two parts.
