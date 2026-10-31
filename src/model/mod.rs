@@ -10,6 +10,7 @@ pub mod char;
 pub mod cinematography;
 pub mod fire;
 pub mod fire_colour;
+pub mod motion;
 pub mod pool;
 pub mod problem;
 pub mod reach;
@@ -35,6 +36,7 @@ pub use fire::{
     flicker_swing, kindle_gain, snuff_gain,
 };
 pub use fire_colour::{FIRE_KELVIN, flame_mid, retint};
+pub use motion::{MAX_TRACKED_SPEED, MIN_TRACKED_SPEED, MOTION_RESPONSE, relative_air, smooth_velocity};
 pub use pool::{
     FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, focus_quota, hand_off, preferred, quota_cutoff,
     shadow_set, shared_value,

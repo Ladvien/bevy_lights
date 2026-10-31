@@ -26,7 +26,8 @@ use crate::flicker::{Flicker, Kindle, Snuff};
 use crate::model::fire_colour::{CORE_YELLOW, EDGE_RED, EMBER_RED};
 use crate::model::{
     DEFAULT_FIRE_DIAMETER, FLAME_TILT_LIMIT, FLICKER_DEPTH, KINDLE_SECONDS, flame_cull_extents, flame_tilt,
-    flicker_swing, kindle_gain, pack_flame_tag, retint, set_flame_brightness, snuff_gain, unpack_flame_tag,
+    flicker_swing, kindle_gain, pack_flame_tag, relative_air, retint, set_flame_brightness, snuff_gain,
+    unpack_flame_tag,
 };
 use crate::pool::PoolCandidate;
 
@@ -50,6 +51,10 @@ impl Plugin for FlamePlugin {
         app.add_plugins(MaterialPlugin::<FlameMaterial>::default())
             .init_resource::<FlameLook>()
             .init_resource::<FlameAssets>()
+            .init_resource::<crate::FlameMotion>()
+            .init_resource::<crate::motion::MovingSites>()
+            .register_type::<crate::FlameMotion>()
+            .register_type::<crate::FlameVelocity>()
             .register_type::<FlameLook>()
             .register_type::<FlameWind>()
             .register_type::<FlameGust>()
@@ -76,6 +81,7 @@ impl Plugin for FlamePlugin {
                     .chain()
                     .in_set(LightsSystems::Flame),
             )
+            .add_systems(Update, crate::motion::track_flame_velocity.before(LightsSystems::Pool))
             .add_systems(Startup, build_flame_assets);
         crate::report::watch::<FlameSite>(app);
         crate::report::watch::<crate::FlameEmbers>(app);
@@ -84,6 +90,7 @@ impl Plugin for FlamePlugin {
         crate::report::watch::<crate::FuelBed>(app);
         crate::report::watch_resource::<FlameLook>(app);
         crate::report::watch_resource::<FlameWind>(app);
+        crate::report::watch_resource::<crate::FlameMotion>(app);
         crate::report::watch_resource::<FlameGust>(app);
     }
 }
@@ -171,7 +178,7 @@ impl Material for FlameMaterial {
 // visible entity has no visibility of its own.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[require(Visibility)]
+#[require(Visibility, crate::FlameVelocity)]
 #[reflect(Component)]
 pub struct FlameSite {
     /// How tall the flame is, in world units.
@@ -808,14 +815,15 @@ pub(crate) fn update_flames(
     let dt = real.delta_secs();
     let t = time.elapsed_secs();
     // The wind this frame: speed and the unit direction it blows towards, on the ground plane.
-    let wind = sites.wind.as_deref().map_or((0.0, Vec2::ZERO), |w| {
-        let speed = w.velocity.length();
-        (speed, if speed > 0.0 && speed.is_finite() { w.velocity / speed } else { Vec2::ZERO })
-    });
+    let wind = sites.wind.as_deref().map_or((0.0, Vec2::ZERO), |w| air_of(w.velocity));
+    let gain = sites.motion.as_deref().map_or(1.0, |m| m.gain);
     let max_height = assets.max_height;
     for (mut flame, mut transform, mut bound, mut tag, mut material, parent, tongue) in &mut flames {
         let height = unpack_flame_tag(tag.value, max_height).1;
-        let (site, owner) = sites.sites.get(parent.parent()).map_or((None, None), |(s, o)| (Some(s), o));
+        let (site, travel, owner) = sites
+            .sites
+            .get(parent.parent())
+            .map_or((None, Vec2::ZERO, None), |(s, v, o)| (Some(s), v.ground, o));
         let source = owner.map(ChildOf::parent).filter(|owner| !sites.sites.contains(*owner));
         if flame.source != source {
             flame.source = source;
@@ -832,8 +840,14 @@ pub(crate) fn update_flames(
             // that flame. The byte holds 1/255 of the swing, so at 60 fps a 2.6 Hz fire skips some
             // frames; a fire that never changes costs nothing at all.
             let (diameter, depth, phase) = sites.fire_of(site);
-            if wind.0 > 0.0 && wind.0.is_finite() {
-                lean = wind.1 * flame_tilt(wind.0, diameter.unwrap_or(DEFAULT_FIRE_DIAMETER)).sin();
+            // The air this fire meets: the wind, less its own velocity when it is moving. A fire at rest takes the frame's wind as it was.
+            let air = if travel == Vec2::ZERO {
+                wind
+            } else {
+                air_of(Vec2::from(relative_air(sites.wind_velocity().to_array(), travel.to_array(), gain)))
+            };
+            if air.0 > 0.0 && air.0.is_finite() {
+                lean = air.1 * flame_tilt(air.0, diameter.unwrap_or(DEFAULT_FIRE_DIAMETER)).sin();
             }
             let brightness = flicker_swing(diameter, depth, t, phase);
             let packed = set_flame_brightness(tag.value, brightness);
@@ -918,15 +932,27 @@ pub(crate) fn update_flames(
 /// The flame sites, and the lights their [`FlameSite::fire`] links may name: one parameter, since `update_flames` reads both.
 #[derive(bevy::ecs::system::SystemParam)]
 pub(crate) struct Sites<'w, 's> {
-    sites: Query<'w, 's, (&'static FlameSite, Option<&'static ChildOf>)>,
+    sites: Query<'w, 's, (&'static FlameSite, &'static crate::FlameVelocity, Option<&'static ChildOf>)>,
     globals: Query<'w, 's, &'static GlobalTransform>,
     lights: Query<'w, 's, (Option<&'static Flicker>, Option<&'static PoolCandidate>)>,
     kindles: Query<'w, 's, &'static Kindle>,
     snuffs: Query<'w, 's, &'static Snuff>,
     wind: Option<Res<'w, FlameWind>>,
+    motion: Option<Res<'w, crate::FlameMotion>>,
+}
+
+/// A wind's speed and the unit direction it blows towards, on the ground plane; no direction for a wind that is zero or not a number.
+fn air_of(velocity: Vec2) -> (f32, Vec2) {
+    let speed = velocity.length();
+    (speed, if speed > 0.0 && speed.is_finite() { velocity / speed } else { Vec2::ZERO })
 }
 
 impl Sites<'_, '_> {
+    /// The wind this frame, on the ground plane; still air with no [`FlameWind`].
+    fn wind_velocity(&self) -> Vec2 {
+        self.wind.as_deref().map_or(Vec2::ZERO, |w| w.velocity)
+    }
+
     /// The `elapsed` of the [`Kindle`] on the entity a site's [`FlameSite::fire`] names, when it has one.
     pub(crate) fn kindle_of(&self, site: &FlameSite) -> Option<f32> {
         self.kindles.get(site.fire?).ok().map(|kindle| kindle.elapsed)
@@ -1974,6 +2000,90 @@ mod catch_colour_tests {
 
     fn site_diameter(world: &World, site: Entity) -> f32 {
         world.get::<FlameSite>(site).and_then(|s| s.diameter).unwrap_or(f32::NAN)
+    }
+
+    /// Gives the one site its own ground velocity, as the tracker would after it had been walked.
+    fn move_site(app: &mut App, velocity: Vec2) {
+        let mut sites = app.world_mut().query_filtered::<&mut crate::FlameVelocity, With<FlameSite>>();
+        for mut v in sites.iter_mut(app.world_mut()) {
+            v.ground = velocity;
+        }
+    }
+
+    #[test]
+    fn a_fire_carried_through_still_air_leans_behind_its_bearer_by_the_tilt_of_its_pace() {
+        let mut app = app();
+        app.world_mut().spawn((site_with(Some(0.1)), Transform::default()));
+        assert_eq!(flame_scale(&mut app), Vec3::ONE, "standing still: upright");
+
+        move_site(&mut app, Vec2::new(1.4, 0.0));
+        let scale = flame_scale(&mut app);
+        let want = crate::model::flame_tilt(1.4, 0.1).sin();
+        assert!(
+            (scale.y - (1.0 - want)).abs() < 1e-6,
+            "walking along +X, the flame streams along -X: {scale:?}"
+        );
+        assert_eq!(scale.z, 1.0, "nothing across it: {scale:?}");
+        assert!(want > 0.6, "a walking pace lays a torch's flame well over: {want}");
+
+        move_site(&mut app, Vec2::new(0.0, 3.0));
+        let scale = flame_scale(&mut app);
+        assert!((scale.z - (1.0 - crate::model::flame_tilt(3.0, 0.1).sin())).abs() < 1e-6, "{scale:?}");
+        assert_eq!(scale.y, 1.0, "{scale:?}");
+
+        move_site(&mut app, Vec2::ZERO);
+        assert_eq!(flame_scale(&mut app), Vec3::ONE, "stopped: upright again");
+    }
+
+    #[test]
+    fn a_fire_feels_the_wind_less_its_own_velocity() {
+        let mut app = app();
+        app.world_mut().spawn((site_with(Some(0.1)), Transform::default()));
+        app.insert_resource(FlameWind { velocity: Vec2::new(2.0, 0.0) });
+        let lean = |scale: Vec3| scale.y - 1.0;
+
+        move_site(&mut app, Vec2::new(2.0, 0.0));
+        assert_eq!(
+            flame_scale(&mut app),
+            Vec3::ONE,
+            "moving with the wind at its speed: no air passes the flame"
+        );
+
+        move_site(&mut app, Vec2::new(-1.5, 0.0));
+        let into = lean(flame_scale(&mut app));
+        assert!(
+            (into - crate::model::flame_tilt(3.5, 0.1).sin()).abs() < 1e-6,
+            "into the wind the two add: {into}"
+        );
+
+        move_site(&mut app, Vec2::new(1.0, 0.0));
+        let with = lean(flame_scale(&mut app));
+        assert!(
+            (with - crate::model::flame_tilt(1.0, 0.1).sin()).abs() < 1e-6,
+            "with it they subtract: {with}"
+        );
+        assert!(with < into);
+    }
+
+    #[test]
+    fn a_motion_gain_of_zero_is_the_crate_as_it_was_and_a_half_is_half_the_pace() {
+        let mut app = app();
+        app.world_mut().spawn((site_with(Some(0.1)), Transform::default()));
+        move_site(&mut app, Vec2::new(2.0, 0.0));
+        app.insert_resource(crate::FlameMotion { gain: 0.0, ..default() });
+        assert_eq!(flame_scale(&mut app), Vec3::ONE, "gain 0: a moving flame stands as it always did");
+        app.insert_resource(crate::FlameMotion { gain: 0.5, ..default() });
+        let scale = flame_scale(&mut app);
+        assert!((scale.y - (1.0 - crate::model::flame_tilt(1.0, 0.1).sin())).abs() < 1e-6, "{scale:?}");
+    }
+
+    #[test]
+    fn a_fire_moved_faster_than_any_gale_is_laid_over_no_further_than_the_tilt_limit() {
+        let mut app = app();
+        app.world_mut().spawn((site_with(Some(0.8)), Transform::default()));
+        move_site(&mut app, Vec2::new(300.0, 0.0));
+        let scale = flame_scale(&mut app);
+        assert!(scale.y.is_finite() && (1.0 - scale.y) <= FLAME_TILT_LIMIT.sin() + 1e-6, "{scale:?}");
     }
 
     #[test]

@@ -7,7 +7,9 @@
 //! `LIGHTS_COLOUR=r,g,b` (linear) gives the fire a colour of its own, the light's and, through `flame_mid`, the flame's;
 //! `LIGHTS_SMOKE=0`, `LIGHTS_EMBERS=0`, `LIGHTS_TONGUES=0` and `LIGHTS_BED=0` turn that extra of the kind off (the `Fire` flags);
 //! `LIGHTS_ROW=n` lays `n` of them side by side, each with its own phase (a frame sequence shows them breathing apart);
-//! `LIGHTS_SNUFF=s` puts them all out at `s` seconds and `LIGHTS_WIND=x,z` blows a wind through them. The `LIGHTS_*` capture
+//! `LIGHTS_SNUFF=s` puts them all out at `s` seconds and `LIGHTS_WIND=x,z` blows a wind through them. `LIGHTS_WALK=v` carries every fire
+//! along +X at `v` metres per second for `LIGHTS_WALK_FOR` seconds (default 1.5) and then stops, the camera standing back (a fire's
+//! flame streams behind it while it moves and stands up again over about half a second when it stops: `FlameMotion`). The `LIGHTS_*` capture
 //! switches come from `examples/common/mod.rs`.
 
 mod common;
@@ -36,6 +38,13 @@ fn off(name: &str) -> bool {
     std::env::var(name).is_ok_and(|v| v == "0")
 }
 
+/// `LIGHTS_WALK=v` (and `LIGHTS_WALK_FOR=s`): the speed the fires are carried at and for how long, if they are.
+fn walk_env() -> Option<(f32, f32)> {
+    let speed = std::env::var("LIGHTS_WALK").ok()?.parse().ok()?;
+    let seconds = std::env::var("LIGHTS_WALK_FOR").ok().and_then(|v| v.parse().ok()).unwrap_or(1.5);
+    Some((speed, seconds))
+}
+
 /// `LIGHTS_ROW=n`: how many fires side by side (`1..=40`).
 fn row_env() -> usize {
     std::env::var("LIGHTS_ROW").ok().and_then(|v| v.parse().ok()).unwrap_or(1).clamp(1, 40)
@@ -46,7 +55,11 @@ fn main() {
     let height = kind.height();
     // A fixed number of flame heights back and up, so a candle and a bonfire fill the frame alike.
     let (eye, look) = camera_placement(
-        Vec3::new(0.0, height * 0.55 + 0.1, (height * 2.6).max(0.45)),
+        Vec3::new(
+            0.0,
+            height * 0.55 + 0.1,
+            (height * 2.6).max(if walk_env().is_some() { 3.5 } else { 0.45 }),
+        ),
         Vec3::new(0.0, height * 0.45, 0.0),
     );
     App::new()
@@ -70,7 +83,7 @@ fn main() {
         })
         .insert_resource(View(eye, look))
         .add_systems(Startup, spawn)
-        .add_systems(Update, snuff_all)
+        .add_systems(Update, (snuff_all, carry_all))
         .run();
 }
 
@@ -122,7 +135,23 @@ fn spawn(
                 ..Fire::lit(kind, POOL_LUX, kind.height() * 0.5)
             },
             Transform::from_xyz(x, 0.0, 0.0),
+            Home(x),
         ));
+    }
+}
+
+/// Where a fire was placed along X, so a walk is centred on it.
+#[derive(Component)]
+struct Home(f32);
+
+/// `LIGHTS_WALK=v`: every fire is carried along +X at `v` for the walk's length, centred on where it was placed, then stands still.
+fn carry_all(time: Res<Time>, mut fires: Query<(&mut Transform, &Home)>) {
+    let Some((speed, seconds)) = walk_env() else {
+        return;
+    };
+    let walked = time.elapsed_secs().min(seconds);
+    for (mut at, home) in &mut fires {
+        at.translation.x = home.0 + speed * (walked - seconds * 0.5);
     }
 }
 

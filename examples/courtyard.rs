@@ -32,6 +32,8 @@
 //! `LIGHTS_EYE`, `LIGHTS_LOOK`, `LIGHTS_SEED` and `LIGHTS_POOL` come from `examples/common/mod.rs`. `LIGHTS_EV100=x` sets the camera's exposure (default 6; 9 is a dark frame whose ground is not saturated by the fires). `LIGHTS_DEPTH_FADE=1`
 //! sets `FlameSite::depth_fade` on every flame and gives the camera a `DepthPrepass`; the occlusion
 //! case it is for has its own scene in `examples/occlusion.rs`.
+//! `LIGHTS_MOTION=g` sets how much of a fire's own velocity counts as wind (`FlameMotion::gain`; default 1, the torch-bearers' flames
+//! stream behind them as they walk; `0` is the courtyard as it was, every flame upright).
 //! `LIGHTS_RANK=distance` (rank by distance alone, the old rule), `LIGHTS_REACH`, `LIGHTS_FOCUS_WALK` (the focus's orbit radius; past the pool's reach the torches
 //! stream across the boundary, which is what makes a candidate leave the pool) and `LIGHTS_POOL_LOG`
 //! (the pool's total every frame, the only way to see a hand-off) are also this example's own.
@@ -74,7 +76,8 @@ use bevy::window::PrimaryWindow;
 use bevy_lights::*;
 
 use common::{
-    Draw, ExampleHarness, GpuTiming, camera, camera_placement, gust_env, render_plugin, seed, wind_env,
+    Draw, ExampleHarness, GpuTiming, camera, camera_placement, gust_env, motion_env, render_plugin, seed,
+    wind_env,
 };
 
 /// How many torch-bearers walk the courtyard.
@@ -402,6 +405,11 @@ fn main() {
         // once here, before any site spawns (the height is packed as a fraction of it).
         .insert_resource(FlameLook { color: fire_temperature(), strength: 0.82, max_height: 4.0 })
         .insert_resource(FlameWind { velocity: wind_env().unwrap_or_default() })
+        // `LIGHTS_MOTION=0` is the courtyard as it was before a fire's own motion counted: every bearer's flame upright.
+        .insert_resource(FlameMotion {
+            gain: motion_env().unwrap_or(FlameMotion::default().gain),
+            ..default()
+        })
         .insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 0.0, ..default() })
         .add_systems(Startup, (spawn_scene, spawn_camera, gust_from_env).chain())
         .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers, snuff_braziers).chain())
