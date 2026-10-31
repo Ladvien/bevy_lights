@@ -1974,3 +1974,45 @@ fn a_departing_light_fades_out_in_its_owners_colour_while_the_arriving_one_fades
     }
     assert!(seen_fading_out, "the reserve never showed, so the cross-fade was not tested");
 }
+
+/// The sum of every visible pool light's base: slots and reserves, the subject's whole pool of light.
+fn pool_total(app: &mut App) -> f32 {
+    slots(app)
+        .iter()
+        .map(|(_, _, visibility, base)| if *visibility == Visibility::Hidden { 0.0 } else { *base })
+        .sum()
+}
+
+#[test]
+fn a_light_handed_on_while_it_is_still_fading_in_fades_out_from_the_level_it_showed() {
+    // A slot whose owner changes twice inside one fade-in: the arriving light has reached a few per cent when the
+    // next challenger takes it, and the reserve that fades it out must start from that few per cent, not from the full
+    // intensity it never reached. Started from full, the pool's light jumped by nearly a whole light on that frame
+    // (the courtyard's `LIGHTS_FOCUS_WALK=18 LIGHTS_POOL=4 LIGHTS_SEED=3 LIGHTS_HYSTERESIS=1.0`: +57 000 lm of 943 000
+    // at frame 235, a visible pop on the pillars and the floor beside it).
+    let mut app =
+        app(LightPool { size: 1, reach: 100.0, gain: 1.0, reserve: 2, hysteresis: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    assert!((pool_total(&mut app) - 100.0).abs() < 1.0, "one light, burning at 100");
+    // A nearer candidate takes the light: the slot restarts its fade from nothing.
+    candidate(&mut app, Vec3::new(0.6, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    app.update();
+    // An even nearer one takes it a few frames into that fade-in, while the arriving light is at a few per cent.
+    candidate(&mut app, Vec3::new(0.3, 0.0, 0.0), 100.0);
+    let mut last = pool_total(&mut app);
+    let mut steepest = 0.0f32;
+    for _ in 0..8 {
+        app.update();
+        let now = pool_total(&mut app);
+        steepest = steepest.max(now - last);
+        last = now;
+    }
+    // The fade-in itself is a smoothstep over 0.35 s: at its steepest it adds about 7 a frame to a light of 100.
+    assert!(
+        steepest < 15.0,
+        "the pool's light jumped by {steepest} in a frame of a hand-off that should be seamless"
+    );
+}

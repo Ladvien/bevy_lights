@@ -647,8 +647,8 @@ fn rank_value(rank: Rank, distance_squared: f32, intensity: f32) -> f32 {
 }
 
 /// A pool light as it last stood: whose light it was, where (the point its `Transform` was given: the
-/// candidate's position plus offset plus the flame's lean), how bright (its candidate's intensity, before
-/// the pool's gain and fade), its flicker, and whether it cast a shadow. A reserve light fading a light out
+/// candidate's position plus offset plus the flame's lean), how bright (its candidate's intensity at the level it was
+/// shown at: after the fade it was in the middle of, before the pool's gain), its flicker, and whether it cast a shadow. A reserve light fading a light out
 /// takes all of it, so the light that leaves keeps moving, and shadowing, exactly as the one that left did —
 /// otherwise the departing and arriving lights swing out of step and their sum wobbles. `at` is where it
 /// last stood, not where it stands: while `owner` is still in the pool the reserve re-reads that candidate's
@@ -1344,7 +1344,9 @@ fn assign_pool<F: Component>(
                 LastLight {
                     owner: entity,
                     at: transform.translation,
-                    intensity,
+                    // The level it was shown at, not the full intensity it was heading for: a light handed on in the
+                    // middle of its own fade-in fades out from the few per cent it had reached.
+                    intensity: intensity * fade,
                     phase: flicker.phase,
                     diameter: flicker.diameter,
                     depth: flicker.depth,
