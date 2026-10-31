@@ -27,10 +27,11 @@ Nguyen, *Fire in the Vulcan Demo* (GPU Gems 1, ch. 6.2): "We started with a sing
 
 `FlameTongues { count, spread }` on a `FlameSite`: `count` tongues (the site's own flame is the first, at the middle and at the site's height, so a one-tongue fire is the flame it was), `spread` the width of the disc their feet stand on, in the host's units. Each extra tongue is one more `Flame` child of the site (a separate `FlameSite`-less flame sharing the site's material, colour, depth fade, catch, snuff and wind), tagged `FlameTongue`, so everything a flame already does, a tongue does: it catches and goes out with its fire, leans in the wind, and is culled by its own box. The sparks and the smoke stay one quad each, on the first flame.
 
-`model::tongue::tongue(index, count, spread, height, seed)` places them (engine-free):
+`model::tongue::flame_tongue(index, count, spread, height, seed)` places them (engine-free):
 
-- **Where.** The extra tongues' feet lie on a Vogel (golden-angle) spiral over the disc, between 0.40 and 1.0 of the radius, with a hash of `seed` and the index for the azimuth and a little of the radius, so any number fills the disc evenly and two fires do not repeat each other. The centre tongue is index 0.
-- **How tall.** A mound: a tongue's height is `height · (1 − 0.5 · r / R)` with a jitter of ±15 %, so the middle is the tallest and the skirt the shortest, and never more than `MERGE_RATIO · r` (`MERGE_RATIO = 3`): two flames `S` apart are one flame above `3 S` (Delichatsios, below), so a tongue 0.1 m from the middle that stood 0.6 m would be the middle flame's own flank, not a tongue of its own.
+- **Where.** The extra tongues' feet lie on a Vogel (golden-angle) spiral over the disc, between 0.35 and 1.0 of the radius, with a hash of `seed` and the index for a little of the azimuth (±0.3 rad) and of the radius (±8 %), so any number fills the disc evenly and two fires do not repeat each other. The centre tongue is index 0.
+- **How tall.** A mound: a tongue's height is `height · (1 − 0.4 · r / R)` times a jitter of 0.70 to 1.15, so the middle is the tallest and the skirt the shortest, never above 0.92 of the middle's, and never more than `MERGE_RATIO · r` (`MERGE_RATIO = 3`): two flames `S` apart are one flame above `3 S` (Delichatsios, below), so a tongue 0.1 m from the middle that stood 0.6 m would be the middle flame's own flank, not a tongue of its own.
+- **How it leans.** In, towards the middle tongue: a fire draws its air in at its foot, and a row of parallel tongues (the first build, captured) reads as a crown of candles, where tongues that converge on a tip read as one fire. The sine of the tilt is `INWARD_LEAN · r / R` (`INWARD_LEAN = 0.30`, 17° at the rim), written the way the wind's lean is, so the shader needs nothing new: `update_flames` adds it to the wind's lean, turned to the world's axes by the site's rotation, and caps the sum at the wind's own tilt limit.
 - **Its phase.** The site's phase plus a hash of the index, so no two tongues move together (Nguyen: "animation start frame"). Brightness is the fire's, shared: one fire breathes as one.
 
 Delichatsios (home-still catalog): "Flame merging of the fire plumes will occur when their flame height is greater than the merging height, Z_m, defined by Equation 6b", with "Z_m / S = 5 sqrt(rho_f / rho_inf) ≈ 3" for a flame temperature of 1000 K and, from Thomas and Baldwin's experiments, "L_f / S = 3 - 3.3" (7b). Below `3 S` the flames are separate tongues and above it they are one: the model's tongues are the separate parts, and the centre tongue, which is taller than `3 S` for every neighbour, is the merged body they stand against.
@@ -41,10 +42,11 @@ Delichatsios (home-still catalog): "Flame merging of the fire plumes will occur 
 |---|---|---|
 | `MAX_TONGUES` | 9 | design default: three rings of the centre's size fill any bed the kinds have; more is overdraw |
 | `MERGE_RATIO` | 3.0 | Delichatsios 2007, eqs. 6b and 7b (3 to 3.3) |
-| ring radius | 0.40 to 1.0 of `spread / 2` | design default, judged in captures |
-| mound | `1 − 0.5 r / R`, jitter ±15 % | design default, judged in captures |
-| `FireKind::Campfire.tongues()` | 5 tongues over 0.5 m | design default (a 0.8 m bed with the logs' ring on the outside; the flame stands on the middle part) |
-| `FireKind::Bonfire.tongues()` | 7 tongues over 1.8 m | design default (a 3 m pyre) |
+| ring radius | 0.35 to 1.0 of `spread / 2` | design default, judged in captures |
+| mound | `1 − 0.4 r / R`, jitter 0.70 to 1.15 | design default, judged in captures |
+| `INWARD_LEAN` | 0.30 (sine of the rim's tilt) | design default, judged in captures: 0.0 is a row (round 1), 0.30 a fire |
+| `FireKind::Campfire.tongues()` | 6 tongues over 0.55 m | design default (a 0.8 m bed with the logs' ring on the outside; the flame stands on the middle part) |
+| `FireKind::Bonfire.tongues()` | 9 tongues over 1.6 m | design default (a 3 m pyre; 7 over 1.8 m, the first build, left the middle of a mass of gaps) |
 | other kinds | none | a candle, a lantern's wick, a torch and a 0.34 m brazier are one tongue: the bed is no wider than a third of the flame |
 
 ## Validation targets
