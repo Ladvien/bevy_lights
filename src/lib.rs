@@ -81,6 +81,7 @@ pub mod model;
 
 mod bed;
 mod embers;
+mod fire;
 mod flame;
 mod flicker;
 mod kind;
@@ -91,6 +92,7 @@ mod tongues;
 
 pub use bed::FuelBed;
 pub use embers::{FlameEmbers, MAX_EMBER_RATE};
+pub use fire::{FIRE_EDGE_LUX, Fire, FirePlugin};
 pub use flame::{Flame, FlameGust, FlameLook, FlameMaterial, FlamePlugin, FlameSite, FlameWind};
 pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled, Snuff, Snuffed};
 pub use kind::{FireKind, UnknownFireKind};
@@ -101,10 +103,11 @@ pub use model::{
     SNUFF_SECONDS, Tongue, WHIPPING_FLICKER_DEPTH, bed_drawn_heat, bed_heat_step, bed_radiance,
     bed_visible_heat, blackbody_colour, blackbody_luminance, blackbody_radiance, char_field, char_radiance,
     char_tile, coal_radiance, ember_cull_extents, ember_reach, fade_factor, fill_for, fire_lumens, fire_lux,
-    fire_reach, flame_cull_extents, flame_light_offset, flame_tilt, flame_tongue, flicker_depth,
-    flicker_factor, flicker_mean, flicker_swing, focus_quota, ground_lux, ground_ramp, ground_reach,
-    hand_off, key_to_fill, kindle_gain, lean_light_shift, pack_flame_tag, preferred, quota_cutoff,
-    raised_light, retint, shadow_set, shared_value, snuff_gain, stops, unpack_flame_tag, white_balanced,
+    fire_phase, fire_reach, flame_cull_extents, flame_light_offset, flame_mid, flame_tilt, flame_tongue,
+    flicker_depth, flicker_factor, flicker_mean, flicker_swing, focus_quota, ground_lux, ground_ramp,
+    ground_reach, hand_off, key_to_fill, kindle_gain, lean_light_shift, pack_flame_tag, preferred,
+    quota_cutoff, raised_light, retint, shadow_set, shared_value, snuff_gain, stops, unpack_flame_tag,
+    white_balanced,
 };
 pub use pool::{FocusRule, LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
 pub use smoke::{FlameSmoke, MAX_SMOKE_DENSITY};

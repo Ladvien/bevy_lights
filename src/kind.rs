@@ -126,10 +126,18 @@ impl FireKind {
     /// the pool moves it with the leaned flame's middle. `phase` is `None`, and `diameter` and `depth` are this
     /// kind's, so the light a torch is handed breathes at the flame's own rate and depth.
     pub fn candidate(self, lux: f32, over: f32) -> PoolCandidate {
+        self.candidate_at_mean(self.lumens(lux, over))
+    }
+
+    /// The pool candidate for this fire whose light averages `mean` lumens: [`candidate`](Self::candidate) with the
+    /// budget written rather than solved from a pool's lux, as [`flicker`](Self::flicker) is to [`light`](Self::light).
+    /// `offset`, `diameter` and `depth` are this kind's, `phase` and `color` are `None`; [`Fire`](crate::Fire) is
+    /// the one that sets them.
+    pub fn candidate_at_mean(self, mean: f32) -> PoolCandidate {
         PoolCandidate {
             offset: Vec3::from(flame_light_offset(self.height())),
             diameter: Some(self.diameter()),
-            ..PoolCandidate::at_mean(self.lumens(lux, over), self.depth())
+            ..PoolCandidate::at_mean(mean, self.depth())
         }
     }
 
@@ -207,26 +215,6 @@ impl FireKind {
             FireKind::Bonfire => 1.9,
         };
         Some(FuelBed { diameter, ..FuelBed::default() })
-    }
-
-    /// The flame and its light in one bundle: [`site`](Self::site) and [`candidate`](Self::candidate),
-    /// so a flame never goes without the light the pool hands it and both come from the same kind.
-    /// Spawn it on the entity at the flame's foot, and the light is handed to the flame's middle (see
-    /// [`candidate`](Self::candidate)); `lux` and `over` are [`lumens`](Self::lumens)' arguments, `over`
-    /// being that middle's height above the ground. The sparks and the smoke stay separate because some kinds have
-    /// neither (a lantern) or only one (a candle smokes and sheds no sparks) and a bundle cannot hold an absent component:
-    /// `if let Some(e) = kind.embers() { entity.insert(e); }`, and the same with [`smoke`](Self::smoke).
-    ///
-    /// ```
-    /// # use bevy_lights::*;
-    /// # use bevy::prelude::*;
-    /// # let mut world = World::new();
-    /// let torch = world.spawn(FireKind::Torch.fire(40.0, 1.8)).id();
-    /// assert!(world.entity(torch).contains::<FlameSite>());
-    /// assert!(world.entity(torch).contains::<PoolCandidate>());
-    /// ```
-    pub fn fire(self, lux: f32, over: f32) -> (FlameSite, PoolCandidate) {
-        (self.site(), self.candidate(lux, over))
     }
 
     /// The fire's name, as a picker shows it.

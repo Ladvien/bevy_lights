@@ -148,6 +148,34 @@ pub fn retint(stop: [f32; 3], mid: [f32; 3]) -> [f32; 3] {
     [0, 1, 2].map(|i| from[i] + (turned[i] - from[i]) * (1.0 - family))
 }
 
+/// The middle colour of a flame whose **light** is `light`: the same hue at the brightness of the shipped middle, so a fire of
+/// any hue is as bright a flame as the orange one (`DEFAULT_MID`) and a host sets one colour, the light's, for both. A blue weighs
+/// less than an orange to the eye (its luminance is about half), so left alone a blue flame is a dim one next to the torches
+/// beside it; scaled to the shipped middle's luminance it is not (`docs/research/fire-colour.md`, the luminance match;
+/// `docs/research/fire-component.md`). The **fire family** (see [`retint`]) keeps the colour as it is, as `retint` keeps its
+/// ramp, so a scene's own orange or red is the flame it always drew, and the scale fades in over the 60° of hue beyond the
+/// family. A colour that is not finite and non-negative is read channel by channel as zero, and one with no luminance is
+/// [`DEFAULT_MID`].
+///
+/// ```
+/// # use bevy_lights::model::fire_colour::*;
+/// assert_eq!(flame_mid(DEFAULT_MID), DEFAULT_MID);
+/// // A blue light's flame is the same blue, about twice as bright as the light's own colour.
+/// let flame = flame_mid([0.1, 0.3, 1.0]);
+/// assert!(flame[2] > 1.5 && flame[2] / flame[1] > 3.0);
+/// ```
+pub fn flame_mid(light: [f32; 3]) -> [f32; 3] {
+    let light = sanitised(light);
+    let have = luminance(light);
+    if have <= 0.0 {
+        return DEFAULT_MID;
+    }
+    let (hue, sat, _) = to_hsv(light);
+    let family = fire_family(hue, sat);
+    let scale = luminance(DEFAULT_MID) / have;
+    light.map(|c| c + (c * scale - c) * (1.0 - family))
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
@@ -288,5 +316,29 @@ mod tests {
                 );
             }
         }
+    }
+
+    #[test]
+    fn a_flame_of_any_hue_is_as_bright_as_the_orange_one_and_the_same_hue() {
+        for light in [[0.1, 0.3, 1.0], [0.2, 1.0, 0.3], [0.6, 0.2, 1.0], [0.1, 0.9, 0.9]] {
+            let flame = flame_mid(light);
+            let want = luminance(DEFAULT_MID);
+            assert!((luminance(flame) - want).abs() < want * 0.02, "{light:?} -> {flame:?}");
+            // The same hue: the channels stay in the ratio they were.
+            let ratio = flame[2] / light[2];
+            assert!(near(flame, light.map(|c| c * ratio), 1e-5), "{light:?} -> {flame:?}");
+        }
+    }
+
+    #[test]
+    fn a_fire_in_the_family_is_its_own_flame_and_a_hostile_colour_is_a_flame() {
+        for light in [DEFAULT_MID, [1.0, 0.18, 0.0], [1.0, 0.8, 0.35], [3.0, 1.2, 0.3]] {
+            assert_eq!(flame_mid(light), light);
+        }
+        for light in [[f32::NAN, 0.0, 0.0], [0.0; 3], [-1.0, -1.0, -1.0], [f32::INFINITY, 0.0, 0.0]] {
+            let flame = flame_mid(light);
+            assert!(flame.iter().all(|c| c.is_finite() && *c >= 0.0), "{light:?} -> {flame:?}");
+        }
+        assert_eq!(flame_mid([0.0; 3]), DEFAULT_MID);
     }
 }
