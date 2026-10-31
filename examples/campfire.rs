@@ -1,16 +1,17 @@
-//! A campfire and a bonfire: the two fires that are wider than they are tall (`FlameTongues`).
+//! A campfire and a bonfire: the two fires that are wider than they are tall (`FlameTongues`), each on a bed of coals (`FuelBed`).
 //!
 //! A flame is one teardrop, `0.4` of its height wide: right for a torch, wrong for a campfire's 0.8 m bed under a 0.7 m flame
 //! or a bonfire's 3 m pyre under a 2 m one, which were drawn as one slender tongue in the middle of a heap of fuel. Here each
-//! is a `FireKind` (its light, flame, sparks and smoke all the kind's own) with the kind's `FlameTongues`: a mound of flames
-//! of different heights and clocks that part and rejoin as the one fire breathes (`docs/research/flame-tongues.md`).
+//! is a `FireKind` (its light, flame, sparks, smoke, tongues and bed all the kind's own): a mound of flames of different
+//! heights and clocks that part and rejoin as the one fire breathes (`docs/research/flame-tongues.md`), standing on coals that
+//! breathe with it, warm as it catches and glow on, cooling, after it is put out (`docs/research/fuel-bed-heat.md`).
 //!
 //! # Knobs
 //!
 //! `LIGHTS_TONGUES=0` draws the same two fires as one flame each, the comparison; `LIGHTS_TONGUES=n` gives both `n` tongues
-//! (`1..=9`). `LIGHTS_WIND=x,z` blows a wind through them and `LIGHTS_SNUFF=s` puts both out at `s` seconds. The default
-//! camera is a viewer's eye, 6 m from the pair; `LIGHTS_EYE` and `LIGHTS_LOOK` move it. The `LIGHTS_*` capture switches come
-//! from `examples/common/mod.rs`.
+//! (`1..=9`). `LIGHTS_BED=0` leaves the coals out and `LIGHTS_COOLING=s` sets their cooling time constant. `LIGHTS_WIND=x,z`
+//! blows a wind through them and `LIGHTS_SNUFF=s` puts both out at `s` seconds. The default camera is a viewer's eye, 6 m
+//! from the pair; `LIGHTS_EYE` and `LIGHTS_LOOK` move it. The `LIGHTS_*` capture switches come from `examples/common/mod.rs`.
 
 mod common;
 
@@ -64,6 +65,16 @@ fn spread_env() -> Option<f32> {
     std::env::var("LIGHTS_SPREAD").ok().and_then(|v| v.parse().ok())
 }
 
+/// `LIGHTS_BED=0`: no bed of coals under either fire (the comparison); `LIGHTS_COOLING=s`: the coals' cooling time constant in seconds, so a
+/// capture of a fire put out (`LIGHTS_SNUFF`) can show the whole cool-down quickly. Unset, the kind's own bed.
+fn bed_for(kind: FireKind) -> Option<FuelBed> {
+    if std::env::var("LIGHTS_BED").is_ok_and(|v| v == "0") {
+        return None;
+    }
+    let cooling = std::env::var("LIGHTS_COOLING").ok().and_then(|v| v.parse().ok());
+    kind.bed().map(|bed| FuelBed { cooling: cooling.unwrap_or(bed.cooling), ..bed })
+}
+
 /// Every fire's light, so `snuff_both` can put them out.
 #[derive(Component)]
 struct Fire;
@@ -99,25 +110,13 @@ fn spawn(
         perceptual_roughness: 0.85,
         ..default()
     });
-    let coals = materials.add(StandardMaterial {
-        base_color: Color::srgb(0.04, 0.02, 0.015),
-        emissive: LinearRgba::rgb(0.9, 0.16, 0.02) * 1.4,
-        perceptual_roughness: 0.9,
-        ..default()
-    });
     let colour = {
         let [r, g, b] = blackbody_colour(1900.0, 1.0);
         Color::from(LinearRgba::rgb(r, g, b))
     };
     for (kind, at) in [(FireKind::Campfire, CAMPFIRE), (FireKind::Bonfire, BONFIRE)] {
         let bed = kind.diameter();
-        // A bed of coals and the stones round it (a campfire's ring; a bonfire's pyre has the logs).
-        commands.spawn((
-            Name::new("Bed"),
-            Mesh3d(meshes.add(Cylinder::new(0.5 * bed, 0.06))),
-            MeshMaterial3d(coals.clone()),
-            Transform::from_translation(at + Vec3::Y * 0.03),
-        ));
+        // The stones round the bed (a campfire's ring; a bonfire's pyre has the logs).
         let ring = if kind == FireKind::Campfire { 9 } else { 14 };
         for i in 0..ring {
             let a = i as f32 / ring as f32 * std::f32::consts::TAU;
@@ -167,13 +166,16 @@ fn spawn(
         let mut site = commands.spawn((
             Name::new("Flame site"),
             FlameSite { fire: Some(light), ..kind.site() },
-            Transform::from_translation(at + Vec3::Y * 0.06),
+            Transform::from_translation(at),
         ));
         if let Some(embers) = kind.embers() {
             site.insert(embers);
         }
         if let Some(smoke) = kind.smoke() {
             site.insert(smoke);
+        }
+        if let Some(bed) = bed_for(kind) {
+            site.insert(bed);
         }
         if let Some(tongues) = tongues_for(kind) {
             site.insert(tongues);
