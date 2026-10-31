@@ -71,8 +71,10 @@ billboards it so a camera orbit never catches it edge-on.
   `queue_silenced` so a site despawned in the same frame cannot panic. `update_flames` writes the
   shared clock once a frame on `Time<Real>`, wrapped hourly, so a paused world's fires still move;
   a changed `FlameLook` is written in place rather than rebuilding the material.
-- `NoFrustumCulling` on the child, because the CPU `Aabb` of the 1×1 quad does not cover what the
-  vertex stage draws.
+- The child carries its own `Aabb` (and `NoAutoAabb`) instead of the engine's: the CPU box of the 1×1 quad does
+  not cover what the vertex stage draws, and `NoFrustumCulling`, this note's first answer, drew every flame in
+  the world every frame. The box, and why the instance scale must be divided out of it, are in
+  `docs/research/flame-culling.md`.
 
 ## Parameters
 
