@@ -248,3 +248,16 @@ Three `EmbedSkip` rows (`ssrn_1601785`, `sm2_58`, `slatkin_effective_python_3rd`
 | `s2025-advances-materials` (the opening, lines 850-920) | Tatarchuk, *Advances in Real-Time Rendering in Games, celebrating 20 years*: the list of games that shaped the field | names *It Takes Two* ("narrative co-operative gameplay with forced split screen") and *Split Fiction* ("expanded upon the forced split-screen co-op model"): evidence that a pool with one focus is not every shipped game's camera |
 
 `book_real_time_rendering_4th_akenine` chapter 21 (virtual and augmented reality) is the technical reference for a frame drawn from more than one viewpoint at once ("each eye has a separate display"). The corpus has no document on lighting a scene for several cameras at once (searched: split-screen, multi-camera, per-view, local multiplayer); the craft source for that is on the web and is listed under `docs/research/pool-foci.md`'s `Pending index`.
+
+## Added by the 2026-10-31 re-scan (iteration 281)
+
+`catalog_recent` (200 rows, newest 07:21 UTC) is the same SIGGRAPH re-embedding iterations 278-280 scanned, plus unrelated clinical-psychology and software papers and the two candle-flame papers (`10.1038_s41598-018-36754-w`, Chen et al. 2019, *Frequency and phase characteristics of candle flame oscillation*; `10.1038_s41598-020-78229-x`, *Flickering candle flames and their collective behavior*), which are in the library and indexed but not yet in the on-disk corpus. They bear on the flicker's rate and phase, not on a new system. No `Research: corpus` commit beyond this note. Smoke (`flame-smoke.md`) read four stems that were already on disk and were not listed for it:
+
+| stem | what it is | use |
+|---|---|---|
+| `s2011-advances-pdf-slides` (Fire/Flamethrowers/Thrusters, lines 1290-1462) | SIGGRAPH 2011 *Advances*, shipping fire | "Particle comp pass converts hotness to a blackbody color texture, adds it on top of smokey particles renderered with usual alpha blending": the additive heat layer over a smoke layer |
+| `s2025-advances-materials-2` (lines 2333-2385) | SIGGRAPH 2025 *Advances*, the transparency (OIT) talk | why blended VFX smoke sorts badly: "manual sorting can result in a lot of side effects ... smoke tendrils look buggy" |
+| `PBR3_11_Volume_Scattering` | *Physically Based Rendering* 3rd ed., ch. 11 | "fog and smoke attenuate and scatter light": smoke is lit by the light that reaches it |
+| `10.13140_marples.nav.lighting.thesis` (9.5.3, lines 6152 and 8060-8206) | Marples 2017 (already listed above for navigation) | a torch sconce "with an animated flame and smoke effect" against a static glowing torch: a measured preference for the animated one (χ²(1, N = 76) = 19.000) |
+
+Not in the corpus: Morton, Taylor & Turner 1956 on plumes (cited second-hand through `10.5194/npg-21-269-2014`, Matulka et al. 2014, found with `paper_search`; `paper_download` and `distill_index` pending) and Briggs' bent-over plume rise law (textbook, no source on disk).

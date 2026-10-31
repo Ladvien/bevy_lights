@@ -92,5 +92,6 @@ Deliberately not built: an occluding (dark) half of the smoke. At night it canno
 
 ## Pending index
 
-- `10.5194/npg-21-269-2014` (Matulka et al. 2014): read through its abstract in `paper_search`; `paper_download` and `distill_index` are pending, and the plume width law is quoted from it second-hand (Morton, Taylor & Turner 1956, whose paper is not in the corpus).
+- `10.5194/npg-21-269-2014` (Matulka et al. 2014): downloaded (`paper_download`: `papers/10/10.5194_npg-21-269-2014.pdf`, 3.2 MB) but read through its abstract only; `scribe_convert` and `catalog_read` through the MCP both timed out at 30 s on a loaded home-still (the outcome is unknown), so `scribe_convert` and `distill_index` are pending, and the plume width law is quoted from the abstract second-hand (Morton, Taylor & Turner 1956, whose paper is not in the corpus).
+- Briggs' bent-over plume law (`z ∝ x^(2/3)`): textbook, no source on disk; it is used as a *shape* for the column's bend, not as a measurement.
 - A photometric measurement of how bright a wood fire's smoke is against its flame: not found; `density` is a design default.
