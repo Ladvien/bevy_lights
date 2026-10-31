@@ -24,7 +24,10 @@ pub use fire::{
     MAX_FLICKER_DEPTH, PUFFING_CONSTANT, SNUFF_SECONDS, WHIPPING_FLICKER_DEPTH, flame_tilt, flicker_depth,
     flicker_factor, flicker_factor_of, flicker_mean, flicker_rate, flicker_swing, kindle_gain, snuff_gain,
 };
-pub use pool::{FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, hand_off, preferred, shadow_set};
+pub use pool::{
+    FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, focus_quota, hand_off, preferred, quota_cutoff,
+    shadow_set, shared_value,
+};
 pub use problem::{Problem, ProblemKind};
 pub use reach::{RANGE_MARGIN, flame_light_offset, lean_light_shift, raised_light};
 pub use tag::{

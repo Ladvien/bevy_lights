@@ -237,3 +237,14 @@ are worth a row, the rest are listed so the next scan does not re-investigate th
 | the `sig2024_*` and `sig2026_*` geometry, simulation, diffusion, cloth, knit, differentiable-rendering and optimisation papers; `transvoxel_*`, `tetgen_*`, `vowels2021`, `thompson2020`, the `schoeller_*` papers, `sexes-05-00047`, `slatkin_effective_python_3rd` | geometry processing, ML, medical and psychology | **not lighting** |
 
 Three `EmbedSkip` rows (`ssrn_1601785`, `sm2_58`, `slatkin_effective_python_3rd`) failed on `503 ... myelin observe` and are unrelated to lighting.
+
+## Added by the 2026-10-31 re-scan (iteration 279)
+
+`catalog_recent` (200 rows, newest 05:01 UTC on the 31st) is the same bulk re-embedding of the SIGGRAPH library that iteration 278 scanned (`sig2024_*`, `sig2026_*`, the `s2007`-`s2025` *Advances* courses), plus three `EmbedSkip` rows that failed on `gpu busy: 1012 MB free < 5000 MB required` and an unrelated forestry paper. Every stem was already on disk. Nothing in it is cinematography, photography or fire physics. Two stems that bear on this crate were not listed before:
+
+| stem | what it is | use |
+|---|---|---|
+| `s2008-advances-chapter-1` | Chen & Liu (Bungie), *Lighting and Material of Halo 3* (SIGGRAPH 2008 *Advances*) | a shipped game's lighting rig and its material model: production context for how a studio budgets the lights a scene carries |
+| `s2025-advances-materials` (the opening, lines 850-920) | Tatarchuk, *Advances in Real-Time Rendering in Games, celebrating 20 years*: the list of games that shaped the field | names *It Takes Two* ("narrative co-operative gameplay with forced split screen") and *Split Fiction* ("expanded upon the forced split-screen co-op model"): evidence that a pool with one focus is not every shipped game's camera |
+
+`book_real_time_rendering_4th_akenine` chapter 21 (virtual and augmented reality) is the technical reference for a frame drawn from more than one viewpoint at once ("each eye has a separate display"). The corpus has no document on lighting a scene for several cameras at once (searched: split-screen, multi-camera, per-view, local multiplayer); the craft source for that is on the web and is listed under `docs/research/pool-foci.md`'s `Pending index`.
