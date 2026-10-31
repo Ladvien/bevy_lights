@@ -466,6 +466,7 @@ fn main() {
         .add_systems(Update, (report_kindled, report_snuffed))
         .add_systems(Update, report_look)
         .add_systems(Update, report_flicker)
+        .add_systems(Update, zz_sway)
         .add_plugins(GpuTiming)
         .run();
 }
@@ -615,6 +616,9 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
         // The depth fade reads the depth prepass, so a camera that asks for it carries one.
         if depth_fade_on() {
             camera.insert(DepthPrepass);
+        }
+        if std::env::var("LIGHTS_BLOOM").is_ok_and(|v| v != "0") {
+            camera.insert(bevy::post_process::bloom::Bloom::NATURAL);
         }
     }
     // The moon: the host's directional light (the crate never adds one), a sky-coloured fill at the
@@ -1253,3 +1257,28 @@ fn report_snuffed(mut snuffed: MessageReader<Snuffed>, names: Query<&Name>) {
         }
     }
 }
+
+/// THROWAWAY: a prototype of light sway on the braziers' lights (`LIGHTS_SWAY` metres).
+fn zz_sway(time: Res<Time>, mut lights: Query<(&mut Transform, &mut Sway0), With<Flicker>>, mut commands: Commands, fresh: Query<(Entity, &Transform), (With<Flicker>, With<PointLight>, Without<Sway0>)>) {
+    let amp: f32 = std::env::var("LIGHTS_SWAY").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+    if amp <= 0.0 {
+        return;
+    }
+    for (entity, tf) in &fresh {
+        commands.entity(entity).insert(Sway0(tf.translation, Vec3::ZERO));
+    }
+    let t = time.elapsed_secs();
+    for (mut tf, mut s) in &mut lights {
+        let ph = s.0.x * 7.0 + s.0.z * 3.0;
+        let off = Vec3::new(
+            0.6 * (TAU * 0.83 * t + 1.1 + ph).sin() + 0.4 * (TAU * 2.1 * t + 2.3 + ph).sin(),
+            0.5 * (0.5 * (TAU * 2.57 * t + ph).sin() + 0.5 * (TAU * 1.3 * t + 0.7).sin()),
+            0.6 * (TAU * 0.71 * t + 4.1 + ph).sin() + 0.4 * (TAU * 1.9 * t + 0.4 + ph).sin(),
+        ) * amp;
+        tf.translation += off - s.1;
+        s.1 = off;
+    }
+}
+
+#[derive(Component)]
+struct Sway0(Vec3, Vec3);

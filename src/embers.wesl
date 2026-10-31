@@ -214,18 +214,78 @@ fn segment_distance(p: vec2<f32>, a: vec2<f32>, b: vec2<f32>) -> f32 {
     return distance(p, a + ab * along);
 }
 
+// ---- Smoke (prototype) ---------------------------------------------------------------------------------------------------
+
+fn hash21(p: vec2<i32>) -> f32 {
+    return f32(pcg(u32(p.x) * 1597334677u ^ u32(p.y) * 3812015801u)) / 4294967295.0;
+}
+
+fn value_noise(p: vec2<f32>) -> f32 {
+    let i = vec2<i32>(floor(p));
+    let f = fract(p);
+    let u = f * f * (3.0 - 2.0 * f);
+    let a = hash21(i);
+    let b = hash21(i + vec2<i32>(1, 0));
+    let c = hash21(i + vec2<i32>(0, 1));
+    let d = hash21(i + vec2<i32>(1, 1));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
+}
+
+fn smoke_fbm(p: vec2<f32>) -> f32 {
+    var sum = 0.0;
+    var amp = 0.5;
+    var q = p;
+    for (var o = 0; o < 3; o += 1) {
+        sum += amp * value_noise(q);
+        q = vec2<f32>(q.x * 0.8 - q.y * 0.6, q.x * 0.6 + q.y * 0.8) * 2.03 + vec2<f32>(17.0, 5.0);
+        amp *= 0.5;
+    }
+    return sum / 0.875;
+}
+
+fn smoke_light(uv: vec2<f32>, clock: f32, phase: f32, drift: f32, cos_e: f32) -> vec3<f32> {
+    let rise = uv.y / max(cos_e, 0.35);
+    if rise < 0.5 || rise > RISE_MAX {
+        return vec3<f32>(0.0);
+    }
+    let t = clock + phase * 3.1;
+    let height = max(rise - 0.7, 0.0);
+    let meander = 0.10 * height * sin(0.9 * t + 1.7 * rise + phase);
+    let centre = drift * rise * 0.8 + meander;
+    let half_width = 0.06 + 0.17 * height;
+    let lat = (uv.x - centre) / half_width;
+    let envelope = exp(-lat * lat * 1.6);
+    if envelope < 0.02 {
+        return vec3<f32>(0.0);
+    }
+    var p = vec2<f32>(uv.x * 3.2, rise * 2.2 - t * 0.7);
+    p.x += (0.5 + 0.8 * height) * (value_noise(p * 0.6 + vec2<f32>(3.1, t * 0.15)) - 0.5);
+    let n = smoke_fbm(p + vec2<f32>(phase * 5.0, 0.0));
+    let body = smoothstep(0.30, 0.85, n);
+    let born = smoothstep(0.55, 1.15, rise);
+    let gone = 1.0 - smoothstep(1.4, RISE_MAX, rise);
+    let rel = (rise - 0.35) / 0.7;
+    let lit = 1.0 / (1.0 + rel * rel);
+    let colour = mix(material.mild.rgb, material.dull.rgb, smoothstep(0.9, 2.4, rise));
+    return colour * (0.30 * envelope * body * born * gone * lit);
+}
+
 @fragment
 fn fragment(in: EmberVertexOutput) -> @location(0) vec4<f32> {
     // Flame heights per pixel, taken before any branch (a derivative needs uniform control flow).
     let pixel = max(max(abs(dpdx(in.uv.x)), abs(dpdy(in.uv.x))), max(abs(dpdx(in.uv.y)), abs(dpdy(in.uv.y))));
     let rate = in.shape.x;
-    if rate < 0.01 || in.took < 0.05 {
+    if in.took < 0.05 {
         return vec4<f32>(0.0);
+    }
+    var light = smoke_light(in.uv, material.params.x, in.phase, in.shape.y, in.shape.z);
+    if rate < 0.01 {
+        let seen_smoke = source_visibility(in.fade, in.fade_margin) * in.took * in.took;
+        return vec4<f32>(light * material.params.w * seen_smoke, 0.0);
     }
     let cycle = f32(SLOTS) / rate;
     let clock = material.params.x / cycle;
     let phase_bits = u32(in.phase * 40.0);
-    var light = vec3<f32>(0.0);
     for (var i = 0u; i < SLOTS; i += 1u) {
         let turns = clock + f32(i) / f32(SLOTS) + in.phase / TAU;
         let n = floor(turns);
