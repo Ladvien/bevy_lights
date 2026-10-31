@@ -4,6 +4,8 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-31
+
 API break (one removal): `FireKind::fire` is gone, replaced by the component that does what it did and the rest (below); `cargo semver-checks` is expected to fail `method_removed` for it, so the next release is a minor one. A host that spawned `kind.fire(lux, over)` spawns `Fire::lit(kind, lux, over)` (with `FirePlugin`) or `(kind.site(), kind.candidate(lux, over))`. Every other change is additive (`FlameTongues` and `FlameTongue` are new components, `FireKind::tongues` a new method, `MAX_TONGUES`, `MERGE_RATIO`, `Tongue` and `flame_tongue` new items, `FlameSmoke` a new component, `FireKind::smoke` a new method, `SMOKE_TAIL_SECONDS` a new constant, `FuelBed` a new component, `FireKind::bed` a new method, `bed_radiance`, `bed_heat_step`, `bed_drawn_heat`, `bed_visible_heat`, `blackbody_radiance`, `char_tile` and `DEFAULT_BED_COOLING` new items, `Fire`, `FirePlugin`, `FIRE_EDGE_LUX`, `fire_phase`, `flame_mid` and `FireKind::candidate_at_mean` new, and `FlameLook`, `FlameSite` and `PoolCandidate` are untouched).
 
 ### Removed
