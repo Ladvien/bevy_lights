@@ -73,7 +73,9 @@ use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 use bevy::window::PrimaryWindow;
 use bevy_lights::*;
 
-use common::{Draw, ExampleHarness, camera, camera_placement, gust_env, seed, wind_env};
+use common::{
+    Draw, ExampleHarness, GpuTiming, camera, camera_placement, gust_env, render_plugin, seed, wind_env,
+};
 
 /// How many torch-bearers walk the courtyard.
 const BEARERS: usize = 48;
@@ -348,66 +350,10 @@ fn shadowed_env() -> usize {
     std::env::var("LIGHTS_SHADOWED").ok().and_then(|v| v.parse().ok()).unwrap_or(3)
 }
 
-/// `LIGHTS_GPU_TIMING=1` records the render graph's GPU timestamps and prints, once, the mean per pass
-/// (microseconds, frames 100 to 400) on stdout as `gpu_us <pass> <mean>`. It needs a Vulkan or DX12
-/// adapter with timestamp queries; without one the run prints nothing. Run it with `LIGHTS_FRAMES=420`.
-fn gpu_timing_on() -> bool {
-    std::env::var("LIGHTS_GPU_TIMING").is_ok_and(|v| v != "0")
-}
-
-fn report_gpu(
-    store: Res<bevy::diagnostic::DiagnosticsStore>,
-    mut sums: Local<std::collections::BTreeMap<String, (f64, u32)>>,
-    mut frame: Local<u32>,
-) {
-    *frame += 1;
-    if (100..400).contains(&*frame) {
-        for d in store.iter().filter(|d| d.path().as_str().ends_with("elapsed_gpu")) {
-            if let Some(ms) = d.value() {
-                let entry = sums.entry(d.path().to_string()).or_default();
-                entry.0 += ms;
-                entry.1 += 1;
-            }
-        }
-    }
-    if *frame == 400 {
-        for (path, (sum, n)) in sums.iter() {
-            println!("gpu_us {path} {:.1}", sum / f64::from((*n).max(1)) * 1000.0);
-        }
-    }
-}
-
-/// Adds the render diagnostics and the report when `LIGHTS_GPU_TIMING` asks for them.
-struct GpuTiming;
-
-impl Plugin for GpuTiming {
-    fn build(&self, app: &mut App) {
-        if gpu_timing_on() {
-            app.add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin)
-                .add_systems(Update, report_gpu);
-        }
-    }
-}
-
 fn main() {
     let (eye, look) = camera_placement(Vec3::new(0.0, 9.0, 16.0), Vec3::ZERO);
     App::new()
-        .add_plugins(
-            DefaultPlugins.set(bevy::render::RenderPlugin {
-                render_creation: bevy::render::settings::WgpuSettings {
-                    features: if gpu_timing_on() {
-                        bevy::render::settings::WgpuFeatures::TIMESTAMP_QUERY
-                            | bevy::render::settings::WgpuFeatures::TIMESTAMP_QUERY_INSIDE_PASSES
-                            | bevy::render::settings::WgpuFeatures::TIMESTAMP_QUERY_INSIDE_ENCODERS
-                    } else {
-                        bevy::render::settings::WgpuFeatures::empty()
-                    },
-                    ..Default::default()
-                }
-                .into(),
-                ..Default::default()
-            }),
-        )
+        .add_plugins(DefaultPlugins.set(render_plugin()))
         .add_plugins((ExampleHarness, FlickerPlugin, LightPoolPlugin::<Focus>::default(), FlamePlugin))
         .insert_resource(CameraPlacement(eye, look))
         // The pool is inserted before the plugin's `init_resource`, so these numbers win: eight real

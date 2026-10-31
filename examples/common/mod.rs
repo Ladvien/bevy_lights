@@ -287,3 +287,62 @@ fn run_limit(
         }
     }
 }
+
+/// `LIGHTS_GPU_TIMING=1` records the render graph's GPU timestamps and prints, once, the mean per pass
+/// (microseconds, frames 100 to 400) on stdout as `gpu_us <pass> <mean>`. It needs a Vulkan or DX12
+/// adapter with timestamp queries; without one the run prints nothing. Run it with `LIGHTS_FRAMES=420`.
+pub fn gpu_timing_on() -> bool {
+    std::env::var("LIGHTS_GPU_TIMING").is_ok_and(|v| v != "0")
+}
+
+/// The render plugin, asking the adapter for timestamp queries when `LIGHTS_GPU_TIMING` is on: pass it to `DefaultPlugins.set(..)`.
+pub fn render_plugin() -> bevy::render::RenderPlugin {
+    bevy::render::RenderPlugin {
+        render_creation: bevy::render::settings::WgpuSettings {
+            features: if gpu_timing_on() {
+                bevy::render::settings::WgpuFeatures::TIMESTAMP_QUERY
+                    | bevy::render::settings::WgpuFeatures::TIMESTAMP_QUERY_INSIDE_PASSES
+                    | bevy::render::settings::WgpuFeatures::TIMESTAMP_QUERY_INSIDE_ENCODERS
+            } else {
+                bevy::render::settings::WgpuFeatures::empty()
+            },
+            ..Default::default()
+        }
+        .into(),
+        ..Default::default()
+    }
+}
+
+fn report_gpu(
+    store: Res<bevy::diagnostic::DiagnosticsStore>,
+    mut sums: Local<std::collections::BTreeMap<String, (f64, u32)>>,
+    mut frame: Local<u32>,
+) {
+    *frame += 1;
+    if (100..400).contains(&*frame) {
+        for d in store.iter().filter(|d| d.path().as_str().ends_with("elapsed_gpu")) {
+            if let Some(ms) = d.value() {
+                let entry = sums.entry(d.path().to_string()).or_default();
+                entry.0 += ms;
+                entry.1 += 1;
+            }
+        }
+    }
+    if *frame == 400 {
+        for (path, (sum, n)) in sums.iter() {
+            println!("gpu_us {path} {:.1}", sum / f64::from((*n).max(1)) * 1000.0);
+        }
+    }
+}
+
+/// Adds the render diagnostics and the report when `LIGHTS_GPU_TIMING` asks for them.
+pub struct GpuTiming;
+
+impl Plugin for GpuTiming {
+    fn build(&self, app: &mut App) {
+        if gpu_timing_on() {
+            app.add_plugins(bevy::render::diagnostic::RenderDiagnosticsPlugin)
+                .add_systems(Update, report_gpu);
+        }
+    }
+}
