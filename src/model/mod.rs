@@ -34,7 +34,7 @@ pub use fire::{
     fire_phase, flame_tilt, flicker_depth, flicker_factor, flicker_factor_of, flicker_mean, flicker_rate,
     flicker_swing, kindle_gain, snuff_gain,
 };
-pub use fire_colour::{flame_mid, retint};
+pub use fire_colour::{FIRE_KELVIN, flame_mid, retint};
 pub use pool::{
     FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, focus_quota, hand_off, preferred, quota_cutoff,
     shadow_set, shared_value,

@@ -7,7 +7,7 @@
 
 use bevy::prelude::*;
 
-use crate::model::{fire_phase, flame_light_offset, flame_mid};
+use crate::model::{FIRE_KELVIN, blackbody_colour, fire_phase, flame_light_offset, flame_mid};
 use crate::{
     FireKind, FlameEmbers, FlamePlugin, FlameSite, FlameSmoke, FlameTongues, FuelBed, LightPool,
     LightsSystems, PoolCandidate,
@@ -68,9 +68,10 @@ pub struct Fire {
     /// ([`fire_phase`](crate::fire_phase)), so fires placed alike do not breathe together and a run that spawns in the same order is
     /// reproducible.
     pub phase: Option<f32>,
-    /// The fire's own colour, when it is not the scene's orange: the colour of the light, and the middle of the flame's ramp as the same hue
+    /// The fire's own colour, when it is not a wood fire's: the colour of the light, and the middle of the flame's ramp as the same hue
     /// at the shipped flame's brightness ([`flame_mid`](crate::flame_mid)), so one value is a fire of that colour, flame, sparks and light
-    /// (`docs/research/fire-colour.md`). `None` is the scene's.
+    /// (`docs/research/fire-colour.md`). `None` is a wood fire: a light of a [`FIRE_KELVIN`](crate::FIRE_KELVIN) blackbody (1900 K, so the
+    /// pool is not lit by the template's white) and the scene's own flame ([`FlameLook::color`](crate::FlameLook::color)).
     pub color: Option<Color>,
     /// Whether the kind's sparks are drawn, if it sheds any ([`FireKind::embers`]).
     pub embers: bool,
@@ -143,11 +144,15 @@ impl Fire {
             let [red, green, blue] = flame_mid([light.red, light.green, light.blue]);
             Color::from(LinearRgba::new(red, green, blue, light.alpha))
         });
+        let light_colour = self.color.unwrap_or_else(|| {
+            let [red, green, blue] = blackbody_colour(FIRE_KELVIN, 1.0);
+            Color::from(LinearRgba::rgb(red, green, blue))
+        });
         Parts {
             site: FlameSite { phase, fire: Some(entity), color: flame_colour, ..kind.site() },
             candidate: PoolCandidate {
                 phase: Some(phase),
-                color: self.color,
+                color: Some(light_colour),
                 ..kind.candidate_at_mean(lumens)
             },
             embers: if self.embers { kind.embers() } else { None },
