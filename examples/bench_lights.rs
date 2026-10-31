@@ -12,6 +12,8 @@
 //! `BENCH_CANDIDATES` (default 5000) and `BENCH_LIGHTS` (default 2000) set the scale, and `BENCH_SNUFFED`
 //! (default 0) puts that many of the candidates out, each with a finished [`Snuff`] — a town at dawn, a saved
 //! scene whose torches were put out — which a pool must meet every frame at no more than the cost of lit ones.
+//! `BENCH_FOCI` (default 1) gives the pool that many viewers, each drifting from its own start, with
+//! `LightPool::focus` set to [`FocusRule::Shared`] above one: the cost of the shared pool.
 //! Every number is one frame's `App::update()`, so it includes the ECS's own scheduling: compare a run with a
 //! change against a run without, on the same machine and the same load, never against another host.
 //!
@@ -47,12 +49,18 @@ fn main() {
     // How many of the candidates are fires that are out: a town at dawn, a saved scene whose torches were put out.
     // Each keeps its `Snuff` for as long as the host leaves it out, so the pool meets them every frame.
     let snuffed = env_usize("BENCH_SNUFFED", 0).min(candidates);
+    let foci = env_usize("BENCH_FOCI", 1).max(1);
 
     let mut app = App::new();
     app.add_plugins(MinimalPlugins)
         .add_plugins((TransformPlugin, FlickerPlugin, LightPoolPlugin::<Focus>::default()))
         .insert_resource(TimeUpdateStrategy::ManualDuration(Duration::from_secs_f64(1.0 / 60.0)))
-        .insert_resource(LightPool { size: pool_size, gain: 1.0, ..default() })
+        .insert_resource(LightPool {
+            size: pool_size,
+            gain: 1.0,
+            focus: if foci > 1 { FocusRule::Shared } else { FocusRule::One },
+            ..default()
+        })
         .add_systems(Update, drift_focus)
         // Each of the crate's sets is switched by `Only` while a per-system timing run is on, and runs
         // normally otherwise. A `Res` in a run condition panics on a missing resource, so it is an
@@ -90,7 +98,11 @@ fn main() {
             Transform::from_xyz(x, 1.8, z),
         ));
     }
-    app.world_mut().spawn((Focus, Drifting(Vec3::ZERO), Transform::default()));
+    // The viewers: each starts somewhere else on the grid, so their reaches overlap and differ.
+    for index in 0..foci {
+        let start = Vec3::new(index as f32 * 23.0 % 71.0, 0.0, index as f32 * 31.0 % 71.0);
+        app.world_mut().spawn((Focus, Drifting(start), Transform::default()));
+    }
 
     // One frame to build the pool's lights and propagate the transforms; then the timed run.
     app.update();
@@ -110,7 +122,7 @@ fn main() {
     let max = sorted.last().copied().unwrap_or(0);
     let pool = app.world().resource::<LightPool>().size;
     println!(
-        "bench_lights candidates={candidates} lights={lights} pool={pool} snuffed={snuffed} frames={} mean_us={mean} p50_us={p50} min_us={min} max_us={max}",
+        "bench_lights candidates={candidates} lights={lights} pool={pool} snuffed={snuffed} foci={foci} frames={} mean_us={mean} p50_us={p50} min_us={min} max_us={max}",
         samples.len()
     );
     per_system(&mut app, frames.min(300));

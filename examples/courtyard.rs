@@ -48,6 +48,13 @@
 //! `LIGHTS_GPU_TIMING=1` (with `LIGHTS_FRAMES=420`) prints the mean GPU time per render pass on stdout.
 //! The default camera is the eye at `(0, 9, 16)` looking at the origin.
 //!
+//! `LIGHTS_FOCI=n` gives the pool `n` foci (up to 8), one orbiting at each `n`th of the orbit, with
+//! [`FocusRule::Shared`] so the pool's lights are shared between them (`docs/research/pool-foci.md`), and a
+//! small cyan marker on each so the overview camera shows who the viewers are. `LIGHTS_SPLIT=1` is the
+//! split-screen courtyard: two such viewers, each with its own camera on half of the window, standing behind
+//! its focus and looking in (`LIGHTS_EYE` and `LIGHTS_LOOK` do not apply to it). `LIGHTS_FOCUS_RULE=one`
+//! keeps the default rule over the same foci, which leaves the pool dark: the comparison.
+//!
 //! ```sh
 //! LIGHTS_FRAMES=600 LIGHTS_SHOT=/tmp/court.png cargo run --release --example courtyard
 //! ```
@@ -57,12 +64,13 @@ mod common;
 use std::f32::consts::TAU;
 
 use bevy::asset::RenderAssetUsages;
-use bevy::camera::Exposure;
+use bevy::camera::{Exposure, Viewport};
 use bevy::core_pipeline::prepass::DepthPrepass;
 use bevy::light::{NotShadowCaster, NotShadowReceiver};
 use bevy::mesh::{Indices, PrimitiveTopology};
 use bevy::prelude::*;
 use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
+use bevy::window::PrimaryWindow;
 use bevy_lights::*;
 
 use common::{Draw, ExampleHarness, camera, camera_placement, gust_env, seed, wind_env};
@@ -429,6 +437,7 @@ fn main() {
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(FADE_SECONDS),
             reach: std::env::var("LIGHTS_REACH").ok().and_then(|v| v.parse().ok()).unwrap_or(20.0),
+            focus: focus_rule(),
             light: PointLight {
                 color: fire_colour(),
                 // The same windowed falloff the fires have: the pool light is a torch's fire, one
@@ -453,6 +462,7 @@ fn main() {
         .insert_resource(GlobalAmbientLight { color: Color::WHITE, brightness: 0.0, ..default() })
         .add_systems(Startup, (spawn_scene, spawn_camera, gust_from_env).chain())
         .add_systems(Update, (walk_bearers, orbit_focus, relight_braziers, snuff_braziers).chain())
+        .add_systems(Update, follow_viewers.after(orbit_focus))
         .add_systems(Update, (report_kindled, report_snuffed))
         .add_systems(Update, report_look)
         .add_systems(Update, report_flicker)
@@ -476,6 +486,37 @@ fn gust_from_env(mut commands: Commands) {
 /// stands in for a camera that a real game would drive.
 #[derive(Component)]
 struct Focus;
+
+/// Which viewer a `Focus` is, under `LIGHTS_FOCI` or `LIGHTS_SPLIT`: `0` is the left half of a split window.
+#[derive(Component)]
+struct Viewer(usize);
+
+/// The camera of a viewer, under `LIGHTS_SPLIT`: it fills its half of the window and follows its focus.
+#[derive(Component)]
+struct ViewerCamera(usize);
+
+/// `LIGHTS_SPLIT=1`: two viewers on one scene, a camera each.
+fn split_on() -> bool {
+    std::env::var("LIGHTS_SPLIT").is_ok_and(|v| v != "0")
+}
+
+/// How many foci the pool has: two for a split screen, `LIGHTS_FOCI=n` (1 to 8), or one.
+fn foci_count() -> usize {
+    if split_on() {
+        return 2;
+    }
+    std::env::var("LIGHTS_FOCI").ok().and_then(|v| v.parse().ok()).filter(|n| (1..=8).contains(n)).unwrap_or(1)
+}
+
+/// The pool's focus rule: shared between the viewers when there are several, or `One` (also with
+/// `LIGHTS_FOCUS_RULE=one`, the default rule over the same foci).
+fn focus_rule() -> FocusRule {
+    match std::env::var("LIGHTS_FOCUS_RULE").ok().as_deref() {
+        Some("one") => FocusRule::One,
+        _ if foci_count() > 1 => FocusRule::Shared,
+        _ => FocusRule::One,
+    }
+}
 
 /// A brazier: the coals, their light and their flame.
 #[derive(Component, Clone, Copy)]
@@ -509,10 +550,9 @@ fn exposure_ev100() -> f32 {
     std::env::var("LIGHTS_EV100").ok().and_then(|v| v.parse().ok()).unwrap_or(NIGHT_EV100)
 }
 
-fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: Res<NightFill>) {
-    let CameraPlacement(eye, look) = *placement;
-    let mut camera = commands.spawn((
-        camera(eye, look, 8.0),
+/// What the night adds to a camera: a cool fill the moon does not have to provide, and the exposure.
+fn night_view() -> impl Bundle {
+    (
         // A cool fill the moon does not have to provide: the sky dome under it, which lights the faces
         // the moon's direction misses. Without it a figure's shadow thrown by a fire onto a wall the moon
         // does not reach is a black hole (`srgb(1,1,5)` at 2 cd/m²); at 20 (about 63 lx, an eighth of the
@@ -520,10 +560,30 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
         // hand-picked blue.
         AmbientLight { color: sky_colour(), brightness: 20.0, ..default() },
         Exposure { ev100: exposure_ev100() },
-    ));
-    // The depth fade reads the depth prepass, so a camera that asks for it carries one.
-    if depth_fade_on() {
-        camera.insert(DepthPrepass);
+    )
+}
+
+fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: Res<NightFill>) {
+    let CameraPlacement(eye, look) = *placement;
+    if split_on() {
+        // Two cameras on one window, a viewer each (the viewports are set by `follow_viewers`, which knows
+        // the window's size and where its focus is).
+        for index in 0..2 {
+            commands.spawn((
+                Name::new(format!("Viewer {index} camera")),
+                Camera3d::default(),
+                Camera { order: index as isize, ..default() },
+                ViewerCamera(index),
+                Transform::from_translation(eye).looking_at(look, Vec3::Y),
+                night_view(),
+            ));
+        }
+    } else {
+        let mut camera = commands.spawn((camera(eye, look, 8.0), night_view()));
+        // The depth fade reads the depth prepass, so a camera that asks for it carries one.
+        if depth_fade_on() {
+            camera.insert(DepthPrepass);
+        }
     }
     // The moon: the host's directional light (the crate never adds one), a sky-coloured fill at the
     // illuminance that makes the target key-to-fill against the braziers' pools.
@@ -547,6 +607,37 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
             0.0,
         )),
     ));
+}
+
+/// Under `LIGHTS_SPLIT`: each viewer's camera fills its half of the window and stands behind its own focus,
+/// 1.7 times as far from the courtyard's middle, looking in at the stone about the focus.
+fn follow_viewers(
+    windows: Query<&Window, With<PrimaryWindow>>,
+    foci: Query<(&Viewer, &Transform), (With<Focus>, Without<ViewerCamera>)>,
+    mut cameras: Query<(&ViewerCamera, &mut Camera, &mut Transform), Without<Focus>>,
+) {
+    let Ok(window) = windows.single() else { return };
+    let size = window.physical_size();
+    if size.x < 2 || size.y == 0 {
+        return;
+    }
+    let half = UVec2::new(size.x / 2, size.y);
+    for (ViewerCamera(index), mut camera, mut transform) in &mut cameras {
+        let physical_position = UVec2::new(*index as u32 * half.x, 0);
+        let placed = camera
+            .viewport
+            .as_ref()
+            .is_some_and(|v| v.physical_position == physical_position && v.physical_size == half);
+        if !placed {
+            camera.viewport = Some(Viewport { physical_position, physical_size: half, ..default() });
+        }
+        if let Some((_, focus)) = foci.iter().find(|(viewer, _)| viewer.0 == *index) {
+            let p = focus.translation;
+            let eye = Vec3::new(p.x * 1.7, 3.0, p.z * 1.7);
+            let look = Vec3::new(p.x * 0.55, 0.9, p.z * 0.55);
+            *transform = Transform::from_translation(eye).looking_at(look, Vec3::Y);
+        }
+    }
 }
 
 /// Where the camera goes, read once at startup so the systems do not read the environment again.
@@ -929,8 +1020,26 @@ fn spawn_scene(
             });
     }
 
-    // The focus the pool measures from.
-    commands.spawn((Name::new("Focus"), Focus, Transform::default()));
+    // The foci the pool measures from: one, or one per viewer, each an equal share of the orbit behind the
+    // last. Under `LIGHTS_FOCI` (one camera) each carries a small cyan marker so the overview shows who
+    // the viewers are.
+    let marker = (foci_count() > 1 && !split_on()).then(|| {
+        (
+            meshes.add(Sphere::new(0.14)),
+            materials.add(StandardMaterial {
+                base_color: Color::srgb(0.0, 0.9, 1.0),
+                unlit: true,
+                ..default()
+            }),
+        )
+    });
+    for index in 0..foci_count() {
+        let name = if index == 0 { "Focus".to_string() } else { format!("Focus {}", index + 1) };
+        let mut focus = commands.spawn((Name::new(name), Focus, Viewer(index), Transform::default()));
+        if let Some((mesh, material)) = marker.clone() {
+            focus.insert((Mesh3d(mesh), MeshMaterial3d(material), NotShadowCaster));
+        }
+    }
 }
 
 fn walk_bearers(time: Res<Time>, mut bearers: Query<(&mut Bearer, &mut Transform)>) {
@@ -946,8 +1055,8 @@ fn walk_bearers(time: Res<Time>, mut bearers: Query<(&mut Bearer, &mut Transform
     }
 }
 
-/// Orbits the focus at 6 m on a 20 s period./// Orbits the focus at 6 m on a 20 s period.
-fn orbit_focus(time: Res<Time>, mut focus: Query<&mut Transform, With<Focus>>) {
+/// Orbits each focus at 6 m on a 20 s period, each viewer an equal share of the orbit behind the last.
+fn orbit_focus(time: Res<Time>, mut focus: Query<(&mut Transform, &Viewer), With<Focus>>) {
     let elapsed = time.elapsed_secs();
     // `LIGHTS_FOCUS_WALK=<radius>` sends the focus out to that radius instead of its 6 m orbit. With a
     // radius past the pool's reach the torches stream across the reach boundary as it goes round, which
@@ -958,9 +1067,12 @@ fn orbit_focus(time: Res<Time>, mut focus: Query<&mut Transform, With<Focus>>) {
         .and_then(|v| v.parse::<f32>().ok())
         .filter(|r| *r > 0.0)
         .unwrap_or(6.0);
-    let at = Vec3::new(radius * (elapsed * TAU / 20.0).cos(), 1.2, radius * (elapsed * TAU / 20.0).sin());
-    for mut transform in &mut focus {
-        transform.translation = at;
+    // A split screen's two viewers stand a quarter of the orbit apart, so their halves are not mirror images
+    // of each other; any other number of foci share the orbit equally.
+    let step = if split_on() { TAU / 4.0 } else { TAU / foci_count() as f32 };
+    for (mut transform, Viewer(index)) in &mut focus {
+        let angle = elapsed * TAU / 20.0 + *index as f32 * step;
+        transform.translation = Vec3::new(radius * angle.cos(), 1.2, radius * angle.sin());
     }
 }
 
