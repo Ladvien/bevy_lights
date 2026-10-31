@@ -139,8 +139,21 @@ The box covers the *quad*, not the sparks. The sparks climb at most 1.5 flame he
 - **No culled ember quad has a point on screen.** The same sweep as the flame's (40 000 random flames, catches, leans to the shader's 0.995, parents turned any way, cameras at any distance and elevation) over a port of the ember vertex stage's corners; a quad any point of which is inside the frame is never culled by Bevy's own sphere and box test. Fails with `RISE_MAX` or `DRIFT` raised in the shader's port without the model following, and with the scale left undivided.
 - **The box keeps its world size through a catch and a lean**, every frame of a kindle in a 3 m/s wind.
 - **The box follows the flame's scale on the same frame**: an ember quad's box is never one frame behind its flame's scale.
-- **Off-screen embers are cheap**: with about twenty fires in view, `bench_flames` with `BENCH_EMBERS=1` at 5 000 flames costs at most a third of the 9.5 ms above, and `embers_visible` is the fires in view and not the fires in the world.
+- **Off-screen embers are cheap**: with about twenty fires in view, a town whose torches all shed sparks costs at most 1.5 times the same town without sparks at 5 000 flames (2.6 times before: 9.5 ms against 3.7), and `embers_visible` is the fires in view and not the fires in the world. (The first draft of this target was "a third of the 9.5 ms", 3.2 ms, which is below the floor: the flames alone, with no sparks at all, cost 3.7 ms in that run, so no cull of the sparks could reach it. The target is restated against the floor, and the restatement is recorded here.)
 - **Nothing visible changes**: the courtyard's captures (four braziers and 48 torches, embers on) at the default, ground, graze, top-down and closefire cameras and a sweep that carries every fire across both frame edges differ from the old build by GPU noise only.
+
+### Results (iteration 278)
+
+`bench_flames`, the new bench over the old and over the new `src/`, best of three alternating runs, `BENCH_EMBERS=1`, mean ms a frame, on a machine at load average 15-26:
+
+| | 5 000 flames | 20 000 flames | 5 000, `BENCH_WIND=3,0` | `embers_visible` |
+|---|---|---|---|---|
+| before (`NoFrustumCulling`) | 11.5 | 37.2 | 8.8 | every quad in the world |
+| after (the quad's own box) | 4.2 | 9.2 | 3.6 | 18-21 |
+
+The residual, with the same binary and `BENCH_EMBERS` 0 against 1 at 5 000 flames, interleaved three times at load average 43: 7.5, 6.1, 5.8 ms without sparks and 9.3, 7.9, 8.0 with, so an embered fire off the screen costs 0.4 µs a frame (1.2 µs before): the ratio is 1.2-1.4, inside the 1.5 target. The 0.4 µs is `update_embers`' per-quad query and box comparison and Bevy's visibility pass over a second box a fire.
+
+Nothing visible changed. Eighteen captures of the courtyard (`LIGHTS_EMBERS=6`, 1280x720, 600 frames at a fixed step, 300 for the sweep; default, ground, edge, top-down, graze and closefire cameras, two more seeds with pool 4 and 16, a cut-edge shot in a 2 m/s wind and a nine-step sweep of the camera's aim from x = -16 to +16 with fires crossing both frame edges) are bit-identical to the old build's except one pixel of one DN in four of them; and a 51-frame sequence (every second frame from 30) with the aim at x = -14, a gusting 2,1 m/s wind and `LIGHTS_EMBERS=8` differs by one DN in one pixel of one frame.
 
 ## What great looks like
 
