@@ -31,7 +31,7 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `src/model/reach.rs` — `raised_light`, `RANGE_MARGIN`.
 - `src/model/tag.rs` — `pack_flame_tag`, `unpack_flame_tag`.
 - `src/flicker.rs` — `FlickerPlugin`, `Flicker`, `Kindle`, `Kindled`, and `flicker_lights` over both light types.
-- `src/pool.rs` — `LightPoolPlugin<F>`, `LightPool`, `PoolCandidate`, `PoolLight`, `assign_pool::<F>`.
+- `src/pool.rs` — `LightPoolPlugin<F>`, `LightPool`, `FocusRule`, `PoolCandidate`, `PoolLight`, `assign_pool::<F>`. `src/model/pool.rs` holds the hand-off rule and the shared pool's maths (`focus_quota`, `quota_cutoff`, `shared_value`).
 - `src/flame.rs` — `FlamePlugin`, `FlameMaterial`, `FlameLook`, `FlameSite`, `Flame`, `dress_flames`, `update_flames`.
 - `src/flame.wesl` — the flame shader, embedded with `embedded_asset!`.
 - `src/embers.rs`, `src/embers.wesl` — `FlameEmbers` and the spark quad (a child of the `Flame`, registered by `FlamePlugin`).
@@ -139,8 +139,9 @@ is an art decision, so it needs the same treatment as a physics constant.
 - **All run conditions are evaluated — there is no short-circuit.** A bare `Res<T>` in a
   `.run_if(..)` closure panics whenever that resource is absent.
 - **`Single<..>` silently skips its system on a non-unique match.** The pool's focus is a plain
-  `Query` and counts its matches instead, because two foci is a *reportable* state and `Single` would
-  hide it.
+  `Query` and counts its matches instead, because two foci is a *reportable* state under the default
+  `FocusRule::One` and `Single` would hide it. `FocusRule::Shared` takes any number, one per viewer, and
+  shares `LightPool::size` between them (`docs/research/pool-foci.md`): `size` is the total, never per view.
 - **Lifecycle observers take the event:** `On<Add<A>>`, `On<Remove<A>>`.
 - Do not hard-wrap markdown.
 - Close any Bevy app you launch.

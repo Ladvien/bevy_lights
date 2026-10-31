@@ -37,7 +37,8 @@ then re-lit (`Kindle`), and each flame grows out of its coals as its light flare
   (light and linked flame together) with a `Snuffed` message for the hiss; both work on a pooled torch too, via its `PoolCandidate`,
   and a pooled fire that stays out costs the pool less than one that is lit, however many there are.
 - **A budgeted pool of real lights** (`LightPoolPlugin::<YourFocusMarker>`): a fixed number of real
-  point lights handed to the best-ranked candidates around the one entity carrying your focus marker,
+  point lights handed to the best-ranked candidates around the entity carrying your focus marker (or, with
+  `FocusRule::Shared`, one per viewer, as in split-screen co-op),
   with hysteresis, a cross-fade and a per-frame hand-off budget, so a light that changes owner does not
   pop — and a shadow budget, so only the nearest few cast shadows and a shadow that moves fades rather
   than pops.
@@ -184,11 +185,13 @@ invisible light is not rewritten (nothing is extracted for it) but its kindle st
 ### The light pool
 
 A fixed number of real point lights (`LightPool::size`, default 16) is handed every frame to the
-best-ranked `PoolCandidate`s around the one entity carrying your focus marker, each light at the
+best-ranked `PoolCandidate`s around the entity carrying your focus marker (exactly one, unless the pool is shared, below), each light at the
 candidate's position plus its own world-space offset. Everything else is a flame and nothing else. The
 assignment is deterministic: rank, then `Entity`.
 
 `PoolBudget` is the pool's lamp schedule, rewritten every frame: `holds(entity)` and `holder_of(slot)` say which candidates are real lights right now, `casts_shadow(entity)` (and `shadowed`) which of those lights throw a shadow, and `starved()` counts the candidates that wanted one and are only flames, so an editor can show the budget and a game can see `size` is too small.
+
+**More than one viewer.** The pool measures from the entity carrying your focus marker, and by default needs exactly one: two are reported and leave the pool dark. A game with a split screen, or a map camera beside the player's, sets `LightPool::focus` to `FocusRule::Shared` and puts the marker on each viewer. The pool's `size` is then **shared**, not multiplied: each focus is entitled to `ceil(size / foci)` lights, ranked by `rank` among the candidates in `reach` of it, and what one viewer does not use goes to the others, so a viewer among twenty fires cannot take the lights of one standing by three (on a plain nearest-focus distance it would take all of them). A fire between two viewers is one light. A viewer joining or leaving re-divides the lights through the ordinary hand-off (give the pool `reserve` at least as large as the number of lights that move, and its total brightness holds at every frame). With one focus it is the default rule, to the bit; with two, the pool's own work on 5 000 candidates went from 490 to 619 µs (best of eight runs; four foci, 660 µs). Run `LIGHTS_SPLIT=1` on the courtyard example for two cameras on one window, and `LIGHTS_FOCUS_RULE=one` over them for the pool without the rule.
 
 A candidate is ranked by the **light it puts on the subject** (`intensity / distance²`), not by its
 distance alone, so a bright brazier at 3 m outranks a dim torch at 2 m; `LightPool::rank` switches to
