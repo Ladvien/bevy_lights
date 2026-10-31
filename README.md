@@ -108,7 +108,7 @@ fn setup(mut commands: Commands) {
         // `kindle` grows the flame with its light, on the same 0.6 s envelope, and `diameter` matches
         // the `Flicker`'s so the drawn flame breathes at the same rate the light does. `depth` is how
         // far it dips: give the flame the same one as its light, or the two disagree.
-        FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS, diameter: Some(0.34), depth: FLICKER_DEPTH, depth_fade: false, fire: None },
+        FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS, diameter: Some(0.34), depth: FLICKER_DEPTH, depth_fade: false, fire: None, color: None },
     ));
 
     // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
@@ -128,7 +128,7 @@ fn setup(mut commands: Commands) {
             ..default()
         },
         // The pool's lights flicker at the un-sized rate, so this flame does too.
-        FlameSite { height: torch_height, phase: 1.9, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false, fire: None },
+        FlameSite { height: torch_height, phase: 1.9, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false, fire: None, color: None },
         Transform::from_xyz(4.0, 0.0, 2.0),
     ));
 
@@ -256,7 +256,13 @@ sliding across a torch dims its flame over a few pixels instead of popping it. G
 as before, with no depth read. `cargo run --release --example occlusion` shows both, and
 `LIGHTS_DEPTH_FADE=1` runs the same scene faded.
 
-**Embers.** Add `FlameEmbers { rate }` (sparks a second, `0..=MAX_EMBER_RATE`, default 3) to a `FlameSite` and its flame sheds sparks: short orange streaks that leave the flame, climb under drag, weave, and cool from yellow through orange to red before they go out (`src/embers.wesl`). It is one extra camera-facing quad per fire, a child of the flame, with no particle state: every spark is a function of the shared clock and an integer hash, so a fire's sparks are the same on every machine and cost one draw. The quad takes the flame's catch and wind lean, so a fire not yet caught sheds nothing, a snuffed one stops, and a wind carries the sparks 1.5 times as far downwind as it leans the flame; `depth_fade` hides the sparks of a hidden source too. A site without the component draws exactly as before. Measured with `LIGHTS_GPU_TIMING=1` on an RTX 3090 (the courtyard's 52 flames, 8 sparks a second each), the transparent pass takes about 11 µs without embers and 107 to 137 µs with them, so the sparks cost about 0.1 ms a frame there. `LIGHTS_EMBERS=3 cargo run --release --example courtyard` shows it; `docs/research/flame-embers.md` has the sources.
+**A fire's own colour.** `FlameSite::color: Option<Color>` gives one fire a colour of its own: a blue gas lantern, a green witch-fire or a violet shrine brazier among orange torches. `None` is the scene's `FlameLook::color`, drawn exactly as before. The colour is the middle of the flame's ramp and the rest is the same flame in that hue, a darker and more saturated rim and a paler core (`retint`, in `bevy_lights::model::fire_colour`); a red, orange or yellow keeps the shipped rim and core, which were tuned for them, so no existing scene changes. The flame's sparks (`FlameEmbers`) follow it. **Give the light the same colour**, so the flame and the ground it lights are one hue: the fire's own `PointLight::color` for a `Flicker`, `PoolCandidate::color` for a prop the pool lights (the pool's light takes it on the frame the light changes owner, while it is fading in from nothing, the light fading out keeps its owner's, and a candidate with no colour gets the template's, or your palette's, back). Every distinct colour is one more material and one more batch, shared by every flame of it and released with the last: a handful is free, and a colour changed every frame is a material a frame. `LIGHTS_COLOURS=1 cargo run --release --example courtyard` is the picture below, `docs/research/fire-colour.md` the sources.
+
+![The courtyard with a blue and a green brazier among the orange ones and some blue and violet torches: each flame, its sparks and its light on the stone are one colour](docs/media/colours.png)
+
+*`LIGHTS_COLOURS=1` on the courtyard (seed 7, pool 8, 1280 × 720, frame 300): braziers 1 and 2 are a gas-flame blue `(0.10, 0.32, 1.0)` and a witch-fire green `(0.20, 1.0, 0.30)`, braziers 0 and 3 stay the scene's orange, and every fifth torch carries a blue or a violet `(0.62, 0.20, 1.0)`. Each coloured fire has `FlameSite::color` on its flame, the same colour on its light (`PointLight::color` for a brazier, `PoolCandidate::color` for a torch), and the stone round it is lit in that hue.*
+
+**Embers.** Add `FlameEmbers { rate }` (sparks a second, `0..=MAX_EMBER_RATE`, default 3) to a `FlameSite` and its flame sheds sparks: short streaks, orange or the fire's own colour, that leave the flame, climb under drag, weave, and cool from yellow through orange to red before they go out (`src/embers.wesl`). It is one extra camera-facing quad per fire, a child of the flame, with no particle state: every spark is a function of the shared clock and an integer hash, so a fire's sparks are the same on every machine and cost one draw. The quad takes the flame's catch and wind lean, so a fire not yet caught sheds nothing, a snuffed one stops, and a wind carries the sparks 1.5 times as far downwind as it leans the flame; `depth_fade` hides the sparks of a hidden source too. A site without the component draws exactly as before. Measured with `LIGHTS_GPU_TIMING=1` on an RTX 3090 (the courtyard's 52 flames, 8 sparks a second each), the transparent pass takes about 11 µs without embers and 107 to 137 µs with them, so the sparks cost about 0.1 ms a frame there. `LIGHTS_EMBERS=3 cargo run --release --example courtyard` shows it; `docs/research/flame-embers.md` has the sources.
 
 **Wind.** Insert `FlameWind { velocity }` (metres per second on the ground plane; the host copies it from
 its weather, which this crate does not own) and every flame leans downwind by the Welker–Sliepcevich

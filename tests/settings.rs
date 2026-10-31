@@ -303,3 +303,27 @@ fn a_fire_kind_parses_the_name_it_displays() {
     let msg = err.to_string();
     assert!(FireKind::ALL.iter().all(|k| msg.contains(k.name())), "{msg}");
 }
+
+/// A fire's own colour is saved with the fire and reads back; a file written before the field existed has none and
+/// loads as the scene's colour.
+#[cfg(feature = "serde")]
+#[test]
+#[allow(clippy::unwrap_used)]
+fn a_fires_colour_round_trips_and_an_old_save_loads_without_one() {
+    use bevy::prelude::Color;
+    let blue = Color::srgb(0.1, 0.3, 1.0);
+    let site = FlameSite { color: Some(blue), ..FireKind::Brazier.site() };
+    let back: FlameSite = serde_json::from_str(&serde_json::to_string(&site).unwrap()).unwrap();
+    assert_eq!(back, site);
+    let candidate = PoolCandidate { color: Some(blue), ..PoolCandidate::at_mean(500.0, 0.15) };
+    let back: PoolCandidate = serde_json::from_str(&serde_json::to_string(&candidate).unwrap()).unwrap();
+    assert_eq!(back, candidate);
+
+    let mut old: serde_json::Value = serde_json::to_value(FireKind::Brazier.site()).unwrap();
+    old.as_object_mut().unwrap().remove("color");
+    let loaded: FlameSite = serde_json::from_value(old).unwrap();
+    assert_eq!(loaded.color, None);
+    let mut old: serde_json::Value = serde_json::to_value(PoolCandidate::default()).unwrap();
+    old.as_object_mut().unwrap().remove("color");
+    assert_eq!(serde_json::from_value::<PoolCandidate>(old).unwrap().color, None);
+}

@@ -187,6 +187,17 @@ magick /tmp/split_shared.png /tmp/split_one.png -compose difference -composite -
 
 Judge each half separately (`magick f.png -crop 640x720+0+0 +repage -colorspace Gray -format "%[fx:mean*255]" info:`), and the difference image for where the pool lights are. A **moving** camera is a different test from a still one: record a sequence (`LIGHTS_SHOT_DIR`, `LIGHTS_SHOT_FROM=150`) and plot each half's mean luminance per frame; a frame that departs from the mean of its two neighbours by about a DN is a light drawn at a stale intensity (iteration 279 found one at 5.6 DN, in the frame a light entered a camera's view, and fixed it: after, none departs by more than 0.9). A static camera cannot show this. `BENCH_FOCI=n` on `bench_lights` prices the shared pool.
 
+## Seeing a fire's own colour
+
+`LIGHTS_COLOURS=1` gives some of the courtyard's fires a colour of their own, on the flame, its sparks and its light together: braziers 1 and 2 burn a gas-flame blue and a witch-fire green, and every fifth torch a blue or a violet; unset or `0` the courtyard is the scene's orange and draws the same pixels it always did (a capture of it differs from the previous build's by **zero** pixels, which is the check to run after any change to what a flame's colours are made of: `magick compare -metric AE old.png new.png null:`).
+
+```sh
+LIGHTS_FRAMES=300 LIGHTS_COLOURS=1 LIGHTS_SEED=7 LIGHTS_SHOT=/tmp/colours.png cargo run --release --example courtyard      # docs/media/colours.png
+LIGHTS_FRAMES=300 LIGHTS_COLOURS=1 LIGHTS_EMBERS=4 LIGHTS_EYE=-5,2.6,8.4 LIGHTS_LOOK=-5,0.9,5 LIGHTS_SHOT=/tmp/blue.png cargo run --release --example courtyard   # the blue brazier from 3.5 m
+```
+
+A coloured fire is judged by whether the light it throws and the flame it is drawn on are one colour: the stone beside the brazier should lean to the flame's hue and the nearest torch-bearer's near side take it, and the rim and core of the flame should read as the orange flame's do (a darker, more saturated rim, a paler core). A pool light that changes owner between two colours changes colour while it is fading in from nothing, so no frame should depart from the mean of its neighbours by more than the pool's usual pop test in any channel: record a sequence (`LIGHTS_FOCUS_WALK=18 LIGHTS_POOL=4 LIGHTS_HYSTERESIS=1.0 LIGHTS_SHOT_DIR=... LIGHTS_SHOT_EVERY=1 LIGHTS_SHOT_FROM=100`) and plot each channel's mean per frame.
+
 ## Seeing a cross-faded hand-off
 
 The pool's `reserve` light is what makes a hand-off cross-fade rather than dip. The example takes
