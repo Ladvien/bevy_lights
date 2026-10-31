@@ -166,12 +166,14 @@ away.
 `bench_lights` has no renderer, so it cannot see a flame. `bench_flames` can: it spawns `BENCH_FLAMES` torches (default 5000) on a 3 m grid, points one camera at a corner of the grid so that about twenty are in view, renders 400 frames to an off-screen image (the first 100 are not counted: the flame material's pipeline compiles in them) and prints
 
 ```text
-bench_flames flames=5000 visible=15 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
+bench_flames flames=5000 visible=15 embers=0 embers_visible=0 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
 ```
 
-`visible` is the number of flames the renderer counted as in view at the last frame, which is the proof that the others were culled; `BENCH_WIND=3,0` makes every flame lean, so each one's scale and culling box are rewritten every frame. Each `*_ms` is one `App::update()`, the main world and the render world's CPU work together, and the bench needs a GPU adapter. It runs without a display or a window (`DefaultPlugins` with `WinitPlugin` disabled and the camera on an `Image`), so it works over ssh. A GPU busy with other jobs makes `create_render` panic at start-up: check `nvidia-smi` and run it again.
+`visible` is the number of flames the renderer counted as in view at the last frame, which is the proof that the others were culled; `BENCH_WIND=3,0` makes every flame lean, so each one's scale and culling box are rewritten every frame; `BENCH_EMBERS=1` gives every torch `FlameEmbers` (a second quad a flame) and `embers_visible` counts those quads the renderer drew. Each `*_ms` is one `App::update()`, the main world and the render world's CPU work together, and the bench needs a GPU adapter. It runs without a display or a window (`DefaultPlugins` with `WinitPlugin` disabled and the camera on an `Image`), so it works over ssh. A GPU busy with other jobs makes `create_render` panic at start-up: check `nvidia-smi` and run it again.
 
 Compare two builds the way `bench_lights` is compared: separate target directories (or a copied binary), interleaved, three rounds. Iteration 277's numbers, best of three on a loaded machine, in ms a frame: 0 flames 1.3 and 1.7 (noise: the order reversed reads the other way), 1 000 flames 2.2 → 1.9, 5 000 7.8 → 2.2, 20 000 30.0 → 6.4, and with `BENCH_WIND=3,0` 5 000 8.0 → 3.1 and 20 000 28.1 → 5.9, before → after culling. What is left, about 0.25 µs a flame, is `update_flames`' own per-flame work and Bevy's visibility pass over the boxes.
+
+Iteration 278's numbers for the ember quads (`BENCH_EMBERS=1`, best of three interleaved runs on a machine at load average 20-36, in ms a frame), before → after the quad got a box of its own: 1 000 flames 4.0 → 2.6, 5 000 12.5 → 3.5, 20 000 32.8 → 11.5, and with `BENCH_WIND=3,0` 5 000 10.0 → 4.2 and 20 000 40.8 → 11.5; `embers_visible` fell from every quad in the world to 18-21. The quiet-machine pair before the change (load 18) was 3.7 → 9.5 ms at 5 000 torches without and with sparks, and 9.4 → 46.3 at 20 000.
 
 ## Seeing a cross-faded hand-off
 
