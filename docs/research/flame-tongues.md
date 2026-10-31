@@ -61,6 +61,19 @@ Delichatsios (home-still catalog): "Flame merging of the fire plumes will occur 
 
 A campfire at night, close: a broad, lively mound of orange with a bright yellow heart, three or four tongues leaving it at different heights and leaning slightly different ways, the tallest in the middle, their feet lost in the bed's glow; the tongues part and rejoin as they breathe at the one rate. From above, a ring of overlapping blobs that fills the bed, not one disc in the middle. The bonfire is the same animal at four times the size: a mass, not a single tongue. Neither shows a row.
 
+## Built, and how it was judged
+
+By rounds, each judged by looking (`examples/campfire.rs`, 1280 × 720, frame 240, a campfire from 2.5 m and a bonfire from 5 m at the eye, a graze, from above, in a 1.5 m/s wind, and a 30-frame sequence at 0.05 s):
+
+- **Round 0, the build before.** One slender tongue (28 cm and 80 cm wide) on a 0.8 m and a 3 m bed: a very large candle. Reproduced before any change (`LIGHTS_TONGUES=0`).
+- **Round 1, separate flames, parallel** (a throwaway scene of one `FlameSite` per tongue, then the crate's, 5 tongues over 0.5 m and 7 over 1.8 m): the campfire is fuller and reads as a fire; the bonfire is a row of pointed teeth with gaps between them, a crown, each one a candle. Not yet.
+- **Round 2, converging.** Each outer tongue leans in towards the middle one by `INWARD_LEAN · r / R` (0.30 at the rim), the layout's azimuth jitter and the mound's spread widened, and a bonfire given nine tongues over 1.5 m: the tongues overlap into one body that narrows to a tip, and the sequence shows them parting and rejoining. Nine tongues over 1.5 m on a campfire is as wide as its stones and too much.
+- **Round 3, the kinds' numbers** (6 over 0.55 m, 9 over 1.6 m) and the final build: campfire, bonfire, wind, graze and top-down judged as below.
+
+Checked against the validation targets: a scene that does not use the component is zero pixels different (ten courtyard views, three with one pixel off by 1 DN: the GPU's own noise); the layout's invariants are unit tests (`model::tongue`: every foot on the bed and off the middle, no tongue above `MERGE_RATIO` times its distance from the middle, no two feet within 6 % of the bed's width, every lean pointing at the middle and never more than `INWARD_LEAN`); every tongue catches and leans with its fire (`tongues::tests`). Cost is in `docs/DEMOS.md`: 0.18 µs a flame a frame on the CPU, and about 0.15 ms of the transparent pass with a campfire and a bonfire filling a third of the screen.
+
+Known limits. From a graze across a log pile the tongues in front of the middle one show as narrow vertical streaks between the logs, as the fire would show between them, and a bed seen from straight above is a ring of small discs (each tongue's own overhead disc), not a single heat; a campfire given more than six tongues over its 0.55 m is wider than the stones; the tongues' tip shapes are the one shader's, and differ only by clock and height.
+
 ## Deviations
 
 - The tongues are separate quads, not one wide shape in the shader. A wide single quad would need a second per-instance number (the tag's 32 bits are full) and a union of silhouettes in a shader that already carries the wind's lean, the overhead disc and the depth fade; a separate flame carries all of them for free and a fire that does not ask for tongues is untouched. The cost is `count` draws for a fire that asks.

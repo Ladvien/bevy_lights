@@ -17,7 +17,7 @@ mod common;
 use bevy::camera::Exposure;
 use bevy::prelude::*;
 use bevy_lights::*;
-use common::{ExampleHarness, camera, camera_placement, wind_env};
+use common::{ExampleHarness, GpuTiming, camera, camera_placement, render_plugin, wind_env};
 
 /// The campfire's and the bonfire's places on the clearing, and how bright each pool is at its reach (lux, in the scene's exposure).
 const CAMPFIRE: Vec3 = Vec3::new(-2.6, 0.0, 0.0);
@@ -28,8 +28,8 @@ fn main() {
     let (eye, look) = camera_placement(Vec3::new(0.4, 1.6, 6.4), Vec3::new(0.4, 1.0, 0.0));
     let fire = blackbody_colour(1900.0, 1.0);
     App::new()
-        .add_plugins(DefaultPlugins)
-        .add_plugins((ExampleHarness, FlickerPlugin, FlamePlugin))
+        .add_plugins(DefaultPlugins.set(render_plugin()))
+        .add_plugins((ExampleHarness, FlickerPlugin, FlamePlugin, GpuTiming))
         .insert_resource(ClearColor(Color::srgb(0.010, 0.014, 0.034)))
         .insert_resource(FlameLook {
             color: LinearRgba::rgb(fire[0], fire[1], fire[2]),

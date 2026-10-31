@@ -295,6 +295,30 @@ What to look for, and what to measure:
 - **A scene that puts nothing out is unchanged.** The default courtyard and the close camera with `LIGHTS_SMOKE` and `LIGHTS_WIND` are zero pixels different from the build before (`magick compare -metric AE`).
 - **From above it is a point.** A camera looking straight down sees a vertical column end-on, so the top-down view shows nothing of the trail, as it shows nothing of the steady plume; the 3x crop of a brazier at the default 45° camera shows a thin warm wisp rising from the coals.
 
+## Seeing a wide fire's tongues
+
+`examples/campfire.rs` puts a campfire (0.8 m bed, 0.7 m flame) at x = -2.6 and a bonfire (3 m pyre, 2 m flame) at x = 3.4, each a `FireKind` with its light, flame, sparks, smoke and `FlameTongues` (`docs/research/flame-tongues.md`). `LIGHTS_TONGUES=0` draws the same two fires as one flame each, which is the comparison, and every frame below is `LIGHTS_FRAMES=240`:
+
+```sh
+# the campfire from 2.5 m, the bonfire from 5 m, and the same two without tongues
+for t in off on; do
+  E=""; [ $t = off ] && E="LIGHTS_TONGUES=0"
+  env $E LIGHTS_FRAMES=240 LIGHTS_EYE=-0.1,1.1,2.3 LIGHTS_LOOK=-2.6,0.55,0 LIGHTS_SHOT=/tmp/${t}_camp.png cargo run --release --example campfire
+  env $E LIGHTS_FRAMES=240 LIGHTS_EYE=1.4,1.5,5.0 LIGHTS_LOOK=3.4,1.0,-0.6 LIGHTS_SHOT=/tmp/${t}_bon.png cargo run --release --example campfire
+done
+# a sequence: 30 frames, one every 3 (0.05 s), from frame 60
+LIGHTS_FRAMES=150 LIGHTS_SHOT_DIR=/tmp/camp LIGHTS_SHOT_FROM=60 LIGHTS_SHOT_EVERY=3 \
+  LIGHTS_EYE=-0.1,1.1,2.3 LIGHTS_LOOK=-2.6,0.55,0 cargo run --release --example campfire
+```
+
+`docs/media/tongues.png` is those four frames (campfire and bonfire, off and on), each cropped to the fire and the captions burned in. `LIGHTS_WIND=1.5,0` shows the tongues laid over together (the inward lean adds to the wind's), `LIGHTS_SNUFF=1.0` puts both out and every tongue goes with its light, `LIGHTS_TONGUES=n` gives both fires `n` tongues over their kind's spread (a campfire given nine is as wide as its stones), and `LIGHTS_SPREAD=m` sets the width the tongues' feet are spread over.
+
+What to look for, and what to measure:
+
+- **A mound, not a row.** The first build laid the tongues parallel, which read as a crown of candles (bonfire) and a handful of separate flames (campfire); the inward lean (`INWARD_LEAN`, 0.30 at the rim) turns them into one fire that converges on a tip. A frame sequence shows the tongues parting and rejoining on clocks of their own.
+- **A scene that does not use the component is unchanged.** The default courtyard in ten views (ground, edge, top and graze, two seeds with a pool of 4 and of 16, and three far views at 45 and 95 m, one with sparks and smoke) against the build before: seven are zero pixels different and three have one pixel off by 1 DN (the GPU's own noise, as in iteration 282); counted with numpy on the two PNGs.
+- **What it costs.** CPU: `BENCH_TONGUES=6 cargo run --release --example bench_flames` (5 000 fires of 6 tongues, 30 000 flames in the world, 88 in view) reads 7.1 to 7.4 ms a frame against 2.6 to 2.9 for 5 000 plain flames: the 25 000 extra flames cost about 0.18 µs each a frame, so a campfire's five extra tongues are about 0.9 µs. GPU: `LIGHTS_GPU_TIMING=1 LIGHTS_FRAMES=420` with the bonfire 5 m from the camera (both fires in view, a third of the screen) reads the transparent pass at 340 and 302 µs without tongues and 504 and 436 µs with them (two rounds, interleaved), the opaque pass unchanged: about 0.15 ms a frame for the two fires, 13 draws more.
+
 ## The still
 
 ```sh
