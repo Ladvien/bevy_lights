@@ -65,7 +65,7 @@ pub struct FuelBed {
     /// every machine.
     pub seed: u32,
     /// The time constant, in seconds, of the coals' cooling once the fire is put out: their heat falls as `exp(-t / cooling)`, and the glow
-    /// is gone in about a minute at the default (a real bed smoulders for tens of minutes, which no scene waits for; a host that wants a
+    /// is gone in a minute and a half at the default (a real bed smoulders for tens of minutes, which no scene waits for; a host that wants a
     /// quick hiss sets it to a few seconds). A design default (`docs/research/fuel-bed-heat.md`).
     pub cooling: f32,
 }

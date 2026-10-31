@@ -27,13 +27,14 @@ pub const BED_COOL_KELVIN: f32 = 450.0;
 pub const BED_WARM_SECONDS: f32 = 4.0;
 
 /// The time constant, in seconds, of a bed's cooling after its fire is put out when the host does not say: Newton's law makes the heat
-/// fall as `exp(-t / cooling)`, and the glow is gone in about a minute (the hottest coal is under [`BED_VISIBLE_SHARE`] of its burning
+/// fall as `exp(-t / cooling)`, and the glow is gone in a minute and a half (the hottest coal is under [`BED_VISIBLE_SHARE`] of its burning
 /// brightness at [`bed_visible_heat`]). A real bed smoulders for tens of minutes; this is the length a game scene can wait. A design default.
 pub const DEFAULT_BED_COOLING: f32 = 60.0;
 
 /// How much of the flame's flicker dip the bed's heat follows: the heat it is drawn at is `h (1 - BED_BREATH (1 - swing))`. Small, and it
-/// has to be: the glow is steep in temperature, so a 6 % dip in heat (about 8 K at the hottest stop) is already a 25 % swing in brightness,
-/// the depth the flame's own flicker has. A design default.
+/// has to be: the glow is steep in temperature (a blackbody roughly doubles for every 25 K near 1200 K, and a heat step of `x` is `450 x` kelvin),
+/// so the flame's deepest dip (0.4 of its brightness for a campfire) is a 2.4 % dip in heat, about 11 K at the hottest stop and a 16 % swing in
+/// that coal's brightness. A design default.
 pub const BED_BREATH: f32 = 0.06;
 
 /// The columns (the char field, `0..=1`) and rows (the heat, `0..=1`) of [`bed_ramp`]'s table.
