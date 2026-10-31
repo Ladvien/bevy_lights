@@ -22,8 +22,9 @@ pub use cinematography::{
 };
 pub use fire::{
     CALM_FLICKER_DEPTH, DEFAULT_FIRE_DIAMETER, FLAME_TILT_LIMIT, FLICKER_DEPTH, KINDLE_SECONDS,
-    MAX_FLICKER_DEPTH, PUFFING_CONSTANT, SNUFF_SECONDS, WHIPPING_FLICKER_DEPTH, flame_tilt, flicker_depth,
-    flicker_factor, flicker_factor_of, flicker_mean, flicker_rate, flicker_swing, kindle_gain, snuff_gain,
+    MAX_FLICKER_DEPTH, PUFFING_CONSTANT, SMOKE_TAIL_SECONDS, SNUFF_SECONDS, WHIPPING_FLICKER_DEPTH,
+    flame_tilt, flicker_depth, flicker_factor, flicker_factor_of, flicker_mean, flicker_rate, flicker_swing,
+    kindle_gain, snuff_gain,
 };
 pub use fire_colour::retint;
 pub use pool::{

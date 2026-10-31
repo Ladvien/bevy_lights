@@ -277,6 +277,24 @@ The frame rate in that log counts from 1 while `LIGHTS_SHOT_DIR`'s numbering sta
 screenshot's `frame0006` is rarely the log's frame 6 — measure the log for the artefact and the images for
 its look, and do not try to line the two up by index.
 
+## Seeing a put-out fire's smoke trail
+
+`FlameSmoke` leaves a trail when the light its flame is linked to gets a `Snuff` (`docs/research/flame-smoke-tail.md`). The courtyard's `LIGHTS_SNUFF=<seconds>` puts every brazier and torch out at that time, and `LIGHTS_SMOKE=0.8 LIGHTS_EMBERS=4` give every flame its smoke and sparks, so a sequence from a close camera is one command:
+
+```sh
+LIGHTS_FRAMES=420 LIGHTS_SNUFF=2.0 LIGHTS_SMOKE=0.8 LIGHTS_EMBERS=4 LIGHTS_EYE=2.4,1.5,7.2 LIGHTS_LOOK=5,1.6,5 \
+  LIGHTS_SHOT_DIR=/tmp/trail LIGHTS_SHOT_FROM=120 LIGHTS_SHOT_EVERY=72 cargo run --release --example courtyard
+```
+
+That is frames 120, 192, 264, 336 and 408: the douse begins at frame 120 (2.0 s), the flame is out by 192 (1.2 s later), and the trail ends, exactly dark, at 5 s (frame 420). Add `LIGHTS_WIND=3,0` to see the trail bend over downwind as it lifts.
+
+What to look for, and what to measure:
+
+- **The flame's end is not the smoke's.** From the second frame on, the column is still there and its base has lifted off the coals; at 2.4 s it has left the bowl and at 3.6 s only its top is left. The old build's smoke was gone with the flame, at about 0.8 s.
+- **No frame pops.** The mean luminance of the column's box, frame by frame (`mean |Δ|` against the frame before, in the same box), is smooth across the douse's first frame and across the trail's last: the build before this change was the same to the DN until the douse began, and the trail's own fade reaches the sky's level (4.15 DN here) at about 4.8 s, a little before its clock stops.
+- **A scene that puts nothing out is unchanged.** The default courtyard and the close camera with `LIGHTS_SMOKE` and `LIGHTS_WIND` are zero pixels different from the build before (`magick compare -metric AE`).
+- **From above it is a point.** A camera looking straight down sees a vertical column end-on, so the top-down view shows nothing of the trail, as it shows nothing of the steady plume; the 3x crop of a brazier at the default 45° camera shows a thin warm wisp rising from the coals.
+
 ## The still
 
 ```sh

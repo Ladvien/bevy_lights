@@ -35,6 +35,11 @@ plainly that it is a design default.
   turns to.
 - [`fire-colour.md`](fire-colour.md) — a fire's own colour on its flame, its sparks and the pooled light
   it is handed: one hue for the visible source and the light it throws, as the same ramp rotated.
+- [`flame-smoke.md`](flame-smoke.md) — the plume a fire goes on up as: one additive quad, a function of the
+  shared clock, lit by the flame and bent over in a wind (a bent-over plume, a turbulent plume's width).
+- [`flame-smoke-tail.md`](flame-smoke-tail.md) — what a fire that is put out leaves: smoke density is
+  advected, so the column's base lifts off the wick and thins for a few seconds instead of shrinking with the
+  flame.
 - [`corpus.md`](corpus.md) — what the home-still library actually holds for cinematography,
   photography, CG and animation lighting, game-lighting craft, many-light rendering, fire physics and
   perception, with the stems to read and the gaps to fill.

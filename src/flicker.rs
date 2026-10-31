@@ -202,7 +202,9 @@ pub struct Kindled {
 /// [`snuff_gain`]; a [`FlameSite`](crate::FlameSite) whose [`fire`](crate::FlameSite::fire) names this
 /// light is drawn at the same factor, so light and flame go out together. At the end the intensity is
 /// exactly 0 and [`Snuffed`] is written once; the fire then stays out until the host removes `Snuff`
-/// (and inserts [`Kindle::default()`] to light it again). With both present, `Snuff` wins.
+/// (and inserts [`Kindle::default()`] to light it again). With both present, `Snuff` wins. A linked flame that
+/// has a [`FlameSmoke`](crate::FlameSmoke) leaves a trail of smoke that lifts off and thins for
+/// [`SMOKE_TAIL_SECONDS`](crate::SMOKE_TAIL_SECONDS) after the flame is gone.
 ///
 /// It acts on a [`Flicker`] light, or on a [`PoolCandidate`](crate::PoolCandidate) (see there): the pool lends the
 /// candidate's light at the same factor.
