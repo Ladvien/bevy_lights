@@ -616,6 +616,9 @@ fn spawn_camera(mut commands: Commands, placement: Res<CameraPlacement>, fill: R
         if depth_fade_on() {
             camera.insert(DepthPrepass);
         }
+        if std::env::var("LIGHTS_BLOOM").is_ok_and(|v| v != "0") {
+            camera.insert(bevy::post_process::bloom::Bloom::NATURAL);
+        }
     }
     // The moon: the host's directional light (the crate never adds one), a sky-coloured fill at the
     // illuminance that makes the target key-to-fill against the braziers' pools.
