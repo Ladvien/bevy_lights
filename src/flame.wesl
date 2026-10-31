@@ -29,12 +29,18 @@ import bevy_pbr::render::{
 import bevy_pbr::prepass::utils::prepass_depth;
 
 struct Flame {
-    // The host's fire colour, and the ember strength in `.a`.
+    // The fire's colour (the middle of its ramp: `FlameLook::color`, or a site's `FlameSite::color`), and the ember strength in `.a`.
     base: vec4<f32>,
     // x: seconds (wrapped hourly), y: the tag's height scale in world units (`FlameLook::max_height`), z: 1 for the material of a
     // site that asked for the depth fade, w: the ember
     // strength.
     params: vec4<f32>,
+    // The rest of the fire's ramp, written by the CPU (`retint` in `src/model/fire_colour.rs`): the shipped orange ramp's cool rim,
+    // its hot core and the colour it tends to while it catches, moved to the fire's hue. For the shipped orange they are the numbers
+    // this shader used to hold as constants, `(0.70, 0.06, 0.005)`, `(1.0, 0.78, 0.30)` and `(0.95, 0.20, 0.02)`.
+    edge: vec4<f32>,
+    core: vec4<f32>,
+    ember: vec4<f32>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> material: Flame;
@@ -51,14 +57,12 @@ const PI: f32 = 3.14159265;
 const FLAME_HALF_WIDTH: f32 = 0.20;
 const FLAME_TIP: f32 = 0.90;
 const PROFILE_PEAK: f32 = 1.172;
-// The ramp: the cool rim and tip, then the host's fire colour, then the hot core.
-const EDGE_RED: vec3<f32> = vec3<f32>(0.70, 0.06, 0.005);
-const CORE_YELLOW: vec3<f32> = vec3<f32>(1.0, 0.78, 0.30);
-// What a flame's colour tends to while its fire is still catching. A flame fed on volatiles with little soot is
+// The ramp: the cool rim and tip (`material.edge`), then the fire's colour (`material.base`), then the hot core (`material.core`).
+// What a flame's colour tends to while its fire is still catching (`material.ember`). A flame fed on volatiles with little soot is
 // cool and blue; a young, small fire is redder and dimmer than the steady one, and the hot yellow core only arrives
 // once the fuel is alight. Planck's law is why this is a *temperature*: cooler emission is redder (the crate's
-// `blackbody_colour`), so the catch pulls the ramp towards the red end and lets it go as the fire takes.
-const EMBER_RED: vec3<f32> = vec3<f32>(0.95, 0.20, 0.02);
+// `blackbody_colour`), so the catch pulls the ramp towards the red end and lets it go as the fire takes. A fire of another hue
+// catches from its own dark end, which is its ramp's, not orange.
 // The depth fade (`docs/research/flame-occlusion.md`): the source point is a third of the way up the flame, the tap ring's radius
 // is this fraction of the flame's height, and a tap occludes when the scene is nearer than the source by more than FADE_MARGIN of
 // the flame's height, compared in linear view distance (so a perspective and an orthographic camera at any far plane agree).
@@ -394,14 +398,14 @@ fn fragment(in: FlameVertexOutput) -> @location(0) vec4<f32> {
         mask = max(mask, 0.85 * foot_mask);
         heat = max(heat, clamp(foot_disc * 1.4, 0.0, 1.0) * mix(0.35, 0.65, foot_streak) * in.overhead.x);
     }
-    var colour = mix(EDGE_RED, material.base.rgb, smoothstep(0.05, 0.40, heat));
-    colour = mix(colour, CORE_YELLOW, smoothstep(0.40, 0.80, heat));
+    var colour = mix(material.edge.rgb, material.base.rgb, smoothstep(0.05, 0.40, heat));
+    colour = mix(colour, material.core.rgb, smoothstep(0.40, 0.80, heat));
     colour *= 1.0 + OVERHEAD_CORE * in.overhead.x * smoothstep(0.30, 0.80, heat);
     // A fire that is still catching is redder, and each flame knows its own progress (`in.took`): the steady ramp
     // is pulled towards the ember at the start and released as the fuel catches. Per flame, not per scene, so a
     // host lighting one torch does not tint every other fire in the world. The whole flame goes, not only its core:
     // a catching fire has no yellow core at all yet.
-    colour = mix(EMBER_RED * max(heat, 0.35), colour, in.took);
+    colour = mix(material.ember.rgb * max(heat, 0.35), colour, in.took);
     // Alpha 0 makes `AlphaMode::Add`'s blend state (`PREMULTIPLIED_ALPHA_BLENDING`, src + (1 - src.a) * dst) purely
     // additive: the same trick as `premultiply_alpha` in `bevy_pbr`'s `pbr_functions.wesl`. Any alpha above 0 would
     // darken what stands behind the flame.

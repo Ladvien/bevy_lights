@@ -23,9 +23,10 @@ use bevy::time::Real;
 use crate::LightsSystems;
 use crate::chain_sets;
 use crate::flicker::{Flicker, Kindle, Snuff};
+use crate::model::fire_colour::{CORE_YELLOW, EDGE_RED, EMBER_RED};
 use crate::model::{
     DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, KINDLE_SECONDS, flame_cull_extents, flame_tilt, flicker_swing,
-    kindle_gain, pack_flame_tag, set_flame_brightness, snuff_gain, unpack_flame_tag,
+    kindle_gain, pack_flame_tag, retint, set_flame_brightness, snuff_gain, unpack_flame_tag,
 };
 use crate::pool::PoolCandidate;
 
@@ -73,13 +74,14 @@ impl Plugin for FlamePlugin {
     }
 }
 
-/// The flame material: the host's fire colour (`.a` is the ember's strength, which scales the flame)
-/// and the animation's clock and shape.
+/// The flame material: a fire's colour (`.a` is the ember's strength, which scales the flame), the
+/// ramp that colour makes, and the animation's clock and shape.
 ///
-/// A host never builds one of these. [`FlamePlugin`] keeps a single material for every flame in the
-/// scene, because the numbers that make two fires burn differently ride on each flame's
-/// [`MeshTag`], not in the material. Change [`FlameLook`] to change the colour, the strength or the
-/// height scale.
+/// A host never builds one of these. [`FlamePlugin`] keeps one material for the scene's fire colour (two
+/// with the depth fade) and one more for each colour a [`FlameSite::color`] asks for, shared by every
+/// flame of that colour, because the numbers that make two fires burn differently ride on each flame's
+/// [`MeshTag`], not in the material. Change [`FlameLook`] to change the scene's colour, the strength or
+/// the height scale.
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct FlameMaterial {
     #[uniform(0)]
@@ -90,6 +92,15 @@ pub struct FlameMaterial {
     /// another's), `w` the ember strength.
     #[uniform(0)]
     params: Vec4,
+    /// The ramp's cool rim and tip (`retint(EDGE_RED, base)`).
+    #[uniform(0)]
+    edge: Vec4,
+    /// The ramp's hot core (`retint(CORE_YELLOW, base)`).
+    #[uniform(0)]
+    core: Vec4,
+    /// What the ramp tends to while the fire is still catching (`retint(EMBER_RED, base)`).
+    #[uniform(0)]
+    ember: Vec4,
 }
 
 impl Material for FlameMaterial {
@@ -209,6 +220,24 @@ pub struct FlameSite {
     /// kindle settles (`docs/research/flame-relight.md`). The site's own [`kindle`](FlameSite::kindle) does not apply
     /// while a linked kindle runs.
     pub fire: Option<Entity>,
+    /// The fire's own colour: the middle of its flame's ramp, what [`FlameLook::color`] is for every fire that
+    /// sets none, and the colour of its sparks ([`FlameEmbers`](crate::FlameEmbers)). The rest of the ramp is the
+    /// same flame in that hue (a darker, more saturated rim and a paler core,
+    /// [`retint`](crate::retint)), so a blue gas lantern, a green witch-fire and a violet shrine brazier are
+    /// each one clean colour and not an orange flame tinted over.
+    ///
+    /// **Set it to the colour of the light this flame motivates** (the [`PointLight::color`] of the fire's
+    /// light, or [`PoolCandidate::color`] on a prop the pool lights): a flame that burns one colour and
+    /// throws another reads as a mistake, not a mood (`docs/research/fire-colour.md`). Channels are linear
+    /// and non-negative, and the green channel is clamped to 1 as it is for [`FlameLook::color`]; a value above 1
+    /// in the others is a brighter fire.
+    ///
+    /// `None` (the default) is the scene's fire colour and the scene's shared materials, exactly as drawn
+    /// before this field existed. Every distinct colour is one more material (and one more batch), shared by
+    /// every flame of that colour and released with the last of them, so a handful of colours is free and a
+    /// colour changed every frame is a material a frame. May be changed at any time; [`FlamePlugin`] moves the
+    /// flame to the right material.
+    pub color: Option<Color>,
 }
 
 impl FlameSite {
@@ -225,6 +254,12 @@ impl FlameSite {
             positive(&mut out, "diameter", d);
         }
         within(&mut out, "depth", self.depth, 0.0, crate::MAX_FLICKER_DEPTH);
+        if let Some(color) = self.color {
+            let color = LinearRgba::from(color);
+            non_negative(&mut out, "color.red", color.red);
+            non_negative(&mut out, "color.green", color.green);
+            non_negative(&mut out, "color.blue", color.blue);
+        }
         out
     }
 }
@@ -433,7 +468,78 @@ fn set_scale(transform: &mut Transform, bound: &mut Aabb, height: f32, took: f32
     }
 }
 
-/// The one mesh, the two materials, and the height scale every flame in the scene shares.
+/// What tells one tinted material from the next: a fire's colour (as the bits of the linear channels the ramp is built from, with
+/// the green clamped, so two sites that pass the same number share a material) and whether it is the depth-fade variant.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) struct TintKey {
+    rgb: [u32; 3],
+    depth_fade: bool,
+}
+
+impl TintKey {
+    /// The key of the material a fire of `color` is drawn with.
+    pub(crate) fn new(color: Color, depth_fade: bool) -> Self {
+        let color = LinearRgba::from(color);
+        Self { rgb: [color.red.to_bits(), color.green.min(1.0).to_bits(), color.blue.to_bits()], depth_fade }
+    }
+
+    /// The colour the key stands for: the middle of the ramp.
+    pub(crate) fn rgb(self) -> [f32; 3] {
+        self.rgb.map(f32::from_bits)
+    }
+}
+
+/// The materials a scene's tinted fires share, one per [`TintKey`]. It holds **ids**, not handles: the flames that use a
+/// material hold it, so the asset is dropped with the last of them and [`sweep`](Self::sweep) forgets the key, and a fire
+/// whose colour is changed every frame costs one live material rather than one for every colour it has ever been.
+pub(crate) struct TintedMaterials<M: Asset> {
+    ids: std::collections::HashMap<TintKey, AssetId<M>>,
+}
+
+impl<M: Asset> Default for TintedMaterials<M> {
+    fn default() -> Self {
+        Self { ids: std::collections::HashMap::new() }
+    }
+}
+
+impl<M: Asset> TintedMaterials<M> {
+    /// The id of the live material for `key`, if there is one.
+    pub(crate) fn id(&self, key: &TintKey) -> Option<AssetId<M>> {
+        self.ids.get(key).copied()
+    }
+
+    /// The ids of every live tinted material.
+    pub(crate) fn ids(&self) -> impl Iterator<Item = AssetId<M>> + '_ {
+        self.ids.values().copied()
+    }
+
+    /// Whether no tinted material is live.
+    pub(crate) fn is_empty(&self) -> bool {
+        self.ids.is_empty()
+    }
+
+    /// A strong handle on the material for `key`: the live one, or a new one `make` builds.
+    pub(crate) fn handle(
+        &mut self,
+        key: TintKey,
+        materials: &mut Assets<M>,
+        make: impl FnOnce() -> M,
+    ) -> Handle<M> {
+        if let Some(handle) = self.ids.get(&key).and_then(|id| materials.get_strong_handle(*id)) {
+            return handle;
+        }
+        let handle = materials.add(make());
+        self.ids.insert(key, handle.id());
+        handle
+    }
+
+    /// Forgets the colours whose last flame has gone.
+    pub(crate) fn sweep(&mut self, materials: &Assets<M>) {
+        self.ids.retain(|_, id| materials.contains(*id));
+    }
+}
+
+/// The one mesh, the scene's two materials, the tinted ones, and the height scale every flame in the scene shares.
 #[derive(Resource, Default)]
 pub(crate) struct FlameAssets {
     mesh: Handle<Mesh>,
@@ -441,6 +547,8 @@ pub(crate) struct FlameAssets {
     /// The same material with the depth fade on, for the sites that set [`FlameSite::depth_fade`]. Two
     /// shared materials rather than one per flame, so a scene with the fade off draws exactly as it did.
     faded_material: Handle<FlameMaterial>,
+    /// The materials of the sites that set [`FlameSite::color`], one per colour and fade setting.
+    tinted: TintedMaterials<FlameMaterial>,
     /// The height scale the material was built with ([`FlameLook::max_height`] at `Startup`): a
     /// [`FlameSite`]'s height is packed as a fraction of it, so the CPU packer and the shader must
     /// agree on it.
@@ -461,9 +569,37 @@ impl FlameAssets {
         self.max_height
     }
 
-    /// The shared material a site's flame is drawn with.
+    /// The scene's shared material a site with no colour of its own is drawn with.
     fn material_for(&self, depth_fade: bool) -> &Handle<FlameMaterial> {
         if depth_fade { &self.faded_material } else { &self.material }
+    }
+
+    /// The id of the material a site of `color` is drawn with, when it exists yet: the scene's for `None`, the tinted one
+    /// otherwise. Cheap, so a flame already on it is not touched.
+    fn material_id(&self, color: Option<Color>, depth_fade: bool) -> Option<AssetId<FlameMaterial>> {
+        match color {
+            None => Some(self.material_for(depth_fade).id()),
+            Some(color) => self.tinted.id(&TintKey::new(color, depth_fade)),
+        }
+    }
+
+    /// The material a site of `color` is drawn with, made if no flame has used it yet.
+    fn material_of(
+        &mut self,
+        color: Option<Color>,
+        depth_fade: bool,
+        look: &FlameLook,
+        materials: &mut Assets<FlameMaterial>,
+    ) -> Handle<FlameMaterial> {
+        match color {
+            None => self.material_for(depth_fade).clone(),
+            Some(color) => {
+                let key = TintKey::new(color, depth_fade);
+                self.tinted.handle(key, materials, || {
+                    FlameMaterial::new(key.rgb(), look.strength, look.max_height, depth_fade)
+                })
+            }
+        }
     }
 }
 
@@ -484,24 +620,47 @@ pub(crate) fn build_flame_assets(
     // camera and scales it by the flame's height, so the model is a unit square in the local XY
     // plane about its origin.
     assets.mesh = meshes.add(Rectangle::new(1.0, 1.0));
-    assets.material = materials.add(material_for(*look, false));
-    assets.faded_material = materials.add(material_for(*look, true));
+    assets.material =
+        materials.add(FlameMaterial::new(scene_colour(&look), look.strength, look.max_height, false));
+    assets.faded_material =
+        materials.add(FlameMaterial::new(scene_colour(&look), look.strength, look.max_height, true));
     assets.max_height = look.max_height;
     assets.built = true;
 }
 
-/// The material for a [`FlameLook`]: its colour (green clamped, so a palette's oversaturated fire does
-/// not blow the ramp out) and its strength as the ember's weight. `depth_fade` is the material of the
-/// sites that asked for [`FlameSite::depth_fade`]: the same flame with the shader's depth test turned on.
-fn material_for(look: FlameLook, depth_fade: bool) -> FlameMaterial {
-    FlameMaterial {
-        base: LinearRgba {
-            red: look.color.red,
-            green: look.color.green.min(1.0),
-            blue: look.color.blue,
-            alpha: look.strength,
-        },
-        params: Vec4::new(0.0, look.max_height, if depth_fade { 1.0 } else { 0.0 }, look.strength),
+/// The middle of the ramp a [`FlameLook`] asks for: its colour with the green clamped, so a palette's oversaturated fire does
+/// not blow the ramp out.
+pub(crate) fn scene_colour(look: &FlameLook) -> [f32; 3] {
+    [look.color.red, look.color.green.min(1.0), look.color.blue]
+}
+
+impl FlameMaterial {
+    /// The material of a fire of colour `mid` (the middle of its ramp) at `strength` (the ember's weight).
+    /// `depth_fade` is the material of the sites that asked for [`FlameSite::depth_fade`]: the same flame with
+    /// the shader's depth test turned on.
+    fn new(mid: [f32; 3], strength: f32, max_height: f32, depth_fade: bool) -> Self {
+        let mut material = Self {
+            base: LinearRgba::NONE,
+            params: Vec4::new(0.0, max_height, if depth_fade { 1.0 } else { 0.0 }, strength),
+            edge: Vec4::ZERO,
+            core: Vec4::ZERO,
+            ember: Vec4::ZERO,
+        };
+        material.recolour(mid, strength);
+        material
+    }
+
+    /// Writes the fire's colour and the ramp it makes: the shipped orange ramp's rim, core and catch colour moved
+    /// to `mid`'s hue ([`retint`]).
+    fn recolour(&mut self, mid: [f32; 3], strength: f32) {
+        let stop = |stop| {
+            let [red, green, blue] = retint(stop, mid);
+            Vec4::new(red, green, blue, 0.0)
+        };
+        self.base = LinearRgba { red: mid[0], green: mid[1], blue: mid[2], alpha: strength };
+        self.edge = stop(EDGE_RED);
+        self.core = stop(CORE_YELLOW);
+        self.ember = stop(EMBER_RED);
     }
 }
 
@@ -520,7 +679,9 @@ fn material_for(look: FlameLook, depth_fade: bool) -> FlameMaterial {
 pub(crate) fn dress_flames(
     mut commands: Commands,
     sites: Query<(Entity, &FlameSite), Without<Flamed>>,
-    assets: Res<FlameAssets>,
+    mut assets: ResMut<FlameAssets>,
+    mut materials: ResMut<Assets<FlameMaterial>>,
+    look: Res<FlameLook>,
     time: Res<Time>,
 ) {
     if !assets.built {
@@ -540,7 +701,7 @@ pub(crate) fn dress_flames(
             half_extents: Vec3A::from(flame_cull_extents(height, 1.0, [0.0; 2])),
         };
         let mesh = assets.mesh.clone();
-        let material = assets.material_for(flame.depth_fade).clone();
+        let material = assets.material_of(flame.color, flame.depth_fade, &look, &mut materials);
         commands.entity(site).queue_silenced(move |mut site: EntityWorldMut| {
             site.insert(Flamed).with_children(|parent| {
                 parent.spawn((
@@ -589,7 +750,7 @@ pub(crate) fn update_flames(
     real: Res<Time<Real>>,
     time: Res<Time>,
     look: Res<FlameLook>,
-    assets: Res<FlameAssets>,
+    mut assets: ResMut<FlameAssets>,
     mut materials: ResMut<Assets<FlameMaterial>>,
     mut flames: Query<FlameParts>,
     sites: Sites,
@@ -617,11 +778,10 @@ pub(crate) fn update_flames(
         }
         let mut lean = Vec2::ZERO;
         if let Some(site) = site {
-            // A site whose `depth_fade` changed moves its flame to the other shared material; the comparison
-            // reads through `Deref`, so a flame that did not change is not marked changed.
-            let wanted = assets.material_for(site.depth_fade);
-            if material.0 != *wanted {
-                material.0 = wanted.clone();
+            // A site whose `depth_fade` or `color` changed moves its flame to the material of its new fire; the comparison
+            // reads through `Deref` and an id, so a flame that did not change is not marked changed.
+            if assets.material_id(site.color, site.depth_fade) != Some(material.0.id()) {
+                material.0 = assets.material_of(site.color, site.depth_fade, &look, &mut materials);
             }
             // Only when the brightness byte actually changes: `MeshTag` is in `bevy_pbr`'s
             // `Changed<MeshTag>` re-extraction set, so a write here costs a render-world re-extract for
@@ -675,21 +835,29 @@ pub(crate) fn update_flames(
             set_scale(&mut transform, &mut bound, height, 1.0, lean);
         }
     }
+    // The tinted materials a flame no longer uses are gone with their last flame; forget their colours.
+    if !assets.tinted.is_empty() {
+        assets.tinted.sweep(&materials);
+    }
     let elapsed = real.elapsed_secs_wrapped();
-    for handle in [&assets.material, &assets.faded_material] {
-        let Some(mut made) = materials.get_mut(handle) else {
+    let scene = scene_colour(&look);
+    let scene_materials = [assets.material.id(), assets.faded_material.id()];
+    for (id, is_scene) in
+        scene_materials.into_iter().map(|id| (id, true)).chain(assets.tinted.ids().map(|id| (id, false)))
+    {
+        let Some(mut made) = materials.get_mut(id) else {
             continue;
         };
         made.params.x = elapsed;
         if look.is_changed() {
             // Rewritten in place: a `FlameLook` change is a colour or strength change, and rebuilding
-            // the material would re-prepare every flame's pipeline for nothing.
-            made.base = LinearRgba {
-                red: look.color.red,
-                green: look.color.green.min(1.0),
-                blue: look.color.blue,
-                alpha: look.strength,
-            };
+            // the material would re-prepare every flame's pipeline for nothing. The scene's colour is the scene's
+            // materials' only: a fire that asked for a colour of its own keeps it.
+            if is_scene {
+                made.recolour(scene, look.strength);
+            } else {
+                made.base.alpha = look.strength;
+            }
             made.params.y = look.max_height;
             made.params.w = look.strength;
         }
@@ -780,6 +948,7 @@ mod tests {
             .world_mut()
             .spawn((
                 FlameSite {
+                    color: None,
                     height: 0.9,
                     phase: 0.4,
                     kindle: 0.0,
@@ -808,6 +977,7 @@ mod tests {
         let mut app = dressing_app();
         app.world_mut().spawn((
             FlameSite {
+                color: None,
                 height: 0.35,
                 phase: 2.5,
                 kindle: 0.0,
@@ -845,6 +1015,7 @@ mod tests {
         let mut app = dressing_app();
         app.world_mut().spawn((
             FlameSite {
+                color: None,
                 height: 0.35,
                 phase: 2.5,
                 kindle: 0.0,
@@ -872,6 +1043,7 @@ mod tests {
         let mut app = dressing_app();
         app.world_mut().spawn((
             FlameSite {
+                color: None,
                 height: 0.35,
                 phase: 2.5,
                 kindle: 0.0,
@@ -904,6 +1076,7 @@ mod tests {
         let light =
             app.world_mut().spawn(Flicker { phase: 1.3, diameter: Some(0.3), depth: 0.30, ..default() }).id();
         let site = FlameSite {
+            color: None,
             height: 0.35,
             phase: 2.5,
             kindle: 0.0,
@@ -942,6 +1115,7 @@ mod tests {
         let candidate = app.world_mut().spawn(PoolCandidate { depth: Some(0.30), ..default() }).id();
         let bare = app.world_mut().spawn(PoolCandidate::default()).id();
         let site = |fire| FlameSite {
+            color: None,
             height: 0.35,
             phase: 2.5,
             kindle: 0.0,
@@ -976,6 +1150,7 @@ mod tests {
         for fire in [gone, bare] {
             app.world_mut().spawn((
                 FlameSite {
+                    color: None,
                     height: 0.35,
                     phase: 2.5,
                     kindle: 0.0,
@@ -1011,6 +1186,7 @@ mod tests {
         let site = |fire| {
             (
                 FlameSite {
+                    color: None,
                     height: 0.35,
                     phase: 0.0,
                     kindle: 0.0,
@@ -1070,6 +1246,7 @@ mod tests {
         let site = |fire| {
             (
                 FlameSite {
+                    color: None,
                     height: 0.35,
                     phase: 0.0,
                     kindle: 0.0,
@@ -1117,6 +1294,7 @@ mod tests {
             let mut app = dressing_app();
             app.world_mut().spawn((
                 FlameSite {
+                    color: None,
                     height: 0.35,
                     phase: 2.5,
                     kindle: 0.0,
@@ -1186,6 +1364,7 @@ mod tests {
         }
         let mut app = dressing_app();
         let site = |depth_fade| FlameSite {
+            color: None,
             height: 0.9,
             phase: 0.0,
             kindle: 0.0,
@@ -1229,6 +1408,7 @@ mod tests {
             .world_mut()
             .spawn((
                 FlameSite {
+                    color: None,
                     height: 0.35,
                     phase: 0.7,
                     kindle: 0.0,
@@ -1263,6 +1443,7 @@ mod tests {
     #[test]
     fn a_flame_names_the_prop_its_site_hangs_on_and_follows_a_reparent() {
         let site_of = || FlameSite {
+            color: None,
             height: 0.35,
             phase: 0.0,
             kindle: 0.0,
@@ -1294,6 +1475,172 @@ mod tests {
         app.world_mut().entity_mut(on_torch).remove::<ChildOf>();
         app.update();
         assert_eq!(source_of(&mut app, on_torch), Some(None), "an unparented site has no source");
+    }
+
+    /// The material a site's flame is drawn with, copied out: its colour, ramp and handle.
+    fn drawn_with(app: &App, site: Entity) -> (Handle<FlameMaterial>, FlameMaterial) {
+        let flame = app
+            .world()
+            .get::<Children>(site)
+            .and_then(|c| c.first().copied())
+            .expect("a dressed site has a flame");
+        let handle = app.world().get::<MeshMaterial3d<FlameMaterial>>(flame).expect("a material").0.clone();
+        let material =
+            app.world().resource::<Assets<FlameMaterial>>().get(&handle).expect("it exists").clone();
+        (handle, material)
+    }
+
+    fn coloured(color: Option<Color>) -> FlameSite {
+        FlameSite { color, ..crate::FireKind::Torch.site() }
+    }
+
+    fn ramp_of(material: &FlameMaterial) -> [[f32; 3]; 4] {
+        let rgb = |v: Vec4| [v.x, v.y, v.z];
+        [
+            rgb(material.edge),
+            [material.base.red, material.base.green, material.base.blue],
+            rgb(material.core),
+            rgb(material.ember),
+        ]
+    }
+
+    /// A scene that sets no colour must draw what it always drew: the shipped ramp, on the scene's own two
+    /// materials, with no tinted material made for it.
+    #[test]
+    fn a_site_with_no_colour_of_its_own_is_drawn_with_the_scenes_shipped_ramp() {
+        use crate::model::fire_colour::{CORE_YELLOW, DEFAULT_MID, EDGE_RED, EMBER_RED};
+        let mut app = dressing_app();
+        let plain = app.world_mut().spawn(coloured(None)).id();
+        app.update();
+        let (handle, material) = drawn_with(&app, plain);
+        assert_eq!(ramp_of(&material), [EDGE_RED, DEFAULT_MID, CORE_YELLOW, EMBER_RED]);
+        assert_eq!(handle, app.world().resource::<FlameAssets>().material, "the scene's own material");
+        assert!(app.world().resource::<FlameAssets>().tinted.is_empty(), "nothing was tinted");
+    }
+
+    /// A fire of its own colour is drawn on a material of it: the colour the site asked for is the middle of the
+    /// ramp, the rest of the ramp is in its hue, and the scene's other flames are not touched.
+    #[test]
+    fn a_site_with_a_colour_is_drawn_in_that_hue_and_its_neighbours_stay_orange() {
+        use crate::model::fire_colour::{DEFAULT_MID, EDGE_RED, retint};
+        let mut app = dressing_app();
+        let blue = Color::from(LinearRgba::rgb(0.1, 0.3, 1.0));
+        let lit = app.world_mut().spawn(coloured(Some(blue))).id();
+        let orange = app.world_mut().spawn(coloured(None)).id();
+        app.update();
+        let (_, material) = drawn_with(&app, lit);
+        let [edge, mid, core, _] = ramp_of(&material);
+        assert_eq!(mid, [0.1, 0.3, 1.0]);
+        assert_eq!(edge, retint(EDGE_RED, mid));
+        assert!(edge[2] > edge[1] && edge[1] > edge[0], "a blue fire's rim is blue, not red: {edge:?}");
+        assert!(core[2] >= core[0] && core[2] >= core[1], "and so is its core: {core:?}");
+        let (_, neighbour) = drawn_with(&app, orange);
+        assert_eq!(ramp_of(&neighbour)[1], DEFAULT_MID, "a torch with no colour is still the scene's");
+    }
+
+    /// Two torches of one colour are one material (one batch), and a different colour is another; the depth fade
+    /// still picks the variant within a colour.
+    #[test]
+    fn flames_of_one_colour_share_a_material_and_a_depth_fade_picks_its_variant() {
+        let mut app = dressing_app();
+        let green = Color::from(LinearRgba::rgb(0.2, 1.0, 0.3));
+        let violet = Color::from(LinearRgba::rgb(0.6, 0.2, 1.0));
+        let a = app.world_mut().spawn(coloured(Some(green))).id();
+        let b = app.world_mut().spawn(coloured(Some(green))).id();
+        let c = app.world_mut().spawn(coloured(Some(violet))).id();
+        let d = app.world_mut().spawn(FlameSite { depth_fade: true, ..coloured(Some(green)) }).id();
+        app.update();
+        let handle = |site| drawn_with(&app, site).0;
+        assert_eq!(handle(a), handle(b), "one colour, one material");
+        assert_ne!(handle(a), handle(c), "two colours, two");
+        assert_ne!(handle(a), handle(d), "the depth-fade variant of a colour is its own");
+        assert_eq!(drawn_with(&app, d).1.params.z, 1.0);
+        assert_eq!(drawn_with(&app, a).1.params.z, 0.0);
+    }
+
+    /// A host changing a site's colour at any time (a slider, a spell, a palette) moves the flame to the new colour's
+    /// material; clearing it returns the flame to the scene's.
+    #[test]
+    fn changing_a_sites_colour_moves_its_flame_and_clearing_it_returns_it_to_the_scene() {
+        let mut app = dressing_app();
+        let site = app.world_mut().spawn(coloured(None)).id();
+        app.update();
+        let scene = drawn_with(&app, site).0;
+        app.world_mut().get_mut::<FlameSite>(site).expect("the site").color =
+            Some(Color::from(LinearRgba::rgb(0.2, 1.0, 0.3)));
+        app.update();
+        let (green, material) = drawn_with(&app, site);
+        assert_ne!(green, scene);
+        assert_eq!(material.base.green, 1.0);
+        app.world_mut().get_mut::<FlameSite>(site).expect("the site").color = None;
+        app.update();
+        assert_eq!(drawn_with(&app, site).0, scene);
+    }
+
+    /// A `FlameLook` change recolours the scene's flames and leaves a fire that chose its colour alone; the strength
+    /// and the height scale reach both.
+    #[test]
+    fn a_look_change_recolours_the_scene_but_not_a_fire_that_chose_its_colour() {
+        let mut app = dressing_app();
+        let violet = Color::from(LinearRgba::rgb(0.6, 0.2, 1.0));
+        let chosen = app.world_mut().spawn(coloured(Some(violet))).id();
+        let scene = app.world_mut().spawn(coloured(None)).id();
+        app.update();
+        {
+            let mut look = app.world_mut().resource_mut::<FlameLook>();
+            look.color = LinearRgba::rgb(0.2, 1.0, 0.3);
+            look.strength = 0.5;
+        }
+        app.update();
+        let (_, scene_material) = drawn_with(&app, scene);
+        assert_eq!(ramp_of(&scene_material)[1], [0.2, 1.0, 0.3], "the scene's flames follow the look");
+        let (_, chosen_material) = drawn_with(&app, chosen);
+        assert_eq!(ramp_of(&chosen_material)[1], [0.6, 0.2, 1.0], "a fire's own colour does not");
+        assert_eq!(chosen_material.params.w, 0.5, "but its strength is the scene's");
+        assert_eq!(chosen_material.base.alpha, 0.5);
+    }
+
+    /// Every distinct colour is a material, so a fire whose colour a host changes every frame must not make the number
+    /// of materials grow without bound: a material is released with the last flame that used it.
+    #[test]
+    fn a_colour_changed_every_frame_holds_a_bounded_number_of_materials() {
+        let mut app = App::new();
+        app.add_plugins((MinimalPlugins, bevy::asset::AssetPlugin::default()))
+            .init_asset::<Mesh>()
+            .init_asset::<FlameMaterial>()
+            .init_resource::<FlameLook>()
+            .init_resource::<FlameAssets>()
+            .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+                std::time::Duration::from_secs_f64(1.0 / 60.0),
+            ));
+        app.add_systems(Startup, build_flame_assets)
+            .add_systems(Update, (dress_flames, update_flames).chain())
+            .add_systems(PostUpdate, Assets::<FlameMaterial>::track_assets.run_if(|| true));
+        app.update();
+        let site = app.world_mut().spawn(coloured(None)).id();
+        app.update();
+        let mut most = 0;
+        for frame in 0..300 {
+            let hue = frame as f32 / 300.0;
+            app.world_mut().get_mut::<FlameSite>(site).expect("the site").color = Some(Color::from(
+                LinearRgba::rgb(0.3 + 0.7 * hue, 1.0 - 0.8 * hue, 0.2 + 0.1 * (frame % 7) as f32),
+            ));
+            app.update();
+            most = most.max(app.world().resource::<Assets<FlameMaterial>>().len());
+        }
+        // The scene's two, the colour in use, and the one or two the asset system has not yet freed.
+        assert!(most <= 6, "300 colours made {most} live materials at once");
+    }
+
+    #[test]
+    fn a_colour_that_is_not_a_colour_is_reported_and_the_default_is_not() {
+        assert!(crate::FireKind::Torch.site().problems().is_empty());
+        let bad = FlameSite {
+            color: Some(Color::from(LinearRgba::rgb(f32::NAN, 0.5, -1.0))),
+            ..crate::FireKind::Torch.site()
+        };
+        let fields: Vec<_> = bad.problems().iter().map(|p| p.field).collect();
+        assert_eq!(fields, ["color.red", "color.blue"]);
     }
 }
 
@@ -1343,6 +1690,7 @@ mod kindle_tests {
         // `/home/ladvien/l18/kindle2_after/` the frames.
         let mut app = app();
         let site = FlameSite {
+            color: None,
             height: 0.9,
             phase: 0.0,
             kindle: KINDLE_SECONDS,
@@ -1378,6 +1726,7 @@ mod kindle_tests {
         let mut app = app();
         app.world_mut().spawn((
             FlameSite {
+                color: None,
                 height: 0.9,
                 phase: 0.0,
                 kindle: 0.0,
@@ -1437,6 +1786,7 @@ mod catch_colour_tests {
         let mut app = app();
         app.world_mut().spawn((
             FlameSite {
+                color: None,
                 height: 0.9,
                 phase: 0.0,
                 kindle: KINDLE_SECONDS,
@@ -1471,6 +1821,7 @@ mod catch_colour_tests {
         let mut app = app();
         app.world_mut().spawn((
             FlameSite {
+                color: None,
                 height: 0.9,
                 phase: 0.0,
                 kindle: KINDLE_SECONDS,
@@ -1483,6 +1834,7 @@ mod catch_colour_tests {
         ));
         app.world_mut().spawn((
             FlameSite {
+                color: None,
                 height: 0.9,
                 phase: 1.3,
                 kindle: 0.0,
@@ -1509,6 +1861,7 @@ mod catch_colour_tests {
 
     fn site_with(diameter: Option<f32>) -> FlameSite {
         FlameSite {
+            color: None,
             height: 0.9,
             phase: 0.0,
             kindle: 0.0,
@@ -1837,6 +2190,7 @@ pub(crate) mod culling_tests {
         let height = 0.9;
         app.world_mut().spawn((
             FlameSite {
+                color: None,
                 height,
                 phase: 0.0,
                 kindle: KINDLE_SECONDS,

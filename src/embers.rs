@@ -25,8 +25,9 @@ use bevy::render::render_resource::{AsBindGroup, RenderPipelineDescriptor, Speci
 use bevy::shader::ShaderRef;
 use bevy::time::Real;
 
-use crate::flame::{Flame, FlameAssets, FlameLook, FlameSite};
-use crate::model::{ember_cull_extents, pack_flame_tag, set_flame_brightness, unpack_flame_tag};
+use crate::flame::{Flame, FlameAssets, FlameLook, FlameSite, TintKey, TintedMaterials, scene_colour};
+use crate::model::fire_colour::{CORE_YELLOW, SPARK_DULL_RED, SPARK_ORANGE};
+use crate::model::{ember_cull_extents, pack_flame_tag, retint, set_flame_brightness, unpack_flame_tag};
 
 /// The embers shader, embedded in the binary by [`FlamePlugin`](crate::FlamePlugin).
 const EMBER_SHADER_PATH: &str = "embedded://bevy_lights/embers.wesl";
@@ -37,9 +38,10 @@ pub const MAX_EMBER_RATE: f32 = 8.0;
 
 /// Sparks leaving a fire: add it to a [`FlameSite`](crate::FlameSite) to give its flame embers, remove it to take them away.
 ///
-/// A site without one is drawn exactly as it always was: no extra entity, no extra draw. The sparks' colour is the flame's
-/// ([`FlameLook::color`]) pulled towards the hot end of its ramp when they are new and towards a dull red as they cool, and their
-/// strength is [`FlameLook::strength`]; both follow a changed look.
+/// A site without one is drawn exactly as it always was: no extra entity, no extra draw. The sparks are the fire's own colour
+/// ([`FlameSite::color`], or the scene's [`FlameLook::color`]): the shipped orange sparks, yellow when new and a dull red as they
+/// cool, moved to that hue ([`retint`](crate::retint)), so a green fire sheds green sparks. Their strength is
+/// [`FlameLook::strength`]; both follow a changed look.
 ///
 /// The sparks respect the site's [`depth_fade`](crate::FlameSite::depth_fade) (a fire whose source cannot be seen sheds none that
 /// can) and its catch (a flame that has not caught sheds none). The default is a hearth's few sparks a second, a design default
@@ -74,7 +76,7 @@ impl FlameEmbers {
 }
 
 /// The embers material: the same uniforms as [`FlameMaterial`](crate::FlameMaterial), because the sparks are the fire's colour and
-/// clock. Private: a host never builds one.
+/// clock, and the three colours a spark passes through. Private: a host never builds one.
 #[derive(Asset, TypePath, AsBindGroup, Debug, Clone)]
 pub struct EmberMaterial {
     #[uniform(0)]
@@ -83,6 +85,42 @@ pub struct EmberMaterial {
     /// fade, `w` the strength.
     #[uniform(0)]
     params: Vec4,
+    /// A spark's colour when it has almost cooled (`retint(SPARK_DULL_RED, base)`).
+    #[uniform(0)]
+    dull: Vec4,
+    /// A spark's colour in the middle of its life (`retint(SPARK_ORANGE, base)`).
+    #[uniform(0)]
+    mild: Vec4,
+    /// A spark's colour at its hottest (`retint(CORE_YELLOW, base)`).
+    #[uniform(0)]
+    hot: Vec4,
+}
+
+impl EmberMaterial {
+    /// The material of a fire of colour `mid` at `strength`; `depth_fade` as [`FlameSite::depth_fade`].
+    fn new(mid: [f32; 3], strength: f32, max_height: f32, depth_fade: bool) -> Self {
+        let mut material = Self {
+            base: LinearRgba::NONE,
+            params: Vec4::new(0.0, max_height, if depth_fade { 1.0 } else { 0.0 }, strength),
+            dull: Vec4::ZERO,
+            mild: Vec4::ZERO,
+            hot: Vec4::ZERO,
+        };
+        material.recolour(mid, strength);
+        material
+    }
+
+    /// Writes the fire's colour and the sparks' three colours it makes.
+    fn recolour(&mut self, mid: [f32; 3], strength: f32) {
+        let stop = |stop| {
+            let [red, green, blue] = retint(stop, mid);
+            Vec4::new(red, green, blue, 0.0)
+        };
+        self.base = LinearRgba { red: mid[0], green: mid[1], blue: mid[2], alpha: strength };
+        self.dull = stop(SPARK_DULL_RED);
+        self.mild = stop(SPARK_ORANGE);
+        self.hot = stop(CORE_YELLOW);
+    }
 }
 
 impl Material for EmberMaterial {
@@ -129,18 +167,47 @@ pub(crate) fn build(app: &mut App) {
         .add_systems(Startup, build_ember_assets);
 }
 
-/// The quad and the two materials (depth fade off and on) every ember quad shares.
+/// The quad, the scene's two materials (depth fade off and on) and one more for each colour a site asks for, which every ember
+/// quad shares.
 #[derive(Resource, Default)]
 pub(crate) struct EmberAssets {
     mesh: Handle<Mesh>,
     material: Handle<EmberMaterial>,
     faded_material: Handle<EmberMaterial>,
+    tinted: TintedMaterials<EmberMaterial>,
     built: bool,
 }
 
 impl EmberAssets {
     fn material_for(&self, depth_fade: bool) -> &Handle<EmberMaterial> {
         if depth_fade { &self.faded_material } else { &self.material }
+    }
+
+    /// The id of the material a site of `color` sheds its sparks with, when it exists yet.
+    fn material_id(&self, color: Option<Color>, depth_fade: bool) -> Option<AssetId<EmberMaterial>> {
+        match color {
+            None => Some(self.material_for(depth_fade).id()),
+            Some(color) => self.tinted.id(&TintKey::new(color, depth_fade)),
+        }
+    }
+
+    /// The material a site of `color` sheds its sparks with, made if no quad has used it yet.
+    fn material_of(
+        &mut self,
+        color: Option<Color>,
+        depth_fade: bool,
+        look: &FlameLook,
+        materials: &mut Assets<EmberMaterial>,
+    ) -> Handle<EmberMaterial> {
+        match color {
+            None => self.material_for(depth_fade).clone(),
+            Some(color) => {
+                let key = TintKey::new(color, depth_fade);
+                self.tinted.handle(key, materials, || {
+                    EmberMaterial::new(key.rgb(), look.strength, look.max_height, depth_fade)
+                })
+            }
+        }
     }
 }
 
@@ -152,18 +219,6 @@ pub(crate) struct Ember;
 #[derive(Component)]
 pub(crate) struct Embered;
 
-fn material_for(look: FlameLook, depth_fade: bool) -> EmberMaterial {
-    EmberMaterial {
-        base: LinearRgba {
-            red: look.color.red,
-            green: look.color.green.min(1.0),
-            blue: look.color.blue,
-            alpha: look.strength,
-        },
-        params: Vec4::new(0.0, look.max_height, if depth_fade { 1.0 } else { 0.0 }, look.strength),
-    }
-}
-
 fn build_ember_assets(
     mut assets: ResMut<EmberAssets>,
     look: Res<FlameLook>,
@@ -171,8 +226,10 @@ fn build_ember_assets(
     mut materials: ResMut<Assets<EmberMaterial>>,
 ) {
     assets.mesh = meshes.add(Rectangle::new(1.0, 1.0));
-    assets.material = materials.add(material_for(*look, false));
-    assets.faded_material = materials.add(material_for(*look, true));
+    assets.material =
+        materials.add(EmberMaterial::new(scene_colour(&look), look.strength, look.max_height, false));
+    assets.faded_material =
+        materials.add(EmberMaterial::new(scene_colour(&look), look.strength, look.max_height, true));
     assets.built = true;
 }
 
@@ -190,7 +247,9 @@ pub(crate) fn dress_embers(
     mut commands: Commands,
     flames: Query<(Entity, &ChildOf, &Transform), UndressedFlame>,
     sites: Query<(&FlameSite, &FlameEmbers)>,
-    ember_assets: Res<EmberAssets>,
+    mut ember_assets: ResMut<EmberAssets>,
+    mut materials: ResMut<Assets<EmberMaterial>>,
+    look: Res<FlameLook>,
     flame_assets: Res<FlameAssets>,
 ) {
     if !ember_assets.built || !flame_assets.built() {
@@ -204,7 +263,7 @@ pub(crate) fn dress_embers(
         let height = unpack_flame_tag(packed, flame_assets.max_height()).1;
         let bound = Aabb { center: Vec3A::ZERO, half_extents: cull_box(height, at.scale) };
         let mesh = ember_assets.mesh.clone();
-        let material = ember_assets.material_for(site.depth_fade).clone();
+        let material = ember_assets.material_of(site.color, site.depth_fade, &look, &mut materials);
         commands.entity(flame).queue_silenced(move |mut flame: EntityWorldMut| {
             flame.insert(Embered).with_children(|parent| {
                 parent.spawn((
@@ -265,7 +324,7 @@ pub(crate) fn update_embers(
     mut commands: Commands,
     real: Res<Time<Real>>,
     look: Res<FlameLook>,
-    ember_assets: Res<EmberAssets>,
+    mut ember_assets: ResMut<EmberAssets>,
     mut materials: ResMut<Assets<EmberMaterial>>,
     mut embers: Query<EmberQuad, With<Ember>>,
     owners: EmberOwners,
@@ -282,9 +341,8 @@ pub(crate) fn update_embers(
             commands.entity(parent.parent()).remove::<Embered>();
             continue;
         };
-        let handle = ember_assets.material_for(site.depth_fade);
-        if material.0 != *handle {
-            material.0 = handle.clone();
+        if ember_assets.material_id(site.color, site.depth_fade) != Some(material.0.id()) {
+            material.0 = ember_assets.material_of(site.color, site.depth_fade, &look, &mut materials);
         }
         let packed = set_flame_brightness(tag.value, wanted.share());
         if packed != tag.value {
@@ -296,17 +354,25 @@ pub(crate) fn update_embers(
             bound.half_extents = half_extents;
         }
     }
+    if !ember_assets.tinted.is_empty() {
+        ember_assets.tinted.sweep(&materials);
+    }
     let elapsed = real.elapsed_secs_wrapped();
-    for handle in [&ember_assets.material, &ember_assets.faded_material] {
-        let Some(mut made) = materials.get_mut(handle) else { continue };
+    let scene = scene_colour(&look);
+    let scene_materials = [ember_assets.material.id(), ember_assets.faded_material.id()];
+    for (id, is_scene) in scene_materials
+        .into_iter()
+        .map(|id| (id, true))
+        .chain(ember_assets.tinted.ids().map(|id| (id, false)))
+    {
+        let Some(mut made) = materials.get_mut(id) else { continue };
         made.params.x = elapsed;
         if look.is_changed() {
-            made.base = LinearRgba {
-                red: look.color.red,
-                green: look.color.green.min(1.0),
-                blue: look.color.blue,
-                alpha: look.strength,
-            };
+            if is_scene {
+                made.recolour(scene, look.strength);
+            } else {
+                made.base.alpha = look.strength;
+            }
             made.params.y = look.max_height;
             made.params.w = look.strength;
         }
@@ -340,6 +406,7 @@ mod tests {
 
     fn site(height: f32, phase: f32) -> FlameSite {
         FlameSite {
+            color: None,
             height,
             phase,
             kindle: 0.0,
@@ -356,6 +423,51 @@ mod tests {
             .iter(app.world())
             .map(|(parent, tag)| (parent.parent(), tag.value))
             .collect()
+    }
+
+    /// The material an ember quad is drawn with, copied out.
+    fn sparks_of(app: &App, site: Entity) -> EmberMaterial {
+        let flame = app.world().get::<Children>(site).and_then(|c| c.first().copied()).expect("a flame");
+        let quad =
+            app.world().get::<Children>(flame).and_then(|c| c.first().copied()).expect("an ember quad");
+        let handle = app.world().get::<MeshMaterial3d<EmberMaterial>>(quad).expect("a material").0.clone();
+        app.world().resource::<Assets<EmberMaterial>>().get(&handle).expect("it exists").clone()
+    }
+
+    /// A fire sheds sparks of its own colour, and a scene that sets none sheds the shipped orange ones.
+    #[test]
+    fn a_fire_sheds_sparks_in_its_own_colour_and_follows_it_when_it_changes() {
+        use crate::model::fire_colour::{CORE_YELLOW, SPARK_DULL_RED, SPARK_ORANGE};
+        let mut app = app();
+        let green = Color::from(LinearRgba::rgb(0.2, 1.0, 0.3));
+        let tinted = app
+            .world_mut()
+            .spawn((FlameSite { color: Some(green), ..site(0.5, 0.0) }, FlameEmbers::default()))
+            .id();
+        let orange = app.world_mut().spawn((site(0.5, 1.0), FlameEmbers::default())).id();
+        app.update();
+        app.update();
+        let spark = |m: &EmberMaterial| {
+            [[m.dull.x, m.dull.y, m.dull.z], [m.mild.x, m.mild.y, m.mild.z], [m.hot.x, m.hot.y, m.hot.z]]
+        };
+        assert_eq!(
+            spark(&sparks_of(&app, orange)),
+            [SPARK_DULL_RED, SPARK_ORANGE, CORE_YELLOW],
+            "the scene's sparks are as shipped"
+        );
+        let [dull, mild, hot] = spark(&sparks_of(&app, tinted));
+        for stop in [dull, mild, hot] {
+            assert!(
+                stop[1] > stop[0] && stop[1] > stop[2],
+                "a green fire's sparks are green at every stage: {stop:?}"
+            );
+        }
+        // A colour the host changes later reaches the sparks too.
+        app.world_mut().get_mut::<FlameSite>(tinted).expect("the site").color =
+            Some(Color::from(LinearRgba::rgb(0.1, 0.3, 1.0)));
+        app.update();
+        let [_, mild, _] = spark(&sparks_of(&app, tinted));
+        assert!(mild[2] > mild[1] && mild[1] > mild[0], "now blue: {mild:?}");
     }
 
     #[test]

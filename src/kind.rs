@@ -190,6 +190,7 @@ impl FireKind {
     /// depth fade, no linked fire.
     pub fn site(self) -> FlameSite {
         FlameSite {
+            color: None,
             height: self.height(),
             phase: 0.0,
             kindle: 0.0,
