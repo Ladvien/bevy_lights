@@ -1465,6 +1465,50 @@ fn a_pooled_light_follows_its_flames_lean() {
     assert!((by(&mut app, bare) - Vec3::new(0.0, 2.0, -1.0)).length() < 1e-4, "no flame, no lean");
 }
 
+/// A torch carried through still air has a wind of its own: its light stands in the flame that streams behind it, by the
+/// tilt of its pace (`FlameVelocity` is what the flame plugin writes from the site's motion), and with the gain at zero it
+/// stands upright, as it did before the fire's own motion counted.
+#[test]
+fn a_pooled_light_follows_the_lean_of_a_carried_flame() {
+    let mut app = app(LightPool { size: 3, ..default() });
+    let torch = app
+        .world_mut()
+        .spawn((
+            FlameSite {
+                color: None,
+                height: 1.0,
+                phase: 0.0,
+                kindle: 0.0,
+                diameter: Some(0.1),
+                depth: 0.15,
+                depth_fade: false,
+                fire: None,
+            },
+            PoolCandidate { offset: Vec3::Y * 0.5, intensity: 1000.0, ..default() },
+            Transform::from_xyz(0.0, 0.0, 1.0),
+        ))
+        .id();
+    focus_at(&mut app, Vec3::ZERO);
+    settle(&mut app);
+    let light = |app: &mut App| -> Vec3 {
+        slots(app).into_iter().find(|slot| slot.3 > 0.0).map(|slot| slot.1).expect("the torch's light")
+    };
+    let still = light(&mut app);
+    assert!((still - Vec3::new(0.0, 0.5, 1.0)).length() < 1e-4, "standing: {still:?}");
+
+    app.world_mut().get_mut::<FlameVelocity>(torch).expect("a site carries its velocity").ground =
+        Vec2::new(0.0, 1.4);
+    settle(&mut app);
+    let walking = light(&mut app);
+    let want = Vec3::from(lean_light_shift(1.0, 1.4, 0.1, [0.0, -1.0]));
+    assert!(walking.z < still.z - 0.2 && walking.y < 0.5, "behind the bearer and lower: {walking:?}");
+    assert!((walking - (still + want)).length() < 1e-4, "{walking:?} vs {still:?} + {want:?}");
+
+    app.insert_resource(FlameMotion { gain: 0.0, ..default() });
+    settle(&mut app);
+    assert!((light(&mut app) - still).length() < 1e-4, "gain 0: the light stands upright as it always did");
+}
+
 /// A torch whose light is a sibling of its flame (joined by `FlameSite::fire`) leans its light exactly as a
 /// light on the site entity does; a light no site names stays upright.
 #[test]

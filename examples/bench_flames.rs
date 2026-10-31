@@ -8,7 +8,7 @@
 //! window and no display; and prints one line:
 //!
 //! ```text
-//! bench_flames flames=5000 fire=0 visible=21 embers=0 embers_visible=0 smoke=0 smoke_visible=0 tongues=0 beds=0 beds_visible=0 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
+//! bench_flames flames=5000 fire=0 visible=21 embers=0 embers_visible=0 smoke=0 smoke_visible=0 tongues=0 beds=0 beds_visible=0 wind=0,0 moving=0 motion=1 frames=300 mean_ms=… p50_ms=… min_ms=…
 //! ```
 //!
 //! `visible` is the number of flames the renderer counted as in view at the last frame (a fire's tongues are flames too), which is what
@@ -25,7 +25,9 @@
 //! per torch instead (with `FirePlugin`, which here logs that the pool and the flicker are missing, as the bench has neither: it
 //! measures the expansion and the components it writes, not a light the pool hands out); `BENCH_FIRE=2` spawns the same parts by hand,
 //! the comparison that shows what the component itself costs. The line says `fire=1` or `fire=2`; the torch's own sparks and smoke come
-//! with either, so compare them with each other, not with `BENCH_EMBERS=1 BENCH_SMOKE=1`.
+//! with either, so compare them with each other, not with `BENCH_EMBERS=1 BENCH_SMOKE=1`. `BENCH_MOVING=v` walks every torch along X at `v`
+//! metres per second (so every flame's site has a velocity, its lean and its culling box change every frame, and the tracker has work to
+//! do), and `BENCH_MOTION=g` sets `FlameMotion::gain` (`0` is the walk with no lean, the comparison that shows what the lean itself costs).
 
 use std::time::Instant;
 
@@ -55,6 +57,8 @@ fn main() {
     let beds = env_usize("BENCH_BEDS", 0) != 0;
     let fire = u8::try_from(env_usize("BENCH_FIRE", 0)).unwrap_or(0);
     let frames = env_usize("BENCH_FRAMES", 400);
+    let moving: f32 = std::env::var("BENCH_MOVING").ok().and_then(|v| v.parse().ok()).unwrap_or(0.0);
+    let motion: f32 = std::env::var("BENCH_MOTION").ok().and_then(|v| v.parse().ok()).unwrap_or(1.0);
     let wind = std::env::var("BENCH_WIND").ok().and_then(|v| {
         let v: Vec<f32> = v.split(',').filter_map(|p| p.trim().parse().ok()).collect();
         (v.len() == 2).then(|| Vec2::new(v[0], v[1]))
@@ -69,9 +73,18 @@ fn main() {
         FlamePlugin,
     ))
     .insert_resource(FlameWind { velocity: wind.unwrap_or_default() })
+    .insert_resource(FlameMotion { gain: motion, ..default() })
     .add_systems(Startup, move |commands: Commands, images: ResMut<Assets<Image>>| {
         scene(commands, images, flames, Dress { embers, smoke, tongues, beds, fire })
     });
+    if moving != 0.0 {
+        app.add_systems(Update, move |time: Res<Time>, mut sites: Query<&mut Transform, With<FlameSite>>| {
+            let step = moving * time.delta_secs();
+            for mut at in &mut sites {
+                at.translation.x += step;
+            }
+        });
+    }
     if fire == 1 {
         app.add_plugins(FirePlugin);
     }
@@ -106,7 +119,7 @@ fn main() {
     let at = |i: usize| samples.get(i).copied().unwrap_or(0.0);
     let wind = wind.unwrap_or_default();
     println!(
-        "bench_flames flames={flames} fire={} visible={flames_visible} embers={} embers_visible={embers_visible} smoke={} smoke_visible={smoke_visible} tongues={tongues} beds={} beds_visible={beds_visible} wind={},{} frames={} mean_ms={mean:.3} p50_ms={:.3} min_ms={:.3}",
+        "bench_flames flames={flames} fire={} visible={flames_visible} embers={} embers_visible={embers_visible} smoke={} smoke_visible={smoke_visible} tongues={tongues} beds={} beds_visible={beds_visible} wind={},{} moving={moving} motion={motion} frames={} mean_ms={mean:.3} p50_ms={:.3} min_ms={:.3}",
         fire,
         u8::from(embers),
         u8::from(smoke),
