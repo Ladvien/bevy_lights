@@ -8,6 +8,7 @@
 use std::time::Duration;
 
 use bevy::camera::Camera;
+use bevy::camera::visibility::{SetViewVisibility, VisibilitySystems};
 use bevy::light::{PointLight, SpotLight};
 use bevy::prelude::*;
 use bevy::time::TimeUpdateStrategy;
@@ -199,6 +200,64 @@ fn a_light_shown_this_frame_is_written_before_the_camera_has_seen_it() {
     app.update();
     let shown = intensity(&app).unwrap_or_default();
     assert!((700.0..=1000.0).contains(&shown), "the frame it is shown, it is written: {shown}");
+}
+
+/// The light a test's camera has just turned to, if any.
+#[derive(Resource, Default)]
+struct TurnedTo(Option<Entity>);
+
+/// What a camera's visibility pass does to a light that has come into its view: turn its `ViewVisibility` true,
+/// in `PostUpdate`, after `Update` has already skipped the light as culled.
+fn see_the_light(turned: Res<TurnedTo>, mut views: Query<&mut ViewVisibility>) {
+    if let Some(entity) = turned.0
+        && let Ok(mut view) = views.get_mut(entity)
+    {
+        view.set_visible();
+    }
+}
+
+#[test]
+fn a_light_a_camera_turns_to_is_written_the_frame_it_is_first_seen() {
+    // The camera moves; a light that was out of view is in it from this frame's `PostUpdate`, and is extracted
+    // this same frame. `Update` skipped it as culled, so without a write after the visibility pass it is drawn
+    // for one frame at the intensity it was last given: here the 1 234 it had, where the fire is 5 000 (a pool
+    // light handed to a new owner while off screen, drawn for one frame at the old owner's brightness).
+    let mut app = app();
+    app.init_resource::<TurnedTo>()
+        .add_systems(PostUpdate, see_the_light.in_set(VisibilitySystems::CheckVisibility));
+    with_camera(&mut app);
+    let light = app
+        .world_mut()
+        .spawn((
+            PointLight { intensity: 1234.0, ..default() },
+            Flicker { base: 1000.0, phase: 0.0, diameter: None, ..default() },
+            ViewVisibility::default(),
+        ))
+        .id();
+    let intensity =
+        |app: &App| app.world().get::<PointLight>(light).map(|light| light.intensity).unwrap_or_default();
+    for _ in 0..10 {
+        app.update();
+    }
+    assert_eq!(intensity(&app), 1234.0, "out of view, it is left alone");
+    app.world_mut().entity_mut(light).insert(Flicker {
+        base: 5000.0,
+        phase: 0.0,
+        diameter: None,
+        ..default()
+    });
+    for _ in 0..5 {
+        app.update();
+    }
+    assert_eq!(intensity(&app), 1234.0, "and still, whatever its fire became");
+
+    app.world_mut().resource_mut::<TurnedTo>().0 = Some(light);
+    app.update();
+    let seen = intensity(&app);
+    assert!(
+        (3500.0..=5000.0).contains(&seen),
+        "the frame it comes into view it is as bright as its fire: {seen}"
+    );
 }
 
 #[test]

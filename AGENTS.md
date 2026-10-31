@@ -200,7 +200,11 @@ is an art decision, so it needs the same treatment as a physics constant.
   recomputed in `PostUpdate`, after `Update`, and the light is extracted that same frame), so a light
   switched on by `Visibility` is written anyway: `is_hidden` exempts a `Visibility` changed (not added)
   this frame. Skipping it drew a pool reserve's first frame at the tail of its last fade, 112 lm for
-  70 000.
+  70 000. **A light the *camera* turns to is the same trap** (no `Visibility` changes, only the view
+  does): `write_lights_coming_into_view` runs in `PostUpdate` after `CheckVisibility` and
+  `MarkNewlyHiddenEntitiesInvisible` and writes every light whose `ViewVisibility` is `Changed` and now
+  true. A static test camera never shows it; a moving one drew a pool light at 75 903 lm for one frame
+  where the fade-in was at 104.
 - **A duplicated plugin panics.** `LightPoolPlugin` therefore cannot add `FlickerPlugin` for the host;
   it reports the missing one in `finish()`.
 - **A parent of a visible entity needs the visibility components.** A `FlameSite` gained `#[require(Visibility, InheritedVisibility, ViewVisibility)]` because `dress_flames` spawns a `Flame` under it: without them Bevy warns (B0004) and the child's visibility is not inherited, so a torch's flame does not go out with the torch.

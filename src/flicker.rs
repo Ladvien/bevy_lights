@@ -3,6 +3,7 @@
 //! [`flicker_lights`] covers both [`PointLight`] and [`SpotLight`], so a wall sconce flickers the
 //! same way a brazier does: it is the same fire.
 
+use bevy::camera::visibility::VisibilitySystems;
 use bevy::light::{PointLight, SpotLight};
 use bevy::prelude::*;
 use bevy::time::Time;
@@ -26,7 +27,15 @@ impl Plugin for FlickerPlugin {
             .register_type::<Kindle>()
             .register_type::<Snuff>()
             .register_type::<crate::FireKind>()
-            .add_systems(Update, flicker_lights.in_set(LightsSystems::Flicker));
+            .add_systems(Update, flicker_lights.in_set(LightsSystems::Flicker))
+            // After every system that decides a light's `ViewVisibility` for the frame, and before the
+            // renderer extracts the lights (which is after `PostUpdate`).
+            .add_systems(
+                PostUpdate,
+                write_lights_coming_into_view
+                    .after(VisibilitySystems::CheckVisibility)
+                    .after(VisibilitySystems::MarkNewlyHiddenEntitiesInvisible),
+            );
         crate::report::watch::<Flicker>(app);
         crate::report::watch::<Snuff>(app);
         crate::report::watch::<Kindle>(app);
@@ -275,7 +284,8 @@ type SpotLightFrame<'w> = (
 ///
 /// A light the camera does not see (`ViewVisibility` false) keeps its last intensity: nothing is
 /// re-extracted for it, so writing it would cost a change-detection edge for no pixels. Its
-/// [`Kindle`] still advances, so it has already flared by the time it comes into view.
+/// [`Kindle`] still advances, so it has already flared by the time it comes into view. The frame it
+/// comes into view it is written by [`write_lights_coming_into_view`].
 fn flicker_lights(
     time: Res<Time>,
     // `Without` on each other's light type, so the two queries are provably disjoint: both ask for
@@ -376,9 +386,59 @@ fn modulate<L: Emits>(
 ) -> Heard {
     let (elapsed, out, heard) = advance_fire(kindle, snuff, dt);
     if !hidden {
-        *light.intensity() = flicker.intensity_at(t, elapsed) * out.unwrap_or(1.0);
+        *light.intensity() = level(flicker, elapsed, out, t);
     }
     heard
+}
+
+/// What a fire gives at virtual time `t`: its flicker, its kindle's flare (`elapsed`, `None` when it has none)
+/// and its snuff's gain (`out`, `None` when it has none). The one formula [`modulate`] writes every frame and
+/// [`write_lights_coming_into_view`] writes the frame a light is first drawn.
+fn level(flicker: Flicker, elapsed: Option<f32>, out: Option<f32>, t: f32) -> f32 {
+    flicker.intensity_at(t, elapsed) * out.unwrap_or(1.0)
+}
+
+/// A point light's state, read in `PostUpdate`: the light, its fire, and whether a camera sees it.
+type PointLightSeen<'w> =
+    (&'w mut PointLight, &'w Flicker, Option<&'w Kindle>, Option<&'w Snuff>, &'w ViewVisibility);
+
+/// A spot light's state, read in `PostUpdate`: the same shape as [`PointLightSeen`].
+type SpotLightSeen<'w> =
+    (&'w mut SpotLight, &'w Flicker, Option<&'w Kindle>, Option<&'w Snuff>, &'w ViewVisibility);
+
+/// Writes the intensity of every light a camera sees **for the first time** this frame (its
+/// `ViewVisibility` has just turned true: the camera moved over it, or it was spawned in view), before the
+/// renderer extracts it.
+///
+/// [`flicker_lights`] leaves a culled light alone, and `ViewVisibility` is recomputed in `PostUpdate`, after
+/// it: the light the camera has just turned to is still "culled" when `Update` runs and is extracted this same
+/// frame, so it was drawn for one frame at whatever intensity it was last written, which for a pool light
+/// handed to a new owner while out of view is the old owner's. Measured on the courtyard with two moving
+/// cameras: one frame of a torch's light at 75 903 lm where the new owner's fade-in was at 104, a 5 DN jump of
+/// a half-frame's mean luminance. This system is the other half of the culling: a culled light costs nothing,
+/// and the frame it is seen it is as bright as its fire is.
+///
+/// It matches only a `ViewVisibility` that changed this frame, so a light that stays in view or out of it
+/// costs a change-detection check and nothing else.
+fn write_lights_coming_into_view(
+    time: Res<Time>,
+    mut points: Query<PointLightSeen, (Without<SpotLight>, Changed<ViewVisibility>)>,
+    mut spots: Query<SpotLightSeen, (Without<PointLight>, Changed<ViewVisibility>)>,
+) {
+    let t = time.elapsed_secs();
+    let level_of = |flicker: &Flicker, kindle: Option<&Kindle>, snuff: Option<&Snuff>| {
+        level(*flicker, kindle.map(|kindle| kindle.elapsed), snuff.map(|snuff| snuff_gain(snuff.elapsed)), t)
+    };
+    for (mut light, flicker, kindle, snuff, seen) in &mut points {
+        if seen.get() {
+            light.intensity = level_of(flicker, kindle, snuff);
+        }
+    }
+    for (mut light, flicker, kindle, snuff, seen) in &mut spots {
+        if seen.get() {
+            light.intensity = level_of(flicker, kindle, snuff);
+        }
+    }
 }
 
 /// Advances a fire's [`Kindle`] and [`Snuff`] by `dt`. Answers the kindle's `elapsed` and the snuff's
