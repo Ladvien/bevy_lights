@@ -13,6 +13,9 @@
 //!   recolours them, its flames are not drawn on them).
 //! - [`FlameMaterial`], [`FlameSite`] — [`FlamePlugin`] draws a billboarded, additive shader flame
 //!   standing on every [`FlameSite`], out of one material and one draw per flame: `src/flame.wesl`.
+//! - [`Fire`] — [`FirePlugin`] writes a whole fire from one component: `Fire::lit(FireKind::Campfire, 250.0, 0.4)`
+//!   is the kind's flame, the light the pool hands it, and its sparks, smoke, tongues and bed of coals, each fire on a
+//!   clock of its own. It is the way in; the three above are the parts it writes, for a host that wants every number.
 //!
 //! Under those three is the cinematographer's half, [`model::cinematography`]: [`key_to_fill`] and
 //! [`stops`] for a scene's key against its fill, [`fill_for`] for the sky that makes a night,
@@ -20,8 +23,9 @@
 //! light's colour from the temperature it burns at. They touch no light: the same numbers a director
 //! of photography sets before a lamp is hung, for a host to size and colour its practicals with.
 //!
-//! Every plugin is independent; adding some and not others is supported, and
-//! [`LightPoolPlugin`] warns (it does not panic) when [`FlickerPlugin`] is missing.
+//! The three plugins are independent of each other; adding some and not others is supported, and
+//! [`LightPoolPlugin`] warns (it does not panic) when [`FlickerPlugin`] is missing. [`FirePlugin`] writes what the
+//! other three run, so it warns when any of them is missing.
 //!
 //! ```no_run
 //! # use bevy::prelude::*;
@@ -98,7 +102,7 @@ pub use flicker::{Flicker, FlickerPlugin, Kindle, Kindled, Snuff, Snuffed};
 pub use kind::{FireKind, UnknownFireKind};
 pub use model::{
     CALM_FLICKER_DEPTH, DEFAULT_BED_COOLING, DEFAULT_FIRE_DIAMETER, EMBER_AT, FADE_SECONDS, FLAME_REACH,
-    FLAME_TILT_LIMIT, FLICKER_DEPTH, HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY, MAX_FLICKER_DEPTH,
+    FIRE_KELVIN, FLAME_TILT_LIMIT, FLICKER_DEPTH, HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY, MAX_FLICKER_DEPTH,
     MAX_TONGUES, MERGE_RATIO, MOON_KEY, Problem, ProblemKind, RANGE_MARGIN, SMOKE_TAIL_SECONDS,
     SNUFF_SECONDS, Tongue, WHIPPING_FLICKER_DEPTH, bed_drawn_heat, bed_heat_step, bed_radiance,
     bed_visible_heat, blackbody_colour, blackbody_luminance, blackbody_radiance, char_field, char_radiance,

@@ -10,14 +10,25 @@ struct MyFocus;
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins((FlickerPlugin, LightPoolPlugin::<MyFocus>::default(), FlamePlugin))
+        .add_plugins((FlickerPlugin, LightPoolPlugin::<MyFocus>::default(), FlamePlugin, FirePlugin))
         .add_systems(Startup, setup)
         .run();
 }
 
 fn setup(mut commands: Commands) {
-    // A brazier: a real light, sized by the pool it lights (1000 lx at 4 m, from 0.9 m up) and
-    // coloured by the temperature it burns at.
+    // A whole fire is one component. A campfire: the kind's flame, tongues, bed of coals, sparks and
+    // smoke, and a light the pool hands it when it is near, sized so its pool puts 250 lx on the ground
+    // at its edge (the light sits in the flame: 0.35 m up). Every fire gets a clock of its own.
+    commands.spawn((Fire::lit(FireKind::Campfire, 250.0, 0.35), Transform::from_xyz(4.0, 0.0, 2.0)));
+    // A torch in a colour of its own: the light is that colour and the flame is the same hue.
+    commands.spawn((
+        Fire { color: Some(Color::srgb(0.2, 0.9, 0.3)), ..Fire::new(FireKind::Torch) },
+        Transform::from_xyz(-2.0, 1.5, 3.0),
+    ));
+
+    // The same parts by hand, when you want every number yourself. A brazier with a real light of its
+    // own, sized by the pool it lights (1000 lx at 4 m, from 0.9 m up) and coloured by the temperature
+    // it burns at.
     let lumens = fire_lumens(1000.0, 4.0, 0.9);
     let [r, g, b] = blackbody_colour(1900.0, 1.0);
     commands.spawn((
@@ -38,36 +49,6 @@ fn setup(mut commands: Commands) {
             fire: None,
             color: None,
         },
-    ));
-
-    // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
-    // hand-held flame is smaller, so its pool is sized from its edge.
-    //
-    // One entity holds both the flame and the candidate, so the light it is handed can never drift away
-    // from the fire: `offset` is the flame's own centre (`flame_light_offset`), measured from the site's
-    // origin, and the intensity is sized for the height the light will actually sit at.
-    let torch_height = 0.35;
-    commands.spawn((
-        // `phase` is this torch's own fire clock: the real light it is handed later breathes with the
-        // flame drawn on it, not with the pool slot that happens to own it.
-        PoolCandidate {
-            offset: Vec3::from(flame_light_offset(torch_height)),
-            intensity: fire_lumens(250.0, 2.0, flame_light_offset(torch_height)[1]),
-            phase: Some(1.9),
-            ..default()
-        },
-        // The pool's lights flicker at the un-sized rate, so this flame does too.
-        FlameSite {
-            height: torch_height,
-            phase: 1.9,
-            kindle: 0.0,
-            diameter: None,
-            depth: FLICKER_DEPTH,
-            depth_fade: false,
-            fire: None,
-            color: None,
-        },
-        Transform::from_xyz(4.0, 0.0, 2.0),
     ));
 
     commands.spawn((MyFocus, Transform::default()));

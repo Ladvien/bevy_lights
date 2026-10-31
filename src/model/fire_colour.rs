@@ -18,6 +18,11 @@
 //! its core reads as outlined, not as hottest at the heart. It keeps what makes the orange ramp read as fire: a rim darker
 //! and more saturated than the middle, a core paler and brighter, and the hues the other way from each other.
 
+/// The temperature a wood fire's light burns at, in kelvin: 1900 K, a deep red-orange in the wood-flame band (1800-2200 K), from which
+/// a [`Fire`](crate::Fire) with no colour of its own takes its light's colour (`blackbody_colour(FIRE_KELVIN, 1.0)`), so a pool's light
+/// is a fire's and not the template's white. The temperature `docs/research/lighting-look.md` colours the courtyard's fires at; a design
+/// default.
+pub const FIRE_KELVIN: f32 = 1900.0;
 /// The middle colour of the shipped ramp, a campfire's orange: `FlameLook::default().color`. A design
 /// default (`docs/research/flame.md`).
 pub const DEFAULT_MID: [f32; 3] = [1.0, 0.55, 0.18];
