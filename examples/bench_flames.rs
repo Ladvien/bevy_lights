@@ -8,7 +8,7 @@
 //! window and no display; and prints one line:
 //!
 //! ```text
-//! bench_flames flames=5000 visible=21 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
+//! bench_flames flames=5000 visible=21 embers=0 embers_visible=0 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
 //! ```
 //!
 //! `visible` is the number of flames the renderer counted as in view at the last frame, which is what
@@ -17,7 +17,8 @@
 //! because the renderer does. Compare a run against a run of the same binary's predecessor on the same machine
 //! and the same load, never against another host. `BENCH_WIND=x,z` blows a wind of that velocity (metres per
 //! second) through every flame, which makes the flames lean and so rewrites each one's scale and its culling
-//! box every frame.
+//! box every frame. `BENCH_EMBERS=1` gives every torch `FlameEmbers` (a second quad a flame), and `embers_visible` is
+//! how many of those quads the renderer counted as in view.
 
 use std::time::Instant;
 
@@ -41,6 +42,7 @@ const WARM_UP: usize = 100;
 
 fn main() {
     let flames = env_usize("BENCH_FLAMES", 5_000);
+    let embers = env_usize("BENCH_EMBERS", 0) != 0;
     let frames = env_usize("BENCH_FRAMES", 400);
     let wind = std::env::var("BENCH_WIND").ok().and_then(|v| {
         let v: Vec<f32> = v.split(',').filter_map(|p| p.trim().parse().ok()).collect();
@@ -57,7 +59,7 @@ fn main() {
     ))
     .insert_resource(FlameWind { velocity: wind.unwrap_or_default() })
     .add_systems(Startup, move |commands: Commands, images: ResMut<Assets<Image>>| {
-        scene(commands, images, flames)
+        scene(commands, images, flames, embers)
     });
     app.finish();
     app.cleanup();
@@ -70,19 +72,26 @@ fn main() {
             samples.push(start.elapsed().as_secs_f64() * 1000.0);
         }
     }
-    let visible = app
-        .world_mut()
-        .query_filtered::<&ViewVisibility, With<Flame>>()
-        .iter(app.world())
-        .filter(|view| view.get())
-        .count();
+    let visible = |world: &mut World, name: Option<&str>| {
+        world
+            .query::<(&ViewVisibility, Option<&Name>, Has<Flame>)>()
+            .iter(world)
+            .filter(|(view, quad, is_flame)| match name {
+                None => *is_flame && view.get(),
+                Some(name) => view.get() && quad.is_some_and(|quad| quad.as_str() == name),
+            })
+            .count()
+    };
+    let flames_visible = visible(app.world_mut(), None);
+    let embers_visible = visible(app.world_mut(), Some("Embers"));
 
     samples.sort_by(f64::total_cmp);
     let mean = samples.iter().sum::<f64>() / samples.len().max(1) as f64;
     let at = |i: usize| samples.get(i).copied().unwrap_or(0.0);
     let wind = wind.unwrap_or_default();
     println!(
-        "bench_flames flames={flames} visible={visible} wind={},{} frames={} mean_ms={mean:.3} p50_ms={:.3} min_ms={:.3}",
+        "bench_flames flames={flames} visible={flames_visible} embers={} embers_visible={embers_visible} wind={},{} frames={} mean_ms={mean:.3} p50_ms={:.3} min_ms={:.3}",
+        u8::from(embers),
         wind.x,
         wind.y,
         samples.len(),
@@ -92,7 +101,7 @@ fn main() {
 }
 
 /// The torches, and one camera at the grid's corner, drawing to an image no one reads.
-fn scene(mut commands: Commands, mut images: ResMut<Assets<Image>>, flames: usize) {
+fn scene(mut commands: Commands, mut images: ResMut<Assets<Image>>, flames: usize, embers: bool) {
     let mut target = Image::new_fill(
         Extent3d { width: 1280, height: 720, depth_or_array_layers: 1 },
         TextureDimension::D2,
@@ -106,7 +115,10 @@ fn scene(mut commands: Commands, mut images: ResMut<Assets<Image>>, flames: usiz
     let side = (flames as f32).sqrt().ceil() as usize;
     for index in 0..flames {
         let at = Vec3::new((index % side) as f32 * SPACING, 0.0, (index / side) as f32 * SPACING);
-        commands.spawn((FireKind::Torch.site(), Transform::from_translation(at)));
+        let mut torch = commands.spawn((FireKind::Torch.site(), Transform::from_translation(at)));
+        if embers {
+            torch.insert(FlameEmbers::default());
+        }
     }
     commands.spawn((
         Camera3d::default(),
