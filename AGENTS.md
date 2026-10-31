@@ -30,6 +30,7 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `src/model/fire.rs` — `flicker_factor`, `kindle_gain`, `KINDLE_SECONDS`.
 - `src/model/reach.rs` — `raised_light`, `RANGE_MARGIN`.
 - `src/model/tag.rs` — `pack_flame_tag`, `unpack_flame_tag`.
+- `src/model/fire_colour.rs` — `retint` and the shipped ramp's stops: a fire's own colour, as the orange ramp moved to its hue (`docs/research/fire-colour.md`).
 - `src/flicker.rs` — `FlickerPlugin`, `Flicker`, `Kindle`, `Kindled`, and `flicker_lights` over both light types.
 - `src/pool.rs` — `LightPoolPlugin<F>`, `LightPool`, `FocusRule`, `PoolCandidate`, `PoolLight`, `assign_pool::<F>`. `src/model/pool.rs` holds the hand-off rule and the shared pool's maths (`focus_quota`, `quota_cutoff`, `shared_value`).
 - `src/flame.rs` — `FlamePlugin`, `FlameMaterial`, `FlameLook`, `FlameSite`, `Flame`, `dress_flames`, `update_flames`.
@@ -205,6 +206,8 @@ is an art decision, so it needs the same treatment as a physics constant.
   `MarkNewlyHiddenEntitiesInvisible` and writes every light whose `ViewVisibility` is `Changed` and now
   true. A static test camera never shows it; a moving one drew a pool light at 75 903 lm for one frame
   where the fade-in was at 104.
+- **A flame's colour is one material per colour, held by ids.** `FlameSite::color` makes `FlameAssets` (and `EmberAssets`) a map from the colour's bits to an `AssetId`, never a `Handle`: the flames hold the material, the asset is dropped with the last of them, and `sweep` forgets the id, so a colour a host changes every frame is one live material and not one per colour ever shown (`a_colour_changed_every_frame_holds_a_bounded_number_of_materials`). A `Handle` in the map would leak every one.
+- **A ramp transform that is the identity only at the shipped colour changes every scene that sets its own.** `retint` first rotated the whole ramp by the difference of hues, and the courtyard's `FlameLook::color` (a 1900 K blackbody, 16° redder than `DEFAULT_MID`) pushed the rim past red into pink on every torch: 3 514 pixels differed from the old build. The zero-pixel capture diff of the *default* courtyard against the old build is what found it, so run it for any change to what a flame's colours are made of. The fire family (red to yellow) is the identity; the rotation fades in beyond it.
 - **A duplicated plugin panics.** `LightPoolPlugin` therefore cannot add `FlickerPlugin` for the host;
   it reports the missing one in `finish()`.
 - **A parent of a visible entity needs the visibility components.** A `FlameSite` gained `#[require(Visibility, InheritedVisibility, ViewVisibility)]` because `dress_flames` spawns a `Flame` under it: without them Bevy warns (B0004) and the child's visibility is not inherited, so a torch's flame does not go out with the torch.
