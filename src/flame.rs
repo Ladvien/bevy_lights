@@ -10,7 +10,8 @@
 //! shape, its noise and their provenance are documented at the top of `src/flame.wesl`.
 
 use bevy::asset::embedded_asset;
-use bevy::camera::visibility::NoFrustumCulling;
+use bevy::camera::primitives::Aabb;
+use bevy::camera::visibility::NoAutoAabb;
 use bevy::light::NotShadowCaster;
 use bevy::mesh::{MeshTag, MeshVertexBufferLayoutRef};
 use bevy::pbr::{Material, MaterialPipeline, MaterialPipelineKey, MaterialPlugin, MeshMaterial3d};
@@ -23,8 +24,8 @@ use crate::LightsSystems;
 use crate::chain_sets;
 use crate::flicker::{Flicker, Kindle, Snuff};
 use crate::model::{
-    DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, KINDLE_SECONDS, flame_tilt, flicker_swing, kindle_gain,
-    pack_flame_tag, set_flame_brightness, snuff_gain,
+    DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, KINDLE_SECONDS, flame_cull_extents, flame_tilt, flicker_swing,
+    kindle_gain, pack_flame_tag, set_flame_brightness, snuff_gain, unpack_flame_tag,
 };
 use crate::pool::PoolCandidate;
 
@@ -420,10 +421,15 @@ fn gust_wind(
 /// `y` and `z` are `1 +` the downwind lean (`sin θ` along world X and Z). Lengths, not directions, so a
 /// parent's rotation cannot change them; `1 +` keeps them positive. Written only when it changes, so a
 /// flame in still air costs nothing.
-fn set_scale(transform: &mut Transform, took: f32, lean: Vec2) {
+///
+/// The flame's culling box goes with it. The scale is the shader's data, not a size, so it distorts the
+/// box the frustum test builds from the transform; [`flame_cull_extents`] divides the distortion out, and
+/// so the box is rewritten on exactly the frames the scale is, and not otherwise.
+fn set_scale(transform: &mut Transform, bound: &mut Aabb, height: f32, took: f32, lean: Vec2) {
     let scale = Vec3::new(took, 1.0 + lean.x, 1.0 + lean.y);
     if transform.scale != scale {
         transform.scale = scale;
+        bound.half_extents = Vec3A::from(flame_cull_extents(height, took, lean.to_array()));
     }
 }
 
@@ -502,10 +508,12 @@ fn material_for(look: FlameLook, depth_fade: bool) -> FlameMaterial {
 /// Gives every [`FlameSite`] without one a single [`Flame`] child.
 ///
 /// The child carries the site's height, phase and starting brightness on its [`MeshTag`] (see
-/// [`pack_flame_tag`](crate::pack_flame_tag)), stands at the site's own origin, and is neither a
-/// shadow caster nor frustum culled — the vertex stage scales the unit quad, so the mesh's own
-/// `Aabb` does not cover what is drawn. The starting brightness is the fire's swing at the frame it
-/// spawns, so the very first frame a flame is drawn it already matches its light.
+/// [`pack_flame_tag`](crate::pack_flame_tag)), stands at the site's own origin, and is not a shadow
+/// caster. Its culling box is the crate's own ([`flame_cull_extents`]), because the vertex stage scales
+/// the unit quad and reads the transform's scale as data, so the mesh's own `Aabb` neither covers what
+/// is drawn nor survives the scale: a flame outside every camera's frustum is not extracted or drawn.
+/// The starting brightness is the fire's swing at the frame it spawns, so the very first frame a flame
+/// is drawn it already matches its light.
 ///
 /// Spawned through `queue_silenced`: a site despawned in the same frame it was created (a short
 /// fire's lifetime running out, a carried torch going away) must not panic the insert.
@@ -523,7 +531,14 @@ pub(crate) fn dress_flames(
     for (site, flame) in &sites {
         let catch = flame.kindle;
         let brightness = flicker_swing(flame.diameter, flame.depth, t, flame.phase);
-        let tag = MeshTag::new(pack_flame_tag(flame.phase, flame.height, brightness, max_height));
+        let packed = pack_flame_tag(flame.phase, flame.height, brightness, max_height);
+        let tag = MeshTag::new(packed);
+        // The culling box of a flame at full scale: `update_flames` rewrites it with the scale.
+        let height = unpack_flame_tag(packed, max_height).1;
+        let bound = Aabb {
+            center: Vec3A::ZERO,
+            half_extents: Vec3A::from(flame_cull_extents(height, 1.0, [0.0; 2])),
+        };
         let mesh = assets.mesh.clone();
         let material = assets.material_for(flame.depth_fade).clone();
         commands.entity(site).queue_silenced(move |mut site: EntityWorldMut| {
@@ -536,7 +551,10 @@ pub(crate) fn dress_flames(
                     MeshMaterial3d(material),
                     Transform::IDENTITY,
                     NotShadowCaster,
-                    NoFrustumCulling,
+                    // Bevy's own box is the unit square's, which neither covers the drawn flame nor survives
+                    // the scale (`flame_cull_extents`): the box is this crate's, and Bevy must leave it alone.
+                    bound,
+                    NoAutoAabb,
                 ));
             });
         });
@@ -565,6 +583,7 @@ pub(crate) fn update_flames(
     mut flames: Query<(
         &mut Flame,
         &mut Transform,
+        &mut Aabb,
         &mut MeshTag,
         &mut MeshMaterial3d<FlameMaterial>,
         &ChildOf,
@@ -584,7 +603,9 @@ pub(crate) fn update_flames(
         let speed = w.velocity.length();
         (speed, if speed > 0.0 && speed.is_finite() { w.velocity / speed } else { Vec2::ZERO })
     });
-    for (mut flame, mut transform, mut tag, mut material, parent) in &mut flames {
+    let max_height = assets.max_height;
+    for (mut flame, mut transform, mut bound, mut tag, mut material, parent) in &mut flames {
+        let height = unpack_flame_tag(tag.value, max_height).1;
         let (site, owner) = sites.sites.get(parent.parent()).map_or((None, None), |(s, o)| (Some(s), o));
         let source = owner.map(ChildOf::parent).filter(|owner| !sites.sites.contains(*owner));
         if flame.source != source {
@@ -616,7 +637,7 @@ pub(crate) fn update_flames(
         // so the flame leaves with its light. It outranks a catch, as `Snuff` outranks `Kindle` on the light; removing
         // it hands the scale back through the settled branch below.
         if let Some(elapsed) = site.and_then(|site| sites.snuff_of(site)) {
-            set_scale(&mut transform, snuff_gain(elapsed).max(0.001), lean);
+            set_scale(&mut transform, &mut bound, height, snuff_gain(elapsed).max(0.001), lean);
             if flame.kindled < f32::MAX {
                 flame.kindled = f32::MAX;
             }
@@ -628,7 +649,7 @@ pub(crate) fn update_flames(
         if let Some(elapsed) =
             site.and_then(|site| sites.kindle_of(site)).filter(|elapsed| *elapsed < KINDLE_SECONDS)
         {
-            set_scale(&mut transform, kindle_gain(elapsed).max(0.001), lean);
+            set_scale(&mut transform, &mut bound, height, kindle_gain(elapsed).max(0.001), lean);
             if flame.kindled < f32::MAX {
                 flame.kindled = f32::MAX;
             }
@@ -636,7 +657,7 @@ pub(crate) fn update_flames(
         }
         if flame.kindled >= f32::MAX {
             // Done catching. A link whose `Kindle` has gone leaves the scale where it stopped; put it back.
-            set_scale(&mut transform, 1.0, lean);
+            set_scale(&mut transform, &mut bound, height, 1.0, lean);
             continue;
         }
         flame.kindled = (flame.kindled + dt).min(f32::MAX);
@@ -644,10 +665,10 @@ pub(crate) fn update_flames(
         let gain = if catch > 0.0 { kindle_gain(flame.kindled.min(catch)) } else { 1.0 };
         // Width and height both: a fire that is catching is smaller in both, and a flame that grew tall
         // while staying wide would read as a sheet. The brightness is in the tag and is written above.
-        set_scale(&mut transform, gain.max(0.001), lean);
+        set_scale(&mut transform, &mut bound, height, gain.max(0.001), lean);
         if flame.kindled >= catch {
             flame.kindled = f32::MAX;
-            set_scale(&mut transform, 1.0, lean);
+            set_scale(&mut transform, &mut bound, height, 1.0, lean);
         }
     }
     let elapsed = real.elapsed_secs_wrapped();
@@ -1586,5 +1607,270 @@ mod catch_colour_tests {
         let fields: Vec<_> = bad.problems().iter().map(|p| p.field).collect();
         assert_eq!(fields, ["mean.x", "intensity"]);
         assert!(FlameGust::default().problems().is_empty());
+    }
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
+mod culling_tests {
+    use super::*;
+    use crate::model::{FLAME_REACH, FLICKER_DEPTH};
+    use crate::{FireKind, KINDLE_SECONDS};
+    use bevy::camera::primitives::{Frustum, Sphere};
+    use bevy::camera::{PerspectiveProjection, Projection};
+    use bevy::math::Affine3A;
+    use bevy::time::TimeUpdateStrategy;
+    use core::f32::consts::TAU;
+
+    /// A seeded stream, so the sweep is the same on every machine.
+    struct Draw(u64);
+
+    impl Draw {
+        fn unit(&mut self) -> f32 {
+            self.0 ^= self.0 << 13;
+            self.0 ^= self.0 >> 7;
+            self.0 ^= self.0 << 17;
+            (self.0 >> 40) as f32 / (1u64 << 24) as f32
+        }
+
+        fn range(&mut self, low: f32, high: f32) -> f32 {
+            low + (high - low) * self.unit()
+        }
+    }
+
+    fn smoothstep(low: f32, high: f32, x: f32) -> f32 {
+        let t = ((x - low) / (high - low)).clamp(0.0, 1.0);
+        t * t * (3.0 - 2.0 * t)
+    }
+
+    /// Points on the flame's quad, a 5 x 5 grid of its corners and interior, where `src/flame.wesl`'s vertex
+    /// stage puts them: the same constants, the same two branches (the upright quad, and the quad that turns to
+    /// face a camera looking down on it), the same lean, for a camera at `eye` whose right axis is `camera_right`.
+    /// `origin` is the flame's foot, `size` the height it is drawn at, `wind` the instance scale's `y` and `z` less
+    /// one.
+    fn drawn_points(origin: Vec3, size: f32, wind: Vec2, eye: Vec3, camera_right: Vec3) -> Vec<Vec3> {
+        const ASPECT: f32 = 0.6;
+        const SOURCE_HEIGHT: f32 = 0.35;
+        const OVERHEAD_START: f32 = 0.873;
+        const OVERHEAD_FULL: f32 = 1.326;
+        const OVERHEAD_HEIGHT: f32 = 1.0;
+        let right = Vec3::new(camera_right.x, 0.0, camera_right.z).normalize();
+        let centre = origin + Vec3::Y * (size * SOURCE_HEIGHT);
+        let to_eye = eye - centre;
+        let sin_e = (to_eye.y / to_eye.length().max(1e-4)).clamp(0.0, 1.0);
+        let topdown = smoothstep(OVERHEAD_START, OVERHEAD_FULL, sin_e.asin());
+        let wind = wind * (1.0 - topdown);
+        let lean = wind.dot(Vec2::new(right.x, right.z));
+        let width = ASPECT + lean.abs();
+        let mut points = Vec::new();
+        for i in 0..5 {
+            for j in 0..5 {
+                let (x, y) = (i as f32 / 4.0 - 0.5, j as f32 / 4.0 - 0.5);
+                let across = x * width + 0.5 * lean;
+                let mut at = origin + right * (across * size) + Vec3::Y * (y * size + size * 0.5);
+                if sin_e > OVERHEAD_START.sin() {
+                    let screen_up = to_eye.normalize().cross(right).normalize();
+                    at = centre + right * (across * size) + screen_up * (y * size * OVERHEAD_HEIGHT);
+                }
+                points.push(at);
+            }
+        }
+        points
+    }
+
+    #[test]
+    fn a_flame_any_part_of_which_is_on_screen_is_never_culled() {
+        // The whole chain, as a camera sees it: the quad the vertex stage draws (`drawn_points`), the box and the
+        // scale this crate gives the flame, and Bevy's own frustum test (the sphere test and then the oriented
+        // box, as `check_visibility` runs them). A flame culled while any of its drawn points is inside the
+        // frame is a flame that pops out at the edge of the screen.
+        let mut draw = Draw(0x9e37_79b9_7f4a_7c15);
+        let projection = Projection::Perspective(PerspectiveProjection {
+            fov: 1.0,
+            aspect_ratio: 16.0 / 9.0,
+            near: 0.1,
+            far: 1000.0,
+            ..default()
+        });
+        let clip_from_view = projection.get_clip_from_view();
+        let (mut on_screen, mut edge) = (0, 0);
+        for round in 0..40_000 {
+            let origin = Vec3::new(draw.range(-3.0, 3.0), draw.range(0.0, 2.0), draw.range(-3.0, 3.0));
+            let height = draw.range(0.04, 3.0);
+            let took = if draw.unit() < 0.4 { 1.0 } else { draw.range(0.001, 1.0) };
+            let tilt = if draw.unit() < 0.25 { 0.0 } else { draw.range(0.0, 0.995) };
+            let heading = draw.range(0.0, TAU);
+            let lean = Vec2::new(heading.cos(), heading.sin()) * tilt;
+            // A camera at any distance and elevation, aimed so the flame lands anywhere from the middle of the
+            // frame to well outside it.
+            let around = draw.range(0.0, TAU);
+            let elevation = draw.range(-0.3, 1.5707);
+            let distance = draw.range(0.3, 14.0);
+            let eye = origin
+                + Vec3::new(around.cos() * elevation.cos(), elevation.sin(), around.sin() * elevation.cos())
+                    * distance;
+            let aim = origin
+                + Vec3::Y * (height * 0.4)
+                + Vec3::new(draw.range(-1.0, 1.0), draw.range(-1.0, 1.0), draw.range(-1.0, 1.0))
+                    * distance
+                    * 0.7;
+            let camera = GlobalTransform::from(Transform::from_translation(eye).looking_at(aim, Vec3::Y));
+            let frustum: Frustum = projection.compute_frustum(&camera);
+
+            // The parent may be turned any way: the scale is read as lengths, so a rotation must not matter.
+            let parent = if round % 2 == 0 {
+                Quat::IDENTITY
+            } else {
+                Quat::from_euler(
+                    EulerRot::YXZ,
+                    draw.range(0.0, TAU),
+                    draw.range(-1.5, 1.5),
+                    draw.range(0.0, TAU),
+                )
+            };
+            let world_from_local = Affine3A::from_scale_rotation_translation(
+                Vec3::new(took, 1.0 + lean.x, 1.0 + lean.y),
+                parent,
+                origin,
+            );
+            let global = GlobalTransform::from(world_from_local);
+            let [hx, hy, hz] = flame_cull_extents(height, took, lean.to_array());
+            let bound = Aabb { center: Vec3A::ZERO, half_extents: Vec3A::new(hx, hy, hz) };
+
+            let size = height * took.powf(2.0 / 3.0);
+            let world_from_view = camera.affine();
+            let view_from_world = world_from_view.inverse();
+            let points = drawn_points(origin, size, lean, eye, camera.right().as_vec3());
+            // The constant the box is built from: no point the vertex stage draws is further from the flame's
+            // foot than `FLAME_REACH` of its drawn heights, from any side, at any lean.
+            let reach = (FLAME_REACH * size) * (1.0 + 1e-4);
+            let worst = points.iter().map(|p| p.distance(origin)).fold(0.0, f32::max);
+            assert!(
+                worst <= reach,
+                "round {round}: a point {worst} from the foot of a flame of drawn height {size}"
+            );
+            let seen = points
+                .into_iter()
+                .filter(|p| {
+                    let clip = clip_from_view * view_from_world.transform_point3(*p).extend(1.0);
+                    clip.w > 0.0
+                        && clip.x.abs() <= clip.w
+                        && clip.y.abs() <= clip.w
+                        && clip.z > 0.0
+                        && clip.z <= clip.w
+                })
+                .count();
+            if seen == 0 {
+                continue;
+            }
+            on_screen += 1;
+            if seen < 25 {
+                edge += 1;
+            }
+            let sphere = Sphere {
+                center: world_from_local.transform_point3a(bound.center),
+                radius: global.radius_vec3a(bound.half_extents),
+            };
+            assert!(
+                frustum.intersects_sphere(&sphere, false)
+                    && frustum.intersects_obb(&bound, &world_from_local, true, false),
+                "round {round}: {seen} of 25 points of a {height} m flame (catch {took}, lean {lean}) are on screen, yet it is culled"
+            );
+        }
+        // The sweep must have exercised what it claims: many frames with the flame on screen, and many of them
+        // at the frame's edge, where a box that is too small is the one that fails.
+        assert!(on_screen > 8_000, "only {on_screen} samples had the flame on screen");
+        assert!(edge > 1_500, "only {edge} samples had it half out of the frame");
+    }
+
+    fn app() -> App {
+        let mut app = App::new();
+        app.add_plugins(MinimalPlugins)
+            .insert_resource(Assets::<Mesh>::default())
+            .insert_resource(Assets::<FlameMaterial>::default())
+            .init_resource::<FlameLook>()
+            .init_resource::<FlameAssets>()
+            .insert_resource(TimeUpdateStrategy::ManualDuration(std::time::Duration::from_secs_f64(
+                1.0 / 60.0,
+            )));
+        app.add_systems(Startup, build_flame_assets)
+            .add_systems(Update, (dress_flames, update_flames).chain());
+        app.update();
+        app
+    }
+
+    /// The flame's box as the frustum test sees it, on its three axes: the half-extent in the entity's own
+    /// axes times the scale the shader reads.
+    fn world_half_extents(app: &mut App) -> (Vec3, Vec3) {
+        let (transform, bound) = app
+            .world_mut()
+            .query_filtered::<(&Transform, &Aabb), With<Flame>>()
+            .single(app.world())
+            .map(|(t, b)| (*t, *b))
+            .unwrap();
+        (transform.scale, Vec3::from(bound.half_extents) * transform.scale)
+    }
+
+    #[test]
+    fn a_flames_box_keeps_its_size_through_the_catch_and_the_lean() {
+        // The scale is the shader's data (its catch and its lean), so it changes every frame the fire catches or
+        // the wind gusts. The frustum test multiplies the box by it; the box must have been divided by it first,
+        // so what the test sees is the cube round the drawn flame at every moment, and not a slab.
+        let mut app = app();
+        app.insert_resource(FlameWind { velocity: Vec2::new(3.0, -1.5) });
+        let height = 0.9;
+        app.world_mut().spawn((
+            FlameSite {
+                height,
+                phase: 0.0,
+                kindle: KINDLE_SECONDS,
+                diameter: None,
+                depth: FLICKER_DEPTH,
+                depth_fade: false,
+                fire: None,
+            },
+            Transform::default(),
+        ));
+        let mut seen_small = false;
+        for frame in 0..(KINDLE_SECONDS * 60.0) as usize + 6 {
+            app.update();
+            let (scale, world) = world_half_extents(&mut app);
+            // The shader clamps the catch to 1 (a light's flare overshoots it), so the drawn size does too; the
+            // box's `x` is divided by the clamped catch and multiplied by the real scale, and may exceed the cube
+            // by exactly the overshoot, never fall short of it.
+            let size = height * scale.x.min(1.0).powf(2.0 / 3.0);
+            let want = Vec3::splat(FLAME_REACH * size);
+            let slack = 1e-4 * (1.0 + want.max_element());
+            assert!(
+                (world.y - want.y).abs() < slack
+                    && (world.z - want.z).abs() < slack
+                    && world.x >= want.x - slack
+                    && world.x <= want.x * scale.x.max(1.0) + slack,
+                "frame {frame}: scale {scale}, the box measures {world} and the drawn flame wants {want}"
+            );
+            seen_small |= scale.x < 0.3 && (scale.y - 1.0).abs() > 0.1;
+        }
+        assert!(
+            seen_small,
+            "the run never had a small, leaning flame, so it did not test the catch and the lean together"
+        );
+    }
+
+    #[test]
+    fn a_flame_carries_a_box_of_its_own_and_is_not_left_to_the_units_quad() {
+        let mut app = app();
+        app.world_mut().spawn((FireKind::Torch.site(), Transform::default()));
+        app.update();
+        let flame = app.world_mut().query_filtered::<Entity, With<Flame>>().single(app.world()).unwrap();
+        let entity = app.world().entity(flame);
+        assert!(entity.contains::<Aabb>(), "a flame has a culling box");
+        assert!(
+            entity.contains::<bevy::camera::visibility::NoAutoAabb>(),
+            "which Bevy is told not to recompute"
+        );
+        assert!(
+            !entity.contains::<bevy::camera::visibility::NoFrustumCulling>(),
+            "and which the frustum test uses: an off-screen flame is not drawn"
+        );
     }
 }

@@ -27,5 +27,5 @@ pub use fire::{
 pub use pool::{FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, hand_off, preferred, shadow_set};
 pub use problem::{Problem, ProblemKind};
 pub use reach::{RANGE_MARGIN, flame_light_offset, lean_light_shift, raised_light};
-pub use tag::{pack_flame_tag, set_flame_brightness, unpack_flame_tag};
+pub use tag::{FLAME_REACH, flame_cull_extents, pack_flame_tag, set_flame_brightness, unpack_flame_tag};
 pub use wind::{GUST_INTENSITY, GUST_TERMS, GUST_TIMESCALE, gust_unit, gust_velocity};
