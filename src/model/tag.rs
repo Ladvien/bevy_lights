@@ -53,6 +53,53 @@ pub fn unpack_flame_tag(tag: u32, max_height: f32) -> (f32, f32, f32) {
     (phase * TAU, height * max_height.max(0.0), brightness)
 }
 
+/// How far from its origin the flame's vertex stage can put a corner, in drawn flame heights: the
+/// ball a billboard is certain to stay inside, whichever way the camera faces and however far the
+/// wind leans it (`1.64` at the worst corner, rounded up).
+///
+/// **Mirrors `src/flame.wesl`**: the quad is `FLAME_ASPECT + |lean|` wide and shifted by half the
+/// lean, so a corner sits at most `0.3 + sin θ` flame heights to the side (`sin θ ≤ 0.995`), and at
+/// most one flame height up when upright, or `0.35 + 0.5` along the camera's screen-up when it turns
+/// to face the camera from above. The test below walks the shader's own corner formula across the
+/// camera's directions and fails when a constant here and a constant there drift apart.
+pub const FLAME_REACH: f32 = 1.7;
+
+/// The catch's power in a flame's drawn size, `src/flame.wesl`'s `CATCH_SIZE_EXPONENT`: a flame
+/// lit with its light is drawn at `took^(2/3)` of its height (`docs/research/flame-catch-size.md`).
+const CATCH_SIZE_EXPONENT: f32 = 2.0 / 3.0;
+
+/// The smallest instance scale a flame's culling box divides by, the shader's own floor for the catch
+/// (`max(took, 0.0001)`): a lean of `-1` would make a scale zero, and a box must stay finite.
+const MIN_SCALE: f32 = 1.0e-4;
+
+/// The half-extents of the box, in the flame entity's **local** axes, that a frustum test must use so
+/// that it holds everything the flame's vertex stage draws.
+///
+/// A flame is a billboard the vertex stage builds from three per-instance numbers it reads out of the
+/// entity's transform: its catch `took` (the scale's `x`, in `0..=1`) and the wind's `lean` (the scale's
+/// `y` and `z` are `1 +` its world `x` and `z`). The CPU never sees the quad, only the mesh's unit square
+/// and the transform, so Bevy's own `Aabb` neither covers the drawn flame nor survives a scale that is
+/// data rather than size. This is the box that does: a cube of side `2 · FLAME_REACH · size` about the
+/// flame's origin, where `size` is the height the shader draws (`height · took^(2/3)`), divided axis by
+/// axis by the scale the frustum test will multiply it by. The test's world-space box is therefore the
+/// same cube whatever the lean, the catch or the parent's rotation, and it holds the flame's ball.
+///
+/// `height` is the flame's own height in world units ([`unpack_flame_tag`]'s second value).
+///
+/// ```
+/// # use bevy_lights::model::tag::*;
+/// let [x, y, z] = flame_cull_extents(1.0, 1.0, [0.0, 0.0]);
+/// assert!((x - FLAME_REACH).abs() < 1e-6 && x == y && y == z, "still air: a cube about the flame");
+/// let [_, y, _] = flame_cull_extents(1.0, 1.0, [-0.9, 0.0]);
+/// assert!(y > 10.0 * FLAME_REACH, "a lean squashes the scale, so the box is stretched back to match");
+/// ```
+pub fn flame_cull_extents(height: f32, took: f32, lean: [f32; 2]) -> [f32; 3] {
+    let took = if took.is_nan() { 0.0 } else { took.clamp(0.0, 1.0) };
+    let size = height.max(0.0) * took.max(1.0e-4).powf(CATCH_SIZE_EXPONENT);
+    let reach = FLAME_REACH * size;
+    [took, 1.0 + lean[0], 1.0 + lean[1]].map(|scale| reach / scale.max(MIN_SCALE))
+}
+
 /// A flame tag with only its brightness written: `tag`'s height and phase untouched.
 ///
 /// The brightness is the one number a running scene rewrites every frame, and decoding the other two
