@@ -45,6 +45,7 @@ impl Plugin for FlamePlugin {
         chain_sets(app);
         embedded_asset!(app, "flame.wesl");
         crate::embers::build(app);
+        crate::smoke::build(app);
         app.add_plugins(MaterialPlugin::<FlameMaterial>::default())
             .init_resource::<FlameLook>()
             .init_resource::<FlameAssets>()
@@ -61,6 +62,8 @@ impl Plugin for FlamePlugin {
                     update_flames,
                     crate::embers::dress_embers,
                     crate::embers::update_embers,
+                    crate::smoke::dress_smoke,
+                    crate::smoke::update_smoke,
                 )
                     .chain()
                     .in_set(LightsSystems::Flame),
@@ -68,6 +71,7 @@ impl Plugin for FlamePlugin {
             .add_systems(Startup, build_flame_assets);
         crate::report::watch::<FlameSite>(app);
         crate::report::watch::<crate::FlameEmbers>(app);
+        crate::report::watch::<crate::FlameSmoke>(app);
         crate::report::watch_resource::<FlameLook>(app);
         crate::report::watch_resource::<FlameWind>(app);
         crate::report::watch_resource::<FlameGust>(app);
