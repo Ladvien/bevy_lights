@@ -200,3 +200,7 @@ game use:
 - **The same bed from the side.** At the showcase camera the braziers read as they did: a warm glow in
   a dark bowl, with no new visible texture noise at the scale of a pixel.
 - **No new cost.** One texture sample in a pass that already samples the stone, and no extra draw.
+
+## Since this note
+
+The bed became a component, and a live one: `FuelBed` (`src/bed.rs`) lays the tileable form of this field (`char_tile`) on a disc under a fire, and the same three temperatures move with the bed's heat so the coals breathe with the flame, warm as the fire catches and cool after it is put out (`docs/research/fuel-bed-heat.md`). The courtyard's brazier beds are still the example's own, built as this note describes.
