@@ -69,7 +69,7 @@ A third quad per fire, a child of the flame like the sparks' (`FlameEmbers`), wi
 4. The column starts at the flame's tip and bends with the wind: at a 3 m/s wind the plume's centreline at the flame's tip is within a flame width of the flame's tip, and downwind of the foot at every height.
 5. **At night it reads as lit smoke, not a second flame**: at 3 m it is a soft warm-grey column with a ragged edge that fades into the dark before its top; at 12 m a faint haze over the fire; never a hard-edged shape, never brighter than the flame's own body.
 6. A fire of another colour has smoke of that colour (`FlameSite::color`).
-7. Cost: with every fire smoking, `bench_flames`' off-screen cost is unchanged (culled), and an on-screen smoke costs fragment work only inside the column (a pixel outside the plume's lateral extent returns before any noise).
+7. Cost: a scene with no smoke costs what it did; a smoking fire off the screen costs the per-entity work the sparks' quad costs (an entity in Bevy's visibility pass, about 0.16 µs a frame) and no draw; an on-screen smoke costs fragment work only inside the column (a pixel outside the plume's lateral extent returns before any noise). *(The first draft of this line said "unchanged (culled)", which the bench refuted: culling saves the draw, not the entity.)*
 
 
 ### Results (iteration 281)
@@ -77,8 +77,12 @@ A third quad per fire, a child of the flame like the sparks' (`FlameEmbers`), wi
 Captured on the courtyard (seed 7, pool 8, `LIGHTS_EMBERS=4`, `LIGHTS_SMOKE=0.8`, 1280 x 720, frame 300). Each target above is a line:
 
 1. A scene with no `FlameSmoke`: the default courtyard and the one with `LIGHTS_EMBERS=4` against the build before this change differ in at most one channel of one pixel (`magick compare -metric AE` prints 0.0013 = 1/765, which two runs of the *new* binary against each other print too: the GPU's own noise).
+2. `a_smoke_quad_any_part_of_which_is_on_screen_is_never_culled` and `a_smoke_quads_box_keeps_its_size_through_the_catch_and_the_lean_on_every_frame` (`src/smoke.rs`) port the vertex stage and run a gusting, catching fire frame by frame; `bench_flames` counts 18 smoke quads in view of 5 000 (the flames' 15).
+3. `the_smoke_is_additive_so_it_joins_no_sorting` (`AlphaMode::Add`).
 4. The first build's column in a 3 m/s wind was a straight, thin streak across the frame (the centreline a ramp, the width measured along the screen's horizontal); the bent-over curve with its oblique width makes it a broad plume that bends over, as the sparks do.
 5. At 3 m, a warm-grey column with a ragged edge that starts at the flame's tip and is gone before the quad's top; from the ground at 9 m a faint wisp above each fire; in the 45° wide shot a thin column over each brazier (the camera looks down it, so it is foreshortened).
+6. A blue brazier smokes blue-grey (`FlameSite::color`, the sparks' stops moved by `retint`), and `a_fire_smokes_in_its_own_colour_and_follows_it_when_it_changes` holds it in a test.
+7. `bench_flames` (three interleaved rounds against the build before this change, best p50, ms a frame): no smoke 2.23 against 2.23 at 5 000 flames and 4.22 against 4.27 at 20 000; every torch smoking 3.01 and 7.57, about 0.16 µs a smoking fire. GPU, the 3 m close-up with 52 smoking fires: the transparent pass 79.0 and 69.9 µs without smoke, 85.3 and 85.7 µs with it. At 30 m (eight consecutive frames) the mean frame-to-frame difference over the fires' rows is 1.021 DN without smoke and 1.057 DN with it: the column does not crawl at a distance. A snuff and relight run shows the smoke leaving with the flame and growing back with its catch.
 
 ## What great looks like
 
