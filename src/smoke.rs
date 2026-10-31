@@ -293,8 +293,9 @@ fn tail_cull_box(height: f32, scale: Vec3) -> Vec3A {
     Vec3A::new(x / scale.x.max(1.0e-4), y, z)
 }
 
-/// A flame that has no smoke quad yet.
-type UnsmokedFlame = (With<Flame>, Without<Smoked>);
+/// A flame that has no smoke quad yet. The extra tongues of a wide fire ([`FlameTongue`](crate::FlameTongue)) have none: the plume leaves
+/// the fire once, from the middle flame.
+type UnsmokedFlame = (With<Flame>, Without<Smoked>, Without<crate::FlameTongue>);
 
 /// Gives the flame of every [`FlameSmoke`] site one smoke quad, carrying the site's phase and height and, in the tag's brightness
 /// byte, the density. The quad's culling box is the crate's own, for the reason the flame's is: the vertex stage draws a quad the
