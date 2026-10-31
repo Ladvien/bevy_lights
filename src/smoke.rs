@@ -28,15 +28,36 @@ use bevy::render::render_resource::{AsBindGroup, RenderPipelineDescriptor, Speci
 use bevy::shader::ShaderRef;
 use bevy::time::Real;
 
+use crate::Snuff;
 use crate::flame::{Flame, FlameAssets, FlameLook, FlameSite, TintKey, TintedMaterials, scene_colour};
 use crate::model::fire_colour::{SPARK_DULL_RED, SPARK_ORANGE};
-use crate::model::{ember_cull_extents, pack_flame_tag, retint, set_flame_brightness, unpack_flame_tag};
+use crate::model::{
+    SMOKE_TAIL_SECONDS, SNUFF_SECONDS, ember_cull_extents, pack_flame_tag, retint, set_flame_brightness,
+    unpack_flame_tag,
+};
 
 /// The smoke shader, embedded in the binary by [`FlamePlugin`](crate::FlamePlugin).
 const SMOKE_SHADER_PATH: &str = "embedded://bevy_lights/smoke.wesl";
 
 /// The most density a fire's smoke can ask for: [`FlameSmoke::density`] above it draws at it.
 pub const MAX_SMOKE_DENSITY: f32 = 1.0;
+
+/// How long a wick goes on making smoke after the fire began to go out, in seconds: the emission falls from full to nothing over this
+/// long (`docs/research/flame-smoke-tail.md`). A design default: twice [`SNUFF_SECONDS`], the wick smouldering on after its flame.
+const EMISSION_SECONDS: f32 = 2.4;
+
+/// How bright the coals' glow lights a put-out fire's smoke, against the unit light of the flame it replaces (a design default).
+const AFTERGLOW: f32 = 0.18;
+
+/// The bit of a smoke quad's tag, the lowest of the height's sixteen, that says "this quad is a trail: read the scale's `x` as the
+/// seconds since the fire went out". A steady quad's tag always has it clear ([`steady_tag`]), so the height keeps fifteen bits of its
+/// sixteen, an error of `2 · max_height / 65535` in the quad's size.
+const TAIL_BIT: u32 = 1 << 16;
+
+/// A smoke quad's tag for `site` at `share` of the most density: the flame's tag with the trail bit clear.
+fn steady_tag(site: &FlameSite, share: f32, max_height: f32) -> u32 {
+    pack_flame_tag(site.phase, site.height, share, max_height) & !TAIL_BIT
+}
 
 /// A fire's smoke: add it to a [`FlameSite`](crate::FlameSite) to give its flame a plume, remove it to take the plume away.
 ///
@@ -48,6 +69,13 @@ pub const MAX_SMOKE_DENSITY: f32 = 1.0;
 /// The smoke respects the site's [`depth_fade`](crate::FlameSite::depth_fade) (a fire whose source cannot be seen smokes nothing
 /// that can) and its catch (a flame that has not caught smokes nothing). Its default density is a design default
 /// (`docs/research/flame-smoke.md`); [`FireKind::smoke`](crate::FireKind::smoke) gives each kind its own.
+///
+/// **A fire put out leaves a trail.** When the light a site's [`fire`](crate::FlameSite::fire) names gets a [`Snuff`], the flame
+/// goes out over [`SNUFF_SECONDS`] as it always did, but the smoke does not shrink with it: it is carried on up the way the air carries
+/// smoke, the base of the column lifts off the wick and thins as the wick smoulders out, and the trail ends, exactly dark, after
+/// [`SMOKE_TAIL_SECONDS`] (`docs/research/flame-smoke-tail.md`). It is lit by the dying flame and then by the coals' glow. A site that
+/// names no fire has no douse to follow and keeps no trail, a fire loaded as already out begins none, and re-lighting a fire (removing
+/// its `Snuff`) ends the trail at once: the plume goes back to following the catch.
 #[derive(Component, Clone, Copy, Debug, PartialEq, Reflect)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize), serde(default))]
 #[reflect(Component)]
@@ -92,6 +120,11 @@ pub struct SmokeMaterial {
     /// The column's colour near its top (`retint(SPARK_DULL_RED, base)`).
     #[uniform(0)]
     cool: Vec4,
+    /// The trail of a fire put out, from the model's constants so the shader copies none of them: `x` the trail's length in seconds
+    /// ([`SMOKE_TAIL_SECONDS`]), `y` the flame's ([`SNUFF_SECONDS`]), `z` how long the wick goes on making smoke ([`EMISSION_SECONDS`])
+    /// and `w` the coals' glow ([`AFTERGLOW`]).
+    #[uniform(0)]
+    tail: Vec4,
 }
 
 impl SmokeMaterial {
@@ -102,6 +135,7 @@ impl SmokeMaterial {
             params: Vec4::new(0.0, max_height, if depth_fade { 1.0 } else { 0.0 }, strength),
             warm: Vec4::ZERO,
             cool: Vec4::ZERO,
+            tail: Vec4::new(SMOKE_TAIL_SECONDS, SNUFF_SECONDS, EMISSION_SECONDS, AFTERGLOW),
         };
         material.recolour(mid, strength);
         material
@@ -215,6 +249,15 @@ pub(crate) struct Smoke;
 #[derive(Component)]
 pub(crate) struct Smoked;
 
+/// The trail of a fire that was put out, on its smoke quad: the seconds since the fire began to go out, on virtual time (the douse is the
+/// fire's state, as its snuff is, so a paused world's trail holds still). While it is there the quad does not follow the flame's catch
+/// (the flame is going to nothing); it travels the clock in its scale's `x` instead (see [`tail_scale`]) and says so in its tag
+/// ([`TAIL_BIT`]), and `update_smoke_tails` owns it.
+#[derive(Component)]
+pub(crate) struct SmokeTail {
+    elapsed: f32,
+}
+
 fn build_smoke_assets(
     mut assets: ResMut<SmokeAssets>,
     look: Res<FlameLook>,
@@ -234,6 +277,20 @@ fn build_smoke_assets(
 /// ([`ember_cull_extents`]), divided by the scale it inherits.
 fn cull_box(height: f32, scale: Vec3) -> Vec3A {
     Vec3A::from(ember_cull_extents(height, scale.x, [scale.y - 1.0, scale.z - 1.0]))
+}
+
+/// The scale `x` a trail `elapsed` seconds old travels in, `1 / (1 + elapsed)`, which the vertex stage inverts. It is the quad's
+/// *world* scale (the flame's catch times the quad's own, which `update_smoke_tails` sets to make it so). It is positive and no less
+/// than `1 / (1 + SMOKE_TAIL_SECONDS)`, so the quad's culling box stays finite, and it needs no copy of the trail's length in the shader.
+fn tail_scale(elapsed: f32) -> f32 {
+    1.0 / (1.0 + elapsed.max(0.0))
+}
+
+/// [`cull_box`] for a trail: the quad is drawn at the height the fire burned at (its catch reads as 1), whatever its scale's `x` says,
+/// so the box is the full ball divided by the scale the frustum test will multiply it by.
+fn tail_cull_box(height: f32, scale: Vec3) -> Vec3A {
+    let [x, y, z] = ember_cull_extents(height, 1.0, [scale.y - 1.0, scale.z - 1.0]);
+    Vec3A::new(x / scale.x.max(1.0e-4), y, z)
 }
 
 /// A flame that has no smoke quad yet.
@@ -256,7 +313,7 @@ pub(crate) fn dress_smoke(
     }
     for (flame, parent, at) in &flames {
         let Ok((site, smoke)) = sites.get(parent.parent()) else { continue };
-        let packed = pack_flame_tag(site.phase, site.height, smoke.share(), flame_assets.max_height());
+        let packed = steady_tag(site, smoke.share(), flame_assets.max_height());
         let tag = MeshTag::new(packed);
         // The flame's scale as it stands: a flame dressed in mid-catch or in a wind is not at the identity.
         let height = unpack_flame_tag(packed, flame_assets.max_height()).1;
@@ -322,10 +379,12 @@ pub(crate) fn update_smoke(
     look: Res<FlameLook>,
     mut smoke_assets: ResMut<SmokeAssets>,
     mut materials: ResMut<Assets<SmokeMaterial>>,
-    mut quads: Query<SmokeQuad, With<Smoke>>,
+    mut quads: Query<SmokeQuad, (With<Smoke>, Without<SmokeTail>)>,
     owners: SmokeOwners,
+    any: Query<(), With<Smoke>>,
 ) {
-    if quads.is_empty() {
+    // The shared clock below ticks while a quad is a trail as well, so the test is for any quad and not the ones this system owns.
+    if any.is_empty() {
         return;
     }
     let max_height = owners.max_height();
@@ -374,6 +433,96 @@ pub(crate) fn update_smoke(
     }
 }
 
+/// Begins a trail on the smoke quad of every flame whose fire has just been put out: a [`Snuff`] added to the light a smoking
+/// [`FlameSite::fire`] names, with the flame still going out. A fire loaded as already out ([`Snuff::elapsed`] at [`SNUFF_SECONDS`])
+/// begins none, and a site that names no fire has no douse to follow. It does nothing in a frame with no new `Snuff` anywhere.
+pub(crate) fn begin_smoke_tails(
+    mut commands: Commands,
+    snuffed: Query<&Snuff, Added<Snuff>>,
+    quads: Query<(Entity, &ChildOf), (With<Smoke>, Without<SmokeTail>)>,
+    flames: Query<&ChildOf, With<Flame>>,
+    sites: Query<&FlameSite>,
+) {
+    if snuffed.is_empty() {
+        return;
+    }
+    for (quad, parent) in &quads {
+        let Ok(on_site) = flames.get(parent.parent()) else { continue };
+        let Ok(site) = sites.get(on_site.parent()) else { continue };
+        let Some(fire) = site.fire else { continue };
+        let Ok(snuff) = snuffed.get(fire) else { continue };
+        if snuff.elapsed < SNUFF_SECONDS {
+            commands.entity(quad).insert(SmokeTail { elapsed: snuff.elapsed.max(0.0) });
+        }
+    }
+}
+
+/// Drives every trail: advances its clock, writes the scale `x` that carries it (set on the quad so that its world scale is
+/// [`tail_scale`], whatever the flame going out has been scaled to), flags the tag and keeps the culling box right. A trail ends when its
+/// time is up or when the fire is no longer out (re-lit, or gone), and the quad goes back to following the flame's catch.
+pub(crate) fn update_smoke_tails(
+    mut commands: Commands,
+    time: Res<Time>,
+    look: Res<FlameLook>,
+    mut smoke_assets: ResMut<SmokeAssets>,
+    mut materials: ResMut<Assets<SmokeMaterial>>,
+    mut quads: Query<
+        (
+            Entity,
+            &ChildOf,
+            &mut SmokeTail,
+            &mut Transform,
+            &mut MeshTag,
+            &mut Aabb,
+            &mut MeshMaterial3d<SmokeMaterial>,
+        ),
+        // `Without<Flame>`: the quad's own `Transform` is written here and the flames' are read through `owners`.
+        (With<Smoke>, Without<Flame>),
+    >,
+    owners: SmokeOwners,
+    snuffs: Query<&Snuff>,
+) {
+    if quads.is_empty() {
+        return;
+    }
+    let max_height = owners.max_height();
+    let dt = time.delta_secs();
+    for (entity, parent, mut tail, mut local, mut tag, mut bound, mut material) in &mut quads {
+        let Some((site, Some(wanted), scale)) = owners.site_of(parent.parent()) else {
+            commands.entity(entity).despawn();
+            commands.entity(parent.parent()).remove::<Smoked>();
+            continue;
+        };
+        let out = site.fire.is_some_and(|fire| snuffs.contains(fire));
+        if !out || tail.elapsed >= SMOKE_TAIL_SECONDS {
+            // Over: the quad follows the flame's catch again, from the tag and the box the flame's scale gives it.
+            commands.entity(entity).remove::<SmokeTail>();
+            local.scale = Vec3::ONE;
+            tag.value = steady_tag(site, wanted.share(), max_height);
+            bound.half_extents = cull_box(unpack_flame_tag(tag.value, max_height).1, scale);
+            continue;
+        }
+        if smoke_assets.material_id(site.color, site.depth_fade) != Some(material.0.id()) {
+            material.0 = smoke_assets.material_of(site.color, site.depth_fade, &look, &mut materials);
+        }
+        tail.elapsed += dt;
+        let carried = tail_scale(tail.elapsed);
+        let wanted_scale = Vec3::new(carried / scale.x.max(1.0e-4), 1.0, 1.0);
+        if local.scale != wanted_scale {
+            local.scale = wanted_scale;
+        }
+        let packed = set_flame_brightness(tag.value, wanted.share()) | TAIL_BIT;
+        if packed != tag.value {
+            tag.value = packed;
+        }
+        let half_extents =
+            tail_cull_box(unpack_flame_tag(tag.value, max_height).1, Vec3::new(carried, scale.y, scale.z));
+        if bound.half_extents != half_extents {
+            bound.half_extents = half_extents;
+        }
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
@@ -393,8 +542,11 @@ mod tests {
             .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
                 std::time::Duration::from_secs_f64(1.0 / 60.0),
             ));
-        app.add_systems(Startup, (build_flame_assets, build_smoke_assets))
-            .add_systems(Update, (dress_flames, update_flames, dress_smoke, update_smoke).chain());
+        app.add_systems(Startup, (build_flame_assets, build_smoke_assets)).add_systems(
+            Update,
+            (dress_flames, update_flames, dress_smoke, update_smoke, begin_smoke_tails, update_smoke_tails)
+                .chain(),
+        );
         app.update();
         app
     }
@@ -634,5 +786,220 @@ mod tests {
             !entity.contains::<bevy::camera::visibility::NoFrustumCulling>(),
             "and which the frustum test uses: an off-screen fire's smoke is not drawn"
         );
+    }
+
+    /// A smoking site whose fire is a bare entity the tests put out by hand: the flicker plugin that advances a `Snuff` is not in this
+    /// app. Returns the fire and the site, a few frames after they were spawned, with the flame's catch long since settled.
+    fn smoking_site_with_fire(app: &mut App, height: f32) -> (Entity, Entity) {
+        let fire = app.world_mut().spawn_empty().id();
+        let site_entity = app
+            .world_mut()
+            .spawn((
+                FlameSite { fire: Some(fire), ..site(height, 0.0) },
+                FlameSmoke::default(),
+                Transform::default(),
+            ))
+            .id();
+        for _ in 0..4 {
+            app.update();
+        }
+        (fire, site_entity)
+    }
+
+    /// One frame of a fire going out: the fire's `Snuff` advanced by the frame's time, as the flicker plugin does, then the frame.
+    fn burn_down(app: &mut App, fire: Entity) {
+        let step = app.world().resource::<Time>().delta_secs().max(1.0 / 60.0);
+        if let Some(mut snuff) = app.world_mut().get_mut::<Snuff>(fire) {
+            snuff.elapsed = (snuff.elapsed + step).min(SNUFF_SECONDS);
+        }
+        app.update();
+    }
+
+    fn the_quad(app: &mut App) -> Entity {
+        app.world_mut().query_filtered::<Entity, With<Smoke>>().single(app.world()).unwrap()
+    }
+
+    /// The instance scale the quad is drawn at: its flame's, times its own (this app has no transform propagation, and the shader
+    /// reads exactly this product).
+    fn drawn_scale(app: &mut App) -> Vec3 {
+        let quad = the_quad(app);
+        let flame = app.world().get::<ChildOf>(quad).unwrap().parent();
+        app.world().get::<Transform>(flame).unwrap().scale * app.world().get::<Transform>(quad).unwrap().scale
+    }
+
+    fn flames_scale(app: &mut App) -> Vec3 {
+        let quad = the_quad(app);
+        let flame = app.world().get::<ChildOf>(quad).unwrap().parent();
+        app.world().get::<Transform>(flame).unwrap().scale
+    }
+
+    fn is_trail(app: &mut App) -> bool {
+        let quad = the_quad(app);
+        let entity = app.world().entity(quad);
+        let (flagged, begun) =
+            (entity.get::<MeshTag>().unwrap().value & TAIL_BIT != 0, entity.contains::<SmokeTail>());
+        assert_eq!(flagged, begun, "the tag says trail exactly while the quad has a trail clock");
+        begun
+    }
+
+    #[test]
+    fn a_steady_quads_tag_is_never_read_as_a_trail_whatever_its_height() {
+        // The trail bit is the lowest of the tag's sixteen height bits, which half of all heights have set: a steady quad's tag must clear
+        // it, or those fires would be drawn as trails (the scale's `x` read as a clock, at once).
+        for step in 0..2000 {
+            let site = FlameSite { phase: step as f32 * 0.37, ..site(0.001 + step as f32 * 0.001, 0.0) };
+            let tag = steady_tag(&site, 0.8, 4.0);
+            assert_eq!(tag & TAIL_BIT, 0, "height {} packs {tag:#x}", site.height);
+            let (_, height, _) = unpack_flame_tag(tag, 4.0);
+            assert!(
+                (height - site.height).abs() <= 2.0 * 4.0 / 65535.0 + 1e-6,
+                "height {} reads back as {height}",
+                site.height
+            );
+        }
+    }
+
+    #[test]
+    fn a_fire_put_out_leaves_a_trail_that_outlives_its_flame_and_ends_with_its_clock() {
+        let mut app = app();
+        let (fire, _) = smoking_site_with_fire(&mut app, 0.8);
+        assert!(!is_trail(&mut app), "a burning fire's smoke follows its catch");
+        assert_eq!(drawn_scale(&mut app).x, 1.0);
+
+        app.world_mut().entity_mut(fire).insert(Snuff::default());
+        burn_down(&mut app, fire);
+        assert!(is_trail(&mut app), "a fire put out begins a trail on the frame its Snuff is seen");
+
+        // Three seconds on: the flame is long gone (its catch is the floor) and the trail has not shrunk with it.
+        for _ in 0..179 {
+            burn_down(&mut app, fire);
+        }
+        assert!(flames_scale(&mut app).x < 0.0011, "the flame is out: {}", flames_scale(&mut app));
+        assert!(is_trail(&mut app), "and the smoke goes on");
+        let carried = drawn_scale(&mut app).x;
+        assert!(
+            ((1.0 / carried - 1.0) - 3.0).abs() < 0.1,
+            "the scale carries the seconds since the douse (1 / (1 + t)): {carried} for 3 s"
+        );
+
+        // Past the trail's length it ends, and the quad follows the (zero) catch again, from the same tag it had.
+        for _ in 0..140 {
+            burn_down(&mut app, fire);
+        }
+        assert!(!is_trail(&mut app), "the trail is over after {SMOKE_TAIL_SECONDS} s");
+        let quad = the_quad(&mut app);
+        assert_eq!(app.world().get::<Transform>(quad).unwrap().scale, Vec3::ONE);
+        let (_, tag) = smoke_quads(&mut app)[0];
+        let (phase, height, share) = unpack_flame_tag(tag, 4.0);
+        assert!(
+            phase.abs() < 0.03 && (height - 0.8).abs() < 1e-3 && share > 0.79,
+            "the tag is the steady one again"
+        );
+    }
+
+    #[test]
+    fn only_a_fire_seen_going_out_leaves_a_trail() {
+        let mut app = app();
+        // A fire loaded as already out: its Snuff is at its end when it is first seen.
+        let out = app.world_mut().spawn(Snuff { elapsed: SNUFF_SECONDS }).id();
+        app.world_mut().spawn((
+            FlameSite { fire: Some(out), ..site(0.5, 0.0) },
+            FlameSmoke::default(),
+            Transform::default(),
+        ));
+        for _ in 0..4 {
+            app.update();
+        }
+        assert!(!is_trail(&mut app), "a fire that was already out when the scene loaded begins no trail");
+
+        // A smoking site that names no fire, with some other fire put out in the same world.
+        let mut app = self::app();
+        app.world_mut().spawn((site(0.5, 0.0), FlameSmoke::default(), Transform::default()));
+        let other = app.world_mut().spawn_empty().id();
+        for _ in 0..4 {
+            app.update();
+        }
+        app.world_mut().entity_mut(other).insert(Snuff::default());
+        for _ in 0..4 {
+            burn_down(&mut app, other);
+        }
+        assert!(!is_trail(&mut app), "a site that names no fire has no douse to follow");
+    }
+
+    #[test]
+    fn re_lighting_a_fire_ends_its_trail_at_once() {
+        let mut app = app();
+        let (fire, _) = smoking_site_with_fire(&mut app, 0.5);
+        app.world_mut().entity_mut(fire).insert(Snuff::default());
+        for _ in 0..90 {
+            burn_down(&mut app, fire);
+        }
+        assert!(is_trail(&mut app));
+
+        app.world_mut().entity_mut(fire).remove::<Snuff>();
+        app.update();
+        assert!(!is_trail(&mut app), "the fire is lit again: its plume follows the catch");
+        let quad = the_quad(&mut app);
+        assert_eq!(
+            app.world().get::<Transform>(quad).unwrap().scale,
+            Vec3::ONE,
+            "and the quad is no longer counter-scaled"
+        );
+        assert!(
+            drawn_scale(&mut app).x > 0.99,
+            "the settled flame is whole again, so is its smoke: {}",
+            drawn_scale(&mut app)
+        );
+    }
+
+    #[test]
+    fn a_paused_worlds_trail_holds_still() {
+        let mut app = app();
+        let (fire, _) = smoking_site_with_fire(&mut app, 0.5);
+        app.world_mut().entity_mut(fire).insert(Snuff::default());
+        for _ in 0..30 {
+            burn_down(&mut app, fire);
+        }
+        app.world_mut().resource_mut::<Time<Virtual>>().pause();
+        app.update();
+        let held = drawn_scale(&mut app);
+        for _ in 0..30 {
+            app.update();
+        }
+        assert_eq!(drawn_scale(&mut app), held, "virtual time stopped, so did the trail's clock");
+        app.world_mut().resource_mut::<Time<Virtual>>().unpause();
+        for _ in 0..3 {
+            app.update();
+        }
+        assert!(drawn_scale(&mut app).x < held.x, "and it runs on when time does");
+    }
+
+    #[test]
+    fn a_trails_box_holds_the_whole_column_though_its_flame_has_shrunk_to_nothing() {
+        // The flame's catch is a point by the end of its snuff, but the trail is drawn at the fire's full height, so a box taken from the
+        // flame's scale would cull a trail that is still on screen. The box must be the full ball, divided by the scale the quad is
+        // drawn at, on every frame of the trail (and in a wind, which widens it downwind).
+        let mut app = app();
+        app.insert_resource(crate::FlameWind { velocity: Vec2::new(3.0, -1.5) });
+        let height = 0.9;
+        let (fire, _) = smoking_site_with_fire(&mut app, height);
+        app.world_mut().entity_mut(fire).insert(Snuff::default());
+        let mut checked = 0;
+        for frame in 0..(SMOKE_TAIL_SECONDS * 60.0) as usize - 6 {
+            burn_down(&mut app, fire);
+            let scale = drawn_scale(&mut app);
+            let quad = the_quad(&mut app);
+            let half = Vec3::from(app.world().get::<Aabb>(quad).unwrap().half_extents);
+            let world = half * scale;
+            let want = Vec3::splat(ember_reach([scale.y - 1.0, scale.z - 1.0]) * height);
+            let slack = 1e-3 * (1.0 + want.max_element());
+            assert!(
+                (world - want).abs().max_element() < slack,
+                "frame {frame}: scale {scale}, the box measures {world} and the trail wants {want}"
+            );
+            checked += 1;
+        }
+        assert!(checked > 250);
+        assert!(flames_scale(&mut app).x < 0.0011, "the flame the box must not be taken from is a point");
     }
 }

@@ -201,6 +201,15 @@ pub const KINDLE_SECONDS: f32 = 0.6;
 /// [`Snuff`]: crate::Snuff
 pub const SNUFF_SECONDS: f32 = 1.2;
 
+/// How long the smoke of a fire that was put out goes on, in seconds: a [`FlameSmoke`] on a flame whose
+/// light has a [`Snuff`] lifts off the fire and thins over this long, after the flame itself is gone.
+/// Design default (`docs/research/flame-smoke-tail.md`): "the first few seconds" a wick goes on
+/// smoking, and long enough for the lifted base of the column to leave its top.
+///
+/// [`FlameSmoke`]: crate::FlameSmoke
+/// [`Snuff`]: crate::Snuff
+pub const SMOKE_TAIL_SECONDS: f32 = 5.0;
+
 /// The flicker multiplier of a fire light at time `t` seconds and clock `phase` radians: a sum of two
 /// sines mapped to 0.70..1.00 of the light's base intensity, mean 0.85.
 ///
