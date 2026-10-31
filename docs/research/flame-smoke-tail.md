@@ -120,6 +120,13 @@ lights it; and nothing of it in a scene that put no fire out.
 None from an earlier default: a site without `FlameSmoke` and a fire that is never put out draw exactly as before. `SMOKE_TAIL_SECONDS`
 (public), `EMISSION_SECONDS`, `AFTERGLOW` and the window and fade constants are design defaults, marked above.
 
+**Known limits** (judged in captures, not deviations): the trail is a child of the flame, so it travels with it: a carried torch put out in
+the hand drags its trail along instead of leaving it hanging where the fire was (the quad has no world-space state, which is also what
+keeps it one draw). It keeps the colour its fire had when it was put out (a trail lasts five seconds). Seen from the default 45° camera or
+from 9 m the trail is as faint as the steady plume it continues (a few pixels of warm wisp over each bowl; a 3× crop shows it), and from
+straight above it is a column seen end-on, so it shows nothing. The coal glow that lights it is one constant (`AFTERGLOW`) for every fire:
+a host cannot yet say that its fire leaves no coals.
+
 ## Pending index
 
 None of the three kinds is missing. Two sources are web pages the corpus does not hold: Oseman (craft) and Saig (technical). A
