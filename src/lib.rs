@@ -96,11 +96,11 @@ pub use model::{
     ProblemKind, RANGE_MARGIN, SNUFF_SECONDS, WHIPPING_FLICKER_DEPTH, blackbody_colour, blackbody_luminance,
     char_field, char_radiance, coal_radiance, ember_cull_extents, ember_reach, fade_factor, fill_for,
     fire_lumens, fire_lux, fire_reach, flame_cull_extents, flame_light_offset, flame_tilt, flicker_depth,
-    flicker_factor, flicker_mean, flicker_swing, ground_lux, ground_ramp, ground_reach, hand_off,
-    key_to_fill, kindle_gain, lean_light_shift, pack_flame_tag, preferred, raised_light, shadow_set,
-    snuff_gain, stops, unpack_flame_tag, white_balanced,
+    flicker_factor, flicker_mean, flicker_swing, focus_quota, ground_lux, ground_ramp, ground_reach,
+    hand_off, key_to_fill, kindle_gain, lean_light_shift, pack_flame_tag, preferred, quota_cutoff,
+    raised_light, shadow_set, shared_value, snuff_gain, stops, unpack_flame_tag, white_balanced,
 };
-pub use pool::{LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
+pub use pool::{FocusRule, LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
 
 use bevy::prelude::*;
 

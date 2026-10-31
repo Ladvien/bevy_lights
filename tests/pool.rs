@@ -1200,7 +1200,7 @@ fn the_budget_is_flagged_changed_only_when_the_schedule_changes() {
 mod saved_pool {
     use bevy::light::PointLight;
     use bevy::prelude::*;
-    use bevy_lights::{LightPool, Rank};
+    use bevy_lights::{FocusRule, LightPool, Rank};
 
     #[test]
     fn a_pool_round_trips_with_its_slot_template() {
@@ -1217,6 +1217,7 @@ mod saved_pool {
                 ..default()
             },
             rank: Rank::Distance,
+            focus: FocusRule::Shared,
             hysteresis: 1.3,
             fade_seconds: 0.0,
             reserve: 3,
@@ -1225,6 +1226,7 @@ mod saved_pool {
         let json = serde_json::to_string(&pool).unwrap();
         let back: LightPool = serde_json::from_str(&json).unwrap();
         assert_eq!((back.size, back.reach, back.gain, back.rank), (6, 31.5, 0.4, Rank::Distance));
+        assert_eq!(back.focus, FocusRule::Shared, "the focus rule is saved");
         assert_eq!((back.hysteresis, back.fade_seconds, back.reserve), (1.3, 0.0, 3));
         assert_eq!(back.max_shadowed, Some(3), "the shadow budget is saved");
         assert_eq!(back.light.color, pool.light.color);
@@ -1282,6 +1284,7 @@ mod saved_pool {
         assert_eq!(pool.light.range, 12.0);
         assert_eq!(pool.light.color, defaults.light.color);
         assert_eq!((pool.reach, pool.reserve, pool.rank), (defaults.reach, defaults.reserve, defaults.rank));
+        assert_eq!(pool.focus, FocusRule::One, "a file saved before the focus rule existed serves one viewer");
     }
 }
 
@@ -1632,4 +1635,182 @@ fn a_fire_kinds_pooled_light_stands_in_its_flame_and_leans_with_it() {
             "{kind}: {light:?} vs the leaned flame's middle {middle:?}"
         );
     }
+}
+
+// ---- more than one viewer (`FocusRule::Shared`, `docs/research/pool-foci.md`) --------------------------------
+
+/// How many of the pool's `size` assigned slots are lit within `radius` metres (on the ground plane) of `centre`.
+fn lit_near(app: &mut App, size: usize, centre: Vec3, radius: f32) -> usize {
+    assigned(app, size)
+        .into_iter()
+        .filter(|(_, at, visibility, _)| {
+            *visibility == Visibility::Inherited && Vec2::new(at.x - centre.x, at.z - centre.z).length() <= radius
+        })
+        .count()
+}
+
+/// Two viewers 200 m apart: one among twenty fires 1-4.8 m from it, the other among three, 6-8 m from it.
+/// On a plain nearest-focus distance the twenty outrank the three and the second viewer gets nothing.
+fn two_viewers(order: impl Fn(usize) -> usize, many: usize) -> (App, Vec3, Vec3) {
+    let (a, b) = (Vec3::ZERO, Vec3::new(200.0, 0.0, 0.0));
+    let mut app = app(LightPool { size: 8, reach: 30.0, focus: FocusRule::Shared, ..default() });
+    focus_at(&mut app, a);
+    focus_at(&mut app, b);
+    let mut fires: Vec<Vec3> = (0..many).map(|i| a + Vec3::new(1.0 + 0.2 * i as f32, 0.0, 0.0)).collect();
+    fires.extend([b + Vec3::new(6.0, 0.0, 0.0), b + Vec3::new(0.0, 0.0, 7.0), b + Vec3::new(0.0, 0.0, -8.0)]);
+    for i in 0..fires.len() {
+        candidate(&mut app, fires[order(i)], 100.0);
+    }
+    for _ in 0..60 {
+        app.update();
+    }
+    (app, a, b)
+}
+
+#[test]
+fn a_viewer_among_few_fires_is_not_starved_by_one_among_many() {
+    let (mut app, a, b) = two_viewers(|i| i, 20);
+    assert_eq!(lit_near(&mut app, 8, b, 20.0), 3, "all three of the sparse viewer's fires hold a light");
+    assert_eq!(lit_near(&mut app, 8, a, 20.0), 5, "the dense viewer keeps the rest of the pool");
+    let budget = app.world().resource::<PoolBudget>();
+    assert_eq!((budget.wanting, budget.granted(), budget.starved()), (23, 8, 15));
+}
+
+#[test]
+fn a_viewer_with_fewer_fires_than_its_share_leaves_the_rest_to_the_other() {
+    // Size 8, two viewers: four each. The second has three, the first takes five; with the second down to
+    // two, six.
+    let (mut app, a, b) = two_viewers(|i| i, 20);
+    // Despawn one of the second viewer's three fires: the one 6 m east of it.
+    let doomed: Entity = app
+        .world_mut()
+        .query_filtered::<(Entity, &Transform), With<PoolCandidate>>()
+        .iter(app.world())
+        .find(|(_, transform)| (transform.translation.x - 206.0).abs() < 1e-3)
+        .map(|(entity, _)| entity)
+        .expect("the fire exists");
+    app.world_mut().despawn(doomed);
+    for _ in 0..90 {
+        app.update();
+    }
+    assert_eq!(lit_near(&mut app, 8, b, 20.0), 2, "the second viewer has two fires left and holds both");
+    assert_eq!(lit_near(&mut app, 8, a, 20.0), 6, "what it does not use goes to the first");
+}
+
+#[test]
+fn the_assignment_does_not_depend_on_the_order_things_were_spawned_in() {
+    let lit = |order: &dyn Fn(usize) -> usize| {
+        let (mut app, ..) = two_viewers(order, 20);
+        let mut at: Vec<[i32; 3]> = assigned(&mut app, 8)
+            .into_iter()
+            .filter(|(_, _, visibility, _)| *visibility == Visibility::Inherited)
+            .map(|(_, at, ..)| [(at.x * 1000.0).round() as i32, (at.y * 1000.0).round() as i32, (at.z * 1000.0).round() as i32])
+            .collect();
+        at.sort();
+        at
+    };
+    let forward = lit(&|i| i);
+    let backward = lit(&|i| 22 - i);
+    assert_eq!(forward.len(), 8);
+    assert_eq!(forward, backward, "the same eight fires are real in either spawn order");
+}
+
+#[test]
+fn a_fire_between_two_viewers_holds_one_light() {
+    let mut app = app(LightPool { size: 4, reach: 20.0, focus: FocusRule::Shared, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    focus_at(&mut app, Vec3::new(10.0, 0.0, 0.0));
+    candidate(&mut app, Vec3::new(5.0, 0.0, 0.0), 100.0);
+    candidate(&mut app, Vec3::new(-3.0, 0.0, 0.0), 100.0);
+    for _ in 0..60 {
+        app.update();
+    }
+    let lit: Vec<Vec3> = assigned(&mut app, 4)
+        .into_iter()
+        .filter(|(_, _, visibility, _)| *visibility == Visibility::Inherited)
+        .map(|(_, at, ..)| at)
+        .collect();
+    assert_eq!(lit.len(), 2, "two fires, two lights, though one stands in both viewers' reach: {lit:?}");
+    assert_eq!(lit.iter().filter(|at| (at.x - 5.0).abs() < 1e-4).count(), 1, "the shared fire is lit once");
+}
+
+#[test]
+fn the_shared_rule_with_one_viewer_is_the_one_rule_frame_for_frame() {
+    // Forty fires placed by a fixed pseudo-random sequence, a focus that walks across them, and both rules:
+    // every slot's position, visibility and brightness, and the budget, agree on every frame.
+    let build = |focus: FocusRule| {
+        let mut app = app(LightPool { size: 6, reach: 14.0, focus, ..default() });
+        let eye = app.world_mut().spawn((TestFocus, Transform::default())).id();
+        let mut seed = 12345_u32;
+        let mut next = move || {
+            seed = seed.wrapping_mul(1664525).wrapping_add(1013904223);
+            (seed >> 8) as f32 / (1u32 << 24) as f32
+        };
+        for _ in 0..40 {
+            let at = Vec3::new(next() * 40.0 - 20.0, 0.0, next() * 40.0 - 20.0);
+            candidate(&mut app, at, 50.0 + next() * 150.0);
+        }
+        (app, eye)
+    };
+    let (mut one, eye_one) = build(FocusRule::One);
+    let (mut shared, eye_shared) = build(FocusRule::Shared);
+    for frame in 0..150 {
+        let at = Vec3::new(-18.0 + frame as f32 * 0.24, 0.0, (frame as f32 * 0.05).sin() * 8.0);
+        one.world_mut().entity_mut(eye_one).insert(Transform::from_translation(at));
+        shared.world_mut().entity_mut(eye_shared).insert(Transform::from_translation(at));
+        one.update();
+        shared.update();
+        assert_eq!(slots(&mut one), slots(&mut shared), "frame {frame}");
+        assert_eq!(
+            one.world().resource::<PoolBudget>().holders,
+            shared.world().resource::<PoolBudget>().holders,
+            "frame {frame}"
+        );
+    }
+}
+
+#[test]
+fn a_viewer_who_leaves_hands_the_lights_to_the_one_who_stays() {
+    let mut app = app(LightPool { size: 4, reach: 30.0, focus: FocusRule::Shared, ..default() });
+    let (a, b) = (Vec3::ZERO, Vec3::new(200.0, 0.0, 0.0));
+    focus_at(&mut app, a);
+    let away = app.world_mut().spawn((TestFocus, Transform::from_translation(b))).id();
+    for i in 0..6 {
+        candidate(&mut app, a + Vec3::new(1.0 + i as f32, 0.0, 0.0), 100.0);
+        candidate(&mut app, b + Vec3::new(1.0 + i as f32, 0.0, 0.0), 100.0);
+    }
+    for _ in 0..60 {
+        app.update();
+    }
+    assert_eq!((lit_near(&mut app, 4, a, 20.0), lit_near(&mut app, 4, b, 20.0)), (2, 2), "an equal share each");
+
+    app.world_mut().despawn(away);
+    for _ in 0..90 {
+        app.update();
+    }
+    assert_eq!(lit_near(&mut app, 4, a, 20.0), 4, "the viewer who stays has the whole pool");
+    assert_eq!(lit_near(&mut app, 4, b, 20.0), 0, "and nobody is near the one who left");
+
+    // A viewer joining takes its share back.
+    app.world_mut().spawn((TestFocus, Transform::from_translation(b)));
+    for _ in 0..90 {
+        app.update();
+    }
+    assert_eq!((lit_near(&mut app, 4, a, 20.0), lit_near(&mut app, 4, b, 20.0)), (2, 2), "an equal share again");
+}
+
+#[test]
+fn the_one_rule_still_leaves_two_viewers_dark() {
+    // The default is unchanged: two foci are a misconfiguration under `FocusRule::One`, and `Shared` is how
+    // a host asks for them.
+    let mut app = app(LightPool { size: 4, reach: 30.0, ..default() });
+    assert_eq!(LightPool::default().focus, FocusRule::One);
+    focus_at(&mut app, Vec3::ZERO);
+    focus_at(&mut app, Vec3::new(100.0, 0.0, 0.0));
+    candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    candidate(&mut app, Vec3::new(101.0, 0.0, 0.0), 100.0);
+    for _ in 0..30 {
+        app.update();
+    }
+    assert_eq!(app.world().resource::<PoolBudget>().granted(), 0);
 }

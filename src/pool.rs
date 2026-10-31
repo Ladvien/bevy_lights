@@ -17,7 +17,9 @@ use bevy::light::PointLight;
 use bevy::prelude::*;
 
 use crate::flicker::{Flicker, FlickerPlugin, Kindle, Kindled, Snuff, Snuffed, advance_candidate_fires};
-use crate::model::pool::{fade_factor, fade_out_factor, preferred, shadow_set};
+use crate::model::pool::{
+    fade_factor, fade_out_factor, focus_quota, preferred, quota_cutoff, shadow_set, shared_value,
+};
 use crate::model::{
     DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, SNUFF_SECONDS, kindle_gain, lean_light_shift, snuff_gain,
 };
@@ -27,8 +29,10 @@ use crate::{FlameSite, FlameWind};
 /// [`LightPoolPlugin`]: keeps [`LightPool::size`] real lights and hands them to the nearest
 /// [`PoolCandidate`]s.
 ///
-/// Generic over `F`, the host's focus marker: exactly one entity carrying `F` is the point the pool
-/// measures distance from. Add it after [`FlickerPlugin`] — the pool's lights are [`Flicker`]
+/// Generic over `F`, the host's focus marker: the entity carrying `F` is the point the pool measures
+/// distance from. Exactly one by default; with [`FocusRule::Shared`], one per viewer (a split screen's
+/// players, a map camera beside the player's), and the pool's lights are shared between them. Add it
+/// after [`FlickerPlugin`] — the pool's lights are [`Flicker`]
 /// lights, and [`Plugin::finish`] reports a missing flicker plugin with an `error!` rather than
 /// panicking or adding one itself.
 pub struct LightPoolPlugin<F: Component> {
@@ -99,7 +103,8 @@ pub struct LightPool {
     /// How many real lights exist. Shrinking it despawns the extra lights on the next frame; growing
     /// it spawns more.
     pub size: usize,
-    /// How far from the focus a candidate may be, in world units, to be given a light.
+    /// How far from the focus a candidate may be, in world units, to be given a light: from the nearest
+    /// focus, under [`FocusRule::Shared`].
     pub reach: f32,
     /// A dimmer shared by the whole pool, usually how lit the night is (0 puts every pool light
     /// out). Applied on top of each candidate's own intensity.
@@ -137,6 +142,10 @@ pub struct LightPool {
     /// How the pool ranks its candidates: by the illuminance each would put on the subject (the default)
     /// or by distance alone.
     pub rank: Rank,
+    /// Whether the pool serves one viewer or several: [`FocusRule::One`] (the default) needs exactly one
+    /// entity carrying the host's focus marker, [`FocusRule::Shared`] takes any number and shares
+    /// [`LightPool::size`] between them. See [`FocusRule`].
+    pub focus: FocusRule,
     /// How many extra lights the pool keeps beyond the ones it assigns, so a hand-off can be a
     /// **cross-fade**: the departing owner's light fades out while the arriving one fades in, and the
     /// subject never brightens or darkens.
@@ -188,6 +197,7 @@ impl Default for LightPool {
             gain: 1.0,
             light: PointLight { intensity: 0.0, range: 10.0, shadow_maps_enabled: false, ..default() },
             rank: Rank::Illuminance,
+            focus: FocusRule::One,
             hysteresis: HYSTERESIS,
             fade_seconds: FADE_SECONDS,
             reserve: 1,
@@ -300,6 +310,43 @@ pub enum Rank {
     Illuminance,
     /// Nearest first, whatever it burns: the rule before [`Rank::Illuminance`] existed.
     Distance,
+}
+
+/// How many viewers [`LightPool`] serves: one focus, or several that share its lights.
+///
+/// A game with one camera has one focus, and the pool measures "near" from it. A game with several
+/// (local split-screen co-op, a map camera beside the player's, a cutscene camera while the player stands
+/// elsewhere) cannot name one point that is near for all of them, and the craft is the multi-camera
+/// cinematographer's: the lighting is a compromise, and the question is who pays for it
+/// (`docs/research/pool-foci.md`).
+///
+/// The pool is **shared, not multiplied**: [`LightPool::size`] is the total for every viewer, so a host
+/// whose budget is per view raises it itself (two views at 16 lights each is `size: 32`).
+///
+/// It is a setting and not a behaviour change because a host that spawns two foci by mistake should be
+/// told, which [`FocusRule::One`] still does.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Reflect)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum FocusRule {
+    /// Exactly one entity carries the focus marker. With none the pool is dark; with more than one it is
+    /// dark and a warning names the setting that serves several. The rule before [`FocusRule::Shared`]
+    /// existed.
+    #[default]
+    One,
+    /// Any number of entities carry the focus marker, one for each viewer, and the pool's lights are
+    /// shared between them.
+    ///
+    /// Each focus is entitled to [`focus_quota`]`(size, foci)` lights, `ceil(size / foci)`, and ranks the
+    /// candidates within [`LightPool::reach`] of it by [`LightPool::rank`]; a candidate's place in the
+    /// pool's one ordering is its best place among the viewers it is near, measured against each viewer's
+    /// own share ([`shared_value`]). So a viewer standing among twenty fires cannot take the lights of one
+    /// standing by three: both keep their nearest, and what a viewer does not use goes to the other. A
+    /// fixture near two viewers holds one light. The hand-off, the reserve cross-fade, the shadow budget
+    /// and [`PoolBudget`] work as for one focus, on that one ordering; a focus that appears or goes (a
+    /// player joining or dropping out) re-divides the lights by the same cross-fades.
+    ///
+    /// With exactly one focus this is [`FocusRule::One`], to the bit.
+    Shared,
 }
 
 /// A prop that would like one of the pool's real lights: how bright it burns, and where its light
@@ -589,6 +636,16 @@ struct HandOffState {
     old_look: std::collections::HashMap<Entity, LastLight>,
     /// Which reserve light is fading out which light, by slot index.
     departure_release: std::collections::HashMap<usize, LastLight>,
+    /// This frame's foci: none, one, or (under [`FocusRule::Shared`]) one per viewer. Scratch, kept for
+    /// its capacity.
+    foci: Vec<Vec3>,
+    /// Under [`FocusRule::Shared`] with several foci: each candidate's rank value from each focus,
+    /// `foci.len()` numbers a candidate in the order of the list, [`f32::INFINITY`] where the candidate is
+    /// beyond that focus's reach. Scratch, kept for its capacity.
+    shares: Vec<f32>,
+    /// One focus's column of `shares`, and every focus's cutoff ([`quota_cutoff`]). Scratch.
+    column: Vec<f32>,
+    cutoffs: Vec<f32>,
 }
 
 /// Spawns, resizes and assigns the pool's real lights.
@@ -599,8 +656,9 @@ struct HandOffState {
 ///    `size`. When [`LightPool::light`] changed, every field of it but `intensity` and
 ///    `shadow_maps_enabled` is copied onto every slot, reserves included; each slot's intensity is left
 ///    to the assignment and its shadow flag to the shadow budget.
-/// 2. **Focus.** The one entity carrying `F`. None, or more than one, means no assignment this frame
-///    (and a warning for the second case): a pool with two cameras has no single near.
+/// 2. **Foci.** [`FocusRule::One`] (the default): the one entity carrying `F`. None, or more than one,
+///    means no assignment this frame (and a warning for the second case): a pool with two cameras has
+///    no single near unless it is told to share. [`FocusRule::Shared`]: every entity carrying `F`.
 /// 3. **Candidates.** Every [`PoolCandidate`] whose own [`Visibility`] is not `Hidden` and whose fire is not
 ///    out (a [`Snuff`] that has run its course), within [`LightPool::reach`], ranked by [`LightPool::rank`]
 ///    and then by [`Entity`], so the assignment is the same on every machine and two props of equal rank
@@ -631,7 +689,18 @@ fn assign_pool<F: Component>(
     time: Res<Time>,
 ) {
     let delta = time.delta_secs();
-    let HandOffState { held, fade_at, applied, shadow_settings, old_look, departure_release } = &mut *state;
+    let HandOffState {
+        held,
+        fade_at,
+        applied,
+        shadow_settings,
+        old_look,
+        departure_release,
+        foci,
+        shares,
+        column,
+        cutoffs,
+    } = &mut *state;
     let existing: Vec<(Entity, usize)> =
         slots.iter().map(|(entity, light, ..)| (entity, light.slot)).collect();
 
@@ -669,26 +738,40 @@ fn assign_pool<F: Component>(
         *applied = Some(look);
     }
 
-    // 2. Focus: exactly one entity, or none.
-    let focus_at = {
-        let mut found = focus.iter();
-        match (found.next(), found.next()) {
-            (Some(at), None) => Some(at.translation()),
-            (Some(_), Some(_)) => {
-                let count = 2 + found.count();
-                warn_once!(
-                    "bevy_lights: LightPoolPlugin found {count} focus entities; the pool needs exactly one"
-                );
-                None
+    // 2. Foci: exactly one entity under `FocusRule::One`, any number under `FocusRule::Shared`.
+    foci.clear();
+    match pool.focus {
+        FocusRule::One => {
+            let mut found = focus.iter();
+            match (found.next(), found.next()) {
+                (Some(at), None) => foci.push(at.translation()),
+                (Some(_), Some(_)) => {
+                    let count = 2 + found.count();
+                    warn_once!(
+                        "bevy_lights: LightPoolPlugin found {count} focus entities; the pool needs exactly one (or `LightPool::focus` set to `FocusRule::Shared`)"
+                    );
+                }
+                _ => {}
             }
-            _ => None,
         }
-    };
+        FocusRule::Shared => foci.extend(focus.iter().map(|at| at.translation())),
+    }
 
     // 3. Candidates: visible, in reach, and ranked by the pool's rule — highest illuminance on the subject
     //    first (or nearest first), ties by entity.
-    let mut lit: Vec<Assignment> = match focus_at {
-        Some(focus_at) if pool.gain > 0.0 => candidates
+    let reach_squared = pool.reach * pool.reach;
+    // One focus is the plain rule. Several are the shared one: each candidate's value from each focus is
+    // kept in `shares` (a row of `foci.len()` numbers a candidate, in the order of `lit`) until every
+    // focus's cutoff is known.
+    let single = match foci.as_slice() {
+        [at] => Some(*at),
+        _ => None,
+    };
+    shares.clear();
+    let mut lit: Vec<Assignment> = if foci.is_empty() || pool.gain <= 0.0 {
+        Vec::new()
+    } else {
+        candidates
             .iter()
             // Not `Visibility::Hidden`: a candidate with no `Visibility` at all is not hidden. And not out: a
             // candidate whose `Snuff` has run its course wants no light, and a `Snuff` in progress still does.
@@ -696,7 +779,7 @@ fn assign_pool<F: Component>(
                 !visibility.is_some_and(|v| *v == Visibility::Hidden)
                     && !snuff.is_some_and(|snuff| snuff.elapsed >= SNUFF_SECONDS)
             })
-            .map(|(entity, at, transform, parent, _, _, candidate)| {
+            .filter_map(|(entity, at, transform, parent, _, _, candidate)| {
                 // The freshest position the frame has. A **root** prop with its own `Transform` has just
                 // been moved by the host, and its `GlobalTransform` will not catch up until `PostUpdate`,
                 // so its local translation is the freshest truth. A **child** (a torch in a hand) is
@@ -707,7 +790,6 @@ fn assign_pool<F: Component>(
                     (None, Some(transform)) => transform.translation,
                     _ => at.translation(),
                 };
-                let distance_squared = position.distance_squared(focus_at);
                 // The value is the pool's one quantity: what it **ranks** by and what the overlap rule
                 // **holds** against, in the units the hysteresis margin applies to. "Smaller is better",
                 // and positive — `preferred` clamps at zero, so a negated brightness would collapse every
@@ -719,17 +801,69 @@ fn assign_pool<F: Component>(
                 // tie-break on entity depends on), and a challenger must arrive 15 % brighter to take a
                 // light. `Distance` is the distance itself, the pair the old rule compared, so that rule is
                 // unchanged.
-                let value = match pool.rank {
+                let value_at = |distance_squared: f32| match pool.rank {
                     Rank::Illuminance => distance_squared / candidate.intensity.max(1e-6),
                     Rank::Distance => distance_squared.sqrt(),
                 };
-                let key = value;
-                (key, distance_squared, value, entity, position + candidate.offset, candidate.intensity)
+                let (distance_squared, value) = match single {
+                    Some(focus_at) => {
+                        let distance_squared = position.distance_squared(focus_at);
+                        (distance_squared, value_at(distance_squared))
+                    }
+                    None => {
+                        // Several foci: the value from each one this candidate is within reach of, kept
+                        // for the cutoffs; the pool's own value is settled below, once they are known.
+                        let row = shares.len();
+                        let mut nearest = f32::INFINITY;
+                        for focus_at in foci.iter() {
+                            let distance_squared = position.distance_squared(*focus_at);
+                            if distance_squared <= reach_squared {
+                                nearest = nearest.min(distance_squared);
+                                shares.push(value_at(distance_squared));
+                            } else {
+                                shares.push(f32::INFINITY);
+                            }
+                        }
+                        if nearest.is_infinite() {
+                            shares.truncate(row);
+                            return None;
+                        }
+                        (nearest, value_at(nearest))
+                    }
+                };
+                (distance_squared <= reach_squared).then_some((
+                    value,
+                    distance_squared,
+                    value,
+                    entity,
+                    position + candidate.offset,
+                    candidate.intensity,
+                ))
             })
-            .filter(|(_, distance_squared, ..)| *distance_squared <= pool.reach * pool.reach)
-            .collect(),
-        _ => Vec::new(),
+            .collect()
     };
+    // Shared between several foci: each focus's value is its own multiple of its cutoff (the value of its
+    // quota-th best candidate), and a candidate takes its best. See `model::pool::shared_value`.
+    if single.is_none() && !lit.is_empty() {
+        let k = foci.len();
+        let quota = focus_quota(pool.size, k);
+        cutoffs.clear();
+        for at in 0..k {
+            column.clear();
+            column.extend(shares.iter().skip(at).step_by(k).copied().filter(|value| value.is_finite()));
+            cutoffs.push(quota_cutoff(column, quota).unwrap_or(1.0));
+        }
+        for (entry, row) in lit.iter_mut().zip(shares.chunks_exact(k)) {
+            let value = row
+                .iter()
+                .zip(cutoffs.iter())
+                .filter(|(value, _)| value.is_finite())
+                .map(|(value, cutoff)| shared_value(*value, *cutoff))
+                .fold(f32::INFINITY, f32::min);
+            entry.0 = value;
+            entry.2 = value;
+        }
+    }
     // Ties break on `Entity`, never on the value: four times the light at twice the distance is an exact
     // tie by design, and two equidistant props must not swap between frames.
     lit.sort_by(|a, b| a.0.total_cmp(&b.0).then_with(|| a.3.to_bits().cmp(&b.3.to_bits())));
