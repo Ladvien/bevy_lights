@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use crate::model::{
     CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, fire_lumens, flame_light_offset, flicker_rate,
 };
-use crate::{FlameEmbers, FlameSite, FlameSmoke, Flicker, MAX_EMBER_RATE, PoolCandidate};
+use crate::{FlameEmbers, FlameSite, FlameSmoke, FlameTongues, Flicker, MAX_EMBER_RATE, PoolCandidate};
 
 /// A named kind of fire: its fuel-bed diameter, flicker depth and flame height together, so a
 /// picker (or a project file) stores one word instead of three loose numbers.
@@ -165,6 +165,19 @@ impl FireKind {
             FireKind::Bonfire => crate::MAX_SMOKE_DENSITY,
         };
         Some(FlameSmoke { density })
+    }
+
+    /// The tongues this fire burns as, or `None` for one whose bed is no wider than its one flame can fill (a candle, a lantern's wick, a
+    /// torch and a brazier: a bed under a third of the flame's height). A campfire's 0.8 m bed under a 0.7 m flame is five tongues over
+    /// 0.5 m, and a bonfire's 3 m pyre under a 2 m flame seven over 1.8 m: drawn as the one slender flame they were, both read as a very
+    /// large candle. Insert the value on the [`FlameSite`] entity, as [`embers`](Self::embers). A design default
+    /// (`docs/research/flame-tongues.md`).
+    pub fn tongues(self) -> Option<FlameTongues> {
+        match self {
+            FireKind::Campfire => Some(FlameTongues { count: 5, spread: 0.5 }),
+            FireKind::Bonfire => Some(FlameTongues { count: 7, spread: 1.8 }),
+            FireKind::Candle | FireKind::Lantern | FireKind::Torch | FireKind::Brazier => None,
+        }
     }
 
     /// The flame and its light in one bundle: [`site`](Self::site) and [`candidate`](Self::candidate),
