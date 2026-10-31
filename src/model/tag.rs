@@ -104,7 +104,7 @@ const EMBER_RISE_MAX: f32 = 2.6;
 /// The ember quad's margin round its sparks, in flame heights: `MARGIN` in `src/embers.wesl`.
 const EMBER_MARGIN: f32 = 0.35;
 /// How far a spark's drift outruns the flame's lean: `DRIFT` in `src/embers.wesl`.
-const EMBER_DRIFT: f32 = 1.5;
+const EMBER_DRIFT: f32 = 1.0;
 
 /// How far from its origin the ember quad's vertex stage can put a corner, in drawn flame heights, for a flame leaning by
 /// `lean` (the scale's `y` and `z` less one): the ball the quad is certain to stay inside whichever way the camera faces.
