@@ -39,7 +39,7 @@
 //!             Kindle::default(),
 //!             // `diameter` matches the `Flicker`'s, so the drawn flame breathes with the light.
 //!             FlameSite { height: 0.9, phase: 0.0, kindle: 0.0, diameter: Some(0.34),
-//!                 depth: FLICKER_DEPTH, depth_fade: false, fire: None }));
+//!                 depth: FLICKER_DEPTH, depth_fade: false, fire: None, color: None }));
 //!         commands.spawn((MyFocus, Transform::default()));
 //!         // A carried fire: one entity holds the `FlameSite` and the `PoolCandidate`, so the light it
 //!         // is handed sits in the flame the host can see. `offset` is the flame's own centre, measured
@@ -51,7 +51,7 @@
 //!                 ..default()
 //!             },
 //!             FlameSite { height, phase: 9.0, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH,
-//!                 depth_fade: false, fire: None },
+//!                 depth_fade: false, fire: None, color: None },
 //!             Transform::from_xyz(4.0, 0.0, 2.0)));
 //!     });
 //! # }
@@ -98,7 +98,7 @@ pub use model::{
     fire_lumens, fire_lux, fire_reach, flame_cull_extents, flame_light_offset, flame_tilt, flicker_depth,
     flicker_factor, flicker_mean, flicker_swing, focus_quota, ground_lux, ground_ramp, ground_reach,
     hand_off, key_to_fill, kindle_gain, lean_light_shift, pack_flame_tag, preferred, quota_cutoff,
-    raised_light, shadow_set, shared_value, snuff_gain, stops, unpack_flame_tag, white_balanced,
+    raised_light, retint, shadow_set, shared_value, snuff_gain, stops, unpack_flame_tag, white_balanced,
 };
 pub use pool::{FocusRule, LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
 

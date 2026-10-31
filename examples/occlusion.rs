@@ -109,6 +109,7 @@ fn spawn(
     ));
     let post = meshes.add(Cuboid::new(0.1, 0.8, 0.1));
     let site = |phase: f32, height: f32| FlameSite {
+        color: None,
         height,
         phase,
         kindle: 0.0,

@@ -542,6 +542,23 @@ fn depth_fade_on() -> bool {
     std::env::var("LIGHTS_DEPTH_FADE").is_ok_and(|v| v != "0")
 }
 
+/// `LIGHTS_COLOURS=1` gives some fires a colour of their own, on the flame, its sparks and its light at once: braziers 1 and 2 burn a
+/// gas-flame blue and a witch-fire green, and every fifth torch a shrine violet or a blue. Unset or `0`, every fire is the scene's
+/// orange and the courtyard draws exactly as it always has.
+fn palette(index: usize, brazier: bool) -> Option<Color> {
+    if !std::env::var("LIGHTS_COLOURS").is_ok_and(|v| v != "0") {
+        return None;
+    }
+    let linear = |r, g, b| Color::from(LinearRgba::rgb(r, g, b));
+    match (brazier, index) {
+        (true, 1) => Some(linear(0.10, 0.32, 1.0)),
+        (true, 2) => Some(linear(0.20, 1.0, 0.30)),
+        (false, i) if i % 5 == 1 => Some(linear(0.10, 0.32, 1.0)),
+        (false, i) if i % 5 == 3 => Some(linear(0.62, 0.20, 1.0)),
+        _ => None,
+    }
+}
+
 /// `LIGHTS_EMBERS=r` gives every flame `FlameEmbers { rate: r }` (sparks a second); unset or `0`, the courtyard draws no sparks.
 fn embers_on() -> Option<FlameEmbers> {
     let rate: f32 = std::env::var("LIGHTS_EMBERS").ok()?.trim().parse().ok()?;
@@ -827,6 +844,7 @@ fn spawn_scene(
     // The four braziers.
     for (index, at) in BRAZIERS.iter().enumerate() {
         let phase = index as f32 * 1.9;
+        let colour = palette(index, true);
         commands
             .spawn((
                 Name::new(format!("Brazier {index}")),
@@ -862,7 +880,7 @@ fn spawn_scene(
                     .spawn((
                         Name::new("Coals"),
                         PointLight {
-                            color: fire_colour(),
+                            color: colour.unwrap_or_else(fire_colour),
                             intensity: lumens,
                             range: BRAZIER_POOL * POOL_RANGE_MARGIN,
                             shadow_maps_enabled: true,
@@ -891,6 +909,7 @@ fn spawn_scene(
                         depth: brazier_kind().map_or(FLICKER_DEPTH, FireKind::depth),
                         depth_fade: depth_fade_on(),
                         fire: Some(coals),
+                        color: colour,
                     },
                     // The flame's foot is on the coals, below the lip with them.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04 - BED_BELOW_LIP, 0.0),
@@ -926,6 +945,7 @@ fn spawn_scene(
         // output — and it is the case the old distance-only rule got wrong.
         let lantern = index % 6 == 0;
         let burn = if lantern { 4.0 } else { 1.0 };
+        let colour = palette(index, false);
         commands
             .spawn((
                 Name::new(format!("Bearer {index}")),
@@ -1002,6 +1022,7 @@ fn spawn_scene(
                         // flame drawn on it instead of the pool slot's phase.
                         phase: Some(phase),
                         diameter: None,
+                        color: colour,
                         ..default()
                     },
                     // The pool's lights flicker at the un-sized rate (`Flicker { diameter: None }` in
@@ -1015,6 +1036,7 @@ fn spawn_scene(
                         depth: FLICKER_DEPTH,
                         depth_fade: depth_fade_on(),
                         fire: Some(fire),
+                        color: colour,
                     },
                     Transform::from_translation(at),
                 ));

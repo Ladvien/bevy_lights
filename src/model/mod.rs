@@ -8,6 +8,7 @@
 pub mod char;
 pub mod cinematography;
 pub mod fire;
+pub mod fire_colour;
 pub mod pool;
 pub mod problem;
 pub mod reach;
@@ -24,6 +25,7 @@ pub use fire::{
     MAX_FLICKER_DEPTH, PUFFING_CONSTANT, SNUFF_SECONDS, WHIPPING_FLICKER_DEPTH, flame_tilt, flicker_depth,
     flicker_factor, flicker_factor_of, flicker_mean, flicker_rate, flicker_swing, kindle_gain, snuff_gain,
 };
+pub use fire_colour::retint;
 pub use pool::{
     FADE_SECONDS, HYSTERESIS, fade_factor, fade_out_factor, focus_quota, hand_off, preferred, quota_cutoff,
     shadow_set, shared_value,
