@@ -154,7 +154,7 @@ A light you want to be able to *re-light* is re-inserted with `Kindle::default()
 `Kindled` again. A fire you want dimmer or brighter is changed through the `Flicker` (`set_mean`, never the light's
 `intensity`: the crate writes the intensity every frame).
 
-`examples/courtyard.rs` is the full showcase, `examples/bench_lights.rs` the CPU bench.
+`examples/courtyard.rs` is the full showcase, `examples/bench_lights.rs` the CPU bench for the pool and the flicker, and `examples/bench_flames.rs` the bench for thousands of flames with few of them on screen (it renders off-screen and needs a GPU adapter).
 
 ## Features
 
@@ -268,6 +268,8 @@ light in the flame in a wind. `LIGHTS_WIND=x,z cargo run --release --example cou
 has the sources.
 
 **Gusts.** Insert `FlameGust { mean, intensity, timescale, seed }` instead of writing `FlameWind` yourself and `FlamePlugin` writes `FlameWind::velocity` every frame from `gust_velocity`: the mean wind with a stationary Gaussian fluctuation of relative size `intensity` (the turbulence intensity, 0.25 by default) that stays correlated for `timescale` seconds (2 by default), with the heading wandering about `intensity` radians. It is a pure function of `Time<Real>` and the `seed`, so two machines see the same wind and a paused world's fires still sway. The tilt law is steep at a breeze and flat at a gale, so gusts read best at 0.2–0.8 m/s (a flame easing between roughly 20° and 40°); at 3 m/s the flame is already near its cap. `LIGHTS_WIND=0.4,0 LIGHTS_GUST=0.5 cargo run --release --example courtyard` shows it; `docs/research/flame-gust.md` has the sources and what is a design default.
+
+**A fire off the screen costs almost nothing.** A flame outside every camera's frustum is neither extracted nor drawn, so a town of thousands of `FlameSite`s costs the frame what the dozens in view cost it: `cargo run --release --example bench_flames` (no window, off-screen, a GPU adapter) puts 5 000 torches in the world with about twenty in view and reads 2.2 ms a frame, where drawing every one read 7.8 (20 000: 6.4 against 30.0). The box that does it is the crate's own, because the flame's catch and the wind's lean ride in the transform's scale and a box built once would shrink as a fire catches or leans: `flame_cull_extents` is that box, for a host that draws its own flames with `FlameMaterial`. `docs/research/flame-culling.md` has the geometry and the measurements. A fire's *light* is the pool's, ranked by distance and never by what the camera sees, so a fire off the screen still lights the screen.
 
 ### The lighting look
 

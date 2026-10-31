@@ -161,6 +161,18 @@ building the base commit and the change into **separate target directories** and
 binaries **interleaved**, three rounds each; a reading whose repeat moves by more than 10 % is thrown
 away.
 
+## The flame bench: thousands of fires, a few on screen
+
+`bench_lights` has no renderer, so it cannot see a flame. `bench_flames` can: it spawns `BENCH_FLAMES` torches (default 5000) on a 3 m grid, points one camera at a corner of the grid so that about twenty are in view, renders 400 frames to an off-screen image (the first 100 are not counted: the flame material's pipeline compiles in them) and prints
+
+```text
+bench_flames flames=5000 visible=15 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
+```
+
+`visible` is the number of flames the renderer counted as in view at the last frame, which is the proof that the others were culled; `BENCH_WIND=3,0` makes every flame lean, so each one's scale and culling box are rewritten every frame. Each `*_ms` is one `App::update()`, the main world and the render world's CPU work together, and the bench needs a GPU adapter. It runs without a display or a window (`DefaultPlugins` with `WinitPlugin` disabled and the camera on an `Image`), so it works over ssh. A GPU busy with other jobs makes `create_render` panic at start-up: check `nvidia-smi` and run it again.
+
+Compare two builds the way `bench_lights` is compared: separate target directories (or a copied binary), interleaved, three rounds. Iteration 277's numbers, best of three on a loaded machine, in ms a frame: 0 flames 1.3 and 1.7 (noise: the order reversed reads the other way), 1 000 flames 2.2 → 1.9, 5 000 7.8 → 2.2, 20 000 30.0 → 6.4, and with `BENCH_WIND=3,0` 5 000 8.0 → 3.1 and 20 000 28.1 → 5.9, before → after culling. What is left, about 0.25 µs a flame, is `update_flames`' own per-flame work and Bevy's visibility pass over the boxes.
+
 ## Seeing a cross-faded hand-off
 
 The pool's `reserve` light is what makes a hand-off cross-fade rather than dip. The example takes

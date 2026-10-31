@@ -18,6 +18,8 @@ plainly that it is a design default.
   default sits well inside.
 - [`flame-silhouette.md`](flame-silhouette.md) — the flame's edges, the puff law that would shape them,
   and the per-flame diameter that blocks it.
+- [`flame-culling.md`](flame-culling.md) — a fire off the screen costs almost nothing: the box a billboard
+  needs, why the instance scale must be divided out of it, and what 20 000 flames cost before and after.
 - [`flame-kindle.md`](flame-kindle.md) — a lit flame must *grow* with the light it motivates, and the
   scale that was written but never drawn.
 - [`carried-fire.md`](carried-fire.md) — where a hand-held fire's light belongs, and the lumens it needs
