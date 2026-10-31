@@ -32,6 +32,7 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `src/model/tag.rs` — `pack_flame_tag`, `unpack_flame_tag`.
 - `src/model/fire_colour.rs` — `retint` and the shipped ramp's stops: a fire's own colour, as the orange ramp moved to its hue (`docs/research/fire-colour.md`).
 - `src/model/tongue.rs` — `flame_tongue`, `Tongue`, `MAX_TONGUES`, `MERGE_RATIO`, `INWARD_LEAN`: where a wide fire's tongues stand, how tall each is and how it leans (`docs/research/flame-tongues.md`).
+- `src/model/bed.rs` — `bed_radiance`, `bed_ramp`, `bed_heat_step`, `bed_drawn_heat`, `bed_offset`, `pack_bed_tag`, `BED_*`: a fuel bed's heat, its colour at a heat and its packing (`docs/research/fuel-bed-heat.md`); `src/model/char.rs` also has `char_tile`, the tileable field, and `src/model/cinematography.rs` `blackbody_radiance`, the blackbody below the 1000 K floor.
 - `src/flicker.rs` — `FlickerPlugin`, `Flicker`, `Kindle`, `Kindled`, and `flicker_lights` over both light types.
 - `src/pool.rs` — `LightPoolPlugin<F>`, `LightPool`, `FocusRule`, `PoolCandidate`, `PoolLight`, `assign_pool::<F>`. `src/model/pool.rs` holds the hand-off rule and the shared pool's maths (`focus_quota`, `quota_cutoff`, `shared_value`).
 - `src/flame.rs` — `FlamePlugin`, `FlameMaterial`, `FlameLook`, `FlameSite`, `Flame`, `dress_flames`, `update_flames`.
@@ -39,10 +40,11 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `src/embers.rs`, `src/embers.wesl` — `FlameEmbers` and the spark quad (a child of the `Flame`, registered by `FlamePlugin`).
 - `src/smoke.rs`, `src/smoke.wesl` — `FlameSmoke` and the smoke quad (a child of the `Flame`, the spark quad's geometry and culling box, additive only), and the trail that quad becomes when its fire is put out (`SmokeTail`, `begin_smoke_tails`, `update_smoke_tails`; `docs/research/flame-smoke-tail.md`).
 - `src/tongues.rs` — `FlameTongues` and `FlameTongue` and `dress_tongues`: a wide fire (a campfire, a bonfire) as extra `Flame` children of its site, one per tongue.
+- `src/bed.rs`, `src/bed.wesl` — `FuelBed` and the coal disc (a child of the `FlameSite`, one shared material, the heat in its `MeshTag`), `update_beds`.
 - `examples/common/mod.rs` — the `LIGHTS_*` run switches and the fly camera.
 - `examples/courtyard.rs` — the showcase and capture scene: four braziers, 48 torch-bearers, an orbit focus.
 - `examples/bench_lights.rs` — the CPU bench, no window and no GPU.
-- `examples/campfire.rs` — a campfire and a bonfire as `FireKind`s with their tongues (`LIGHTS_TONGUES=0` is the one-flame comparison).
+- `examples/campfire.rs` — a campfire and a bonfire as `FireKind`s with their tongues and beds (`LIGHTS_TONGUES=0` is the one-flame comparison, `LIGHTS_BED=0` the one without coals).
 - `examples/bench_flames.rs` — what thousands of flames cost when few are on screen: headless, off-screen, needs a GPU adapter.
 - `tests/leaf.rs` — the boundary ratchet: the dependency list, forbidden names, engine-free `src/model/`.
 - `tests/flicker.rs`, `tests/pool.rs` — the two plugins' consumer-visible behaviour.

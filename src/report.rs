@@ -36,6 +36,7 @@ checked!(
     crate::FlameEmbers,
     crate::FlameSmoke,
     crate::FlameTongues,
+    crate::FuelBed,
     crate::PoolCandidate,
     crate::LightPool,
     crate::FlameLook,

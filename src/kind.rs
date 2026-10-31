@@ -5,7 +5,9 @@ use bevy::prelude::*;
 use crate::model::{
     CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, fire_lumens, flame_light_offset, flicker_rate,
 };
-use crate::{FlameEmbers, FlameSite, FlameSmoke, FlameTongues, Flicker, MAX_EMBER_RATE, PoolCandidate};
+use crate::{
+    FlameEmbers, FlameSite, FlameSmoke, FlameTongues, Flicker, FuelBed, MAX_EMBER_RATE, PoolCandidate,
+};
 
 /// A named kind of fire: its fuel-bed diameter, flicker depth and flame height together, so a
 /// picker (or a project file) stores one word instead of three loose numbers.
@@ -178,6 +180,33 @@ impl FireKind {
             FireKind::Bonfire => Some(FlameTongues { count: 9, spread: 1.6 }),
             FireKind::Candle | FireKind::Lantern | FireKind::Torch | FireKind::Brazier => None,
         }
+    }
+
+    /// The bed of coals this fire burns on, or `None` for one with no bed worth drawing (a candle's wick, a lantern's, a torch's wrapped
+    /// head). A campfire's is its 0.8 m ring less the stones, a bonfire's the pyre's glowing floor under its tongues, a brazier's the
+    /// coal bed in its bowl. Insert the value on the [`FlameSite`] entity, as [`embers`](Self::embers); the coals follow the site's fire
+    /// (`FlameSite::fire`), breathing with its flicker and glowing on after it is put out. A design default
+    /// (`docs/research/fuel-bed-heat.md`).
+    ///
+    /// ```
+    /// # use bevy_lights::*;
+    /// assert!(FireKind::Torch.bed().is_none());
+    /// for kind in FireKind::ALL {
+    ///     if let Some(bed) = kind.bed() {
+    ///         assert!(bed.problems().is_empty());
+    ///         // The bed is a little narrower than the fuel it sits in.
+    ///         assert!(bed.diameter <= kind.diameter());
+    ///     }
+    /// }
+    /// ```
+    pub fn bed(self) -> Option<FuelBed> {
+        let diameter = match self {
+            FireKind::Candle | FireKind::Lantern | FireKind::Torch => return None,
+            FireKind::Brazier => 0.30,
+            FireKind::Campfire => 0.7,
+            FireKind::Bonfire => 1.9,
+        };
+        Some(FuelBed { diameter, ..FuelBed::default() })
     }
 
     /// The flame and its light in one bundle: [`site`](Self::site) and [`candidate`](Self::candidate),
