@@ -221,3 +221,19 @@ are worth a row, the rest are listed so the next scan does not re-investigate th
 | `Idiomatic Rust- Code like a Rustacean`, `Effective Rust- 35 Specific Ways to Improve Your Rust Code` | Rust idiom books (Anna's Archive imports) | not lighting; the reference for per-frame code that must not allocate or scan |
 | `Evaluation-of-Reverse-Tone-Mapping-through-Varying-Exposure-Conditions` | already listed under *Perception and tone* | re-embedded, unchanged |
 | the mesh, garment, motion-synthesis, retargeting and parameterization papers (`Laplacian-*`, `Instant-Field-Aligned-Meshes`, `Neural-Cages-*`, `MoDi-*`, `Frame-Fields-*`, `Cosserat-Rods-*` and their `_supp` files), the medical, psychology and relationship books and papers (`NEJM200009073431002`, `Fight Right-*`, `Legion A Novel*`) | geometry processing, animation, health | **not lighting** |
+
+## Added by the 2026-10-30 re-scan (iteration 278)
+
+`catalog_recent` (200 rows, 02:04-02:22 UTC on the 31st) is a re-embedding of the SIGGRAPH library (`sig2024_*`, `sig2026_*`, the `s2006`-`s2025` *Advances* courses) plus unrelated books and papers. Read from the on-disk markdown, not from memory. Nothing in it is cinematography, photography or practical-fire craft; the rows that bear on this crate are below, the rest is listed so the next scan does not re-investigate it.
+
+| stem | what it is | use |
+|---|---|---|
+| `s2024-advances-pdf-2-6-mb` | *Seamless cluster rendering on mobile* (SIGGRAPH 2024 *Advances*) | clustered lights on a mobile budget: how many real lights a shipping renderer affords, for `LightPool`'s default sizes |
+| `s2024-advances-pdf-48-mb` | *Hemispherical lighting insights* (SIGGRAPH 2024 *Advances*) | least-squares and spherical-harmonic encodings of irradiance: the technical reference when a practical's wash on a floor is compared with a probe's |
+| `s2024-advances-pdf-7-mb` | Frostbite GIBS (SIGGRAPH 2024 *Advances*) | global illumination a game's lights are added to; context for the pool's bounce-free fill |
+| `sig2024_Area_ReSTIR_Resampling_for_Real-Time_Defocus_and_Antialiasing`, `sig2026_Spatio-Temporal_Control_Variates_with_ReSTIR_for_Real-Time_Rendering` | resampled many-light direct illumination | the technical alternative to a budgeted pool (every light, sampled), as `s2025-advances-materials-9` and `-12` are |
+| `sig2024_Scintilla_Simulating_Combustible_Vegetation_for_Wildfires` | fire spreading through vegetation | forest-fire spread is `bevy_flora`'s, not this crate's (`AGENTS.md`, ownership map); listed so it is not re-read |
+| `s2024-advances-pdf-slides-notes-6mb` (Iwanicki, Activision), `s2024-advances-pdf-slides-notes-5mb`, `s2024-advances-pdf-12-5-mb`, `s2017-advances-pdf-slides-*` (clouds, planar reflections), the rest of `s2006`-`s2025-advances-*` | neural-network, terrain, cloud and reflection talks | **not lighting** (`torch` in the Iwanicki talk is PyTorch) |
+| the `sig2024_*` and `sig2026_*` geometry, simulation, diffusion, cloth, knit, differentiable-rendering and optimisation papers; `transvoxel_*`, `tetgen_*`, `vowels2021`, `thompson2020`, the `schoeller_*` papers, `sexes-05-00047`, `slatkin_effective_python_3rd` | geometry processing, ML, medical and psychology | **not lighting** |
+
+Three `EmbedSkip` rows (`ssrn_1601785`, `sm2_58`, `slatkin_effective_python_3rd`) failed on `503 ... myelin observe` and are unrelated to lighting.

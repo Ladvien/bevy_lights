@@ -41,7 +41,7 @@ Use the engine's culling, and give it the box it needs. Three facts make a flame
 2. **The transform's scale is data.** The catch is the scale's `x` and the wind's lean is the scale's `y` and `z` (`1 +` the lean's `x` and `z`), so that one shared material can still draw a different flame per instance. The engine multiplies the box by that scale, so a box built once for a full-size flame shrinks to a sliver as the flame catches or leans (`1 + lean` is as small as 0.06 at the lean limit). The extents are therefore divided by the scale, axis by axis, every time the scale changes: `flame_cull_extents(height, took, lean)`. The box the frustum test builds is then the same cube of side `2 * FLAME_REACH * size` for every catch and lean, and, because it is a cube about the foot, for every rotation of a parent.
 3. **The box is the crate's, not the engine's.** The flame carries an `Aabb` and `NoAutoAabb`, so `calculate_bounds` leaves it alone; `update_flames` rewrites `half_extents` on exactly the frames it rewrites the scale (a flame in still air costs nothing, as before); `NoFrustumCulling` is gone.
 
-The flame's *light* is untouched: it is the pool's or the host's, and a culled flame is a flame that is out of shot, not a light that is out. The embers (`FlameEmbers`) keep `NoFrustumCulling`: their quad is a separate, smaller cost (iteration 235 measured 0.1 ms for the courtyard's) and is the next item if it matters at scale.
+The flame's *light* is untouched: it is the pool's or the host's, and a culled flame is a flame that is out of shot, not a light that is out. The embers (`FlameEmbers`) kept `NoFrustumCulling` in iteration 277 as a separate, smaller cost (iteration 235 measured 0.1 ms for the courtyard's); at a town's scale that is not so, and the section "Embers" below measures it and gives their quad the same treatment.
 
 What was tried and not done: skipping the brightness write of a flame that is not visible. It saves 0.5 ms at 20 000 flames (5.9 against 6.5 ms) and costs one frame of a stale brightness byte when a flame enters the view (`ViewVisibility` is computed in `PostUpdate`, after `Update`, so the first visible frame is drawn with the byte of the last frame it was). A flame at the frame's edge brightening by up to its depth for one frame is invisible, but 0.5 ms at 20 000 flames is not worth any frame that is wrong.
 
@@ -76,6 +76,85 @@ The 0-flame cell is noise (six more runs with the order reversed read 2.4-5.2 fo
 
 What is left at 20 000 flames is about 0.25 µs a flame, all of it in the main world and the visibility pass: `update_flames`' per-flame work (a parent lookup, the flicker's sines, the tilt law when there is wind) and Bevy's sphere and box test over the boxes. Skipping a hidden flame's brightness saved only 0.5 ms of the 4.3 ms and was dropped (above); a memo of the tilt law by diameter changed nothing measurable under a 3 m/s wind (three alternating runs at 5 000 flames: 2.6-3.4 ms without it, 3.0-3.4 with it) and was dropped too.
 
+## Embers (iteration 278): the second quad a fire draws
+
+`FlameEmbers` adds one more camera-facing quad to a flame (`src/embers.rs`, `src/embers.wesl`), and until this section it carried `NoFrustumCulling`, for the reason the flame once did (its box would be the unit square's). The flame's cull box, built in iteration 277, cannot be reused: the sparks' quad is 3 to 5 flame heights across, against the flame's 1.7.
+
+### Sources
+
+| Source | What it says | Used for |
+|---|---|---|
+| `10.58709_niujhu.v8i3.1694` — Orisayemi & Afabor, as above | "a strong key light from offscreen left throws a shadow on the curtain at the right" | craft: a source off the frame lights the frame; a *source's sparks* must still be there when the fire is half out of it |
+| `10.7456_tojdac.1674124` — Doğaner, citing Bordwell & Thompson | "A table lamp or street lantern on a set is not usually the main source of light ... However, these objects determine the motivation of the light in the scene" | craft: the sparks are what shows the practical is burning; a fire's sparks are part of it, so a half-framed fire keeps them |
+| `10.22630_mgv.2016.25.1.4` — Zeler & Rohleder (Techland), *Particle effect system for the needs of a modern video game using the GPU* | "the frustum culling step. It must be performed for all P_curr particles (including the possibility that dead particles are inside that block)" | production: a shipped particle system culls every particle against every camera before it sorts and draws, and counts the cost of the ones it cannot drop |
+| `s2011-advances-pdf-slides`, Fire/Flamethrowers/Thrusters | "Use vertex shader to extrude particle along velocity to do motion blur/hide strobing" | production: why the sparks are one quad with the motion in its shader, and so why the box must be the quad's |
+| `book_real_time_collision_detection_ericson` §4.1 | "the bounding volume should also be as tight fitting as possible, resulting in a trade-off between tightness and intersection test cost" | technical: the cube about the foot is chosen for its cost, and its slack is priced below |
+| `src/embers.wesl` (`vertex`) and `docs/research/flame-embers.md` | the quad's reach: `RISE_MAX` 2.6, `HALF_WIDTH` 0.7, `MARGIN` 0.35, `DRIFT` 1.5 | the extents below |
+
+### What it costs, measured
+
+`bench_flames` with the new `BENCH_EMBERS=1` (every torch carries `FlameEmbers::default()`), the build of `6e3bb37`, a machine at load average 18, the mean of 300 `App::update()` calls:
+
+| flames | 0 | 5 000 | 20 000 |
+|---|---|---|---|
+| no embers | 1.9 | 3.7 | 9.4 |
+| embers | 1.7 | 9.5 | 46.3 |
+| embers the renderer counted in view | 0 | 5 000 | 20 000 |
+
+So an embered fire off the screen costs 1.2 µs a frame at 5 000 and 1.8 µs at 20 000 (the sort of the transparent phase is not linear), and *every one* of them is counted in view. A town of 5 000 braziers with sparks pays 5.8 ms of a 16.7 ms frame for fires nobody can see; the flames themselves, since iteration 277, cost 1.8 ms of that town.
+
+### Craft principle
+
+The embers are the half of a fire that says it is burning *something*, so the rule that holds for the flame holds for them: they are culled when the last pixel of them has left the frame, and they are there on the first pixel that enters. They are also the half that reaches furthest. A torch at the frame's left edge, its flame already out of shot, still throws sparks that drift back across the edge in a wind; a cull box fitted to the flame would delete them, and the audience would see a fire that sheds sparks only when it is fully in frame. The box is therefore the quad's, not the flame's.
+
+### How shipping games do it
+
+Techland's particle system does the culling first and the rest for what survives: "the frustum culling step. It must be performed for all P_curr particles (including the possibility that dead particles are inside that block)", after which the survivors' "indices are known" and are sorted by distance for drawing. The cost a particle that cannot be seen still imposes is the reason the authors pursue "the reduction of the P_prev value". This crate draws its sparks as one quad a fire, so the per-particle test is a per-quad test, and the CPU's box (Bevy's `check_visibility`) is the place to make it.
+
+### Model adopted
+
+Give the ember quad its own `Aabb` and `NoAutoAabb`, exactly as the flame has, and rewrite it on the frames its scale changes. The quad is the flame's child at the identity, so it inherits the flame's instance scale (`took`, `1 + lean`) and the box is divided by it axis by axis for the same reason (`flame_cull_extents`' fact 2).
+
+The shader's vertex stage puts every corner at `origin + right * across * size + screen_up * climb * size`, where `right` and `screen_up` are perpendicular unit vectors (`screen_up` is a normalised cross product) and `size` is the flame's drawn height (`height * took^(2/3)`, the flame's own). So a corner is `size * sqrt(across^2 + climb^2)` from the foot, and a ball about the foot holds the quad from every side. Its extents, from the constants in `src/embers.wesl`:
+
+- `climb` runs from `-MARGIN` to `RISE_MAX * cos(elevation) + MARGIN`, at most `2.6 + 0.35 = 2.95`;
+- `across` runs from `-HALF_WIDTH + min(reach, 0)` to `HALF_WIDTH + max(reach, 0)`, where `reach = DRIFT * RISE_MAX * (lean . right)`, so at most `0.7 + 1.5 * 2.6 * |lean| = 0.7 + 3.9 |lean|`.
+
+The reach of the ball is therefore `sqrt((0.7 + 3.9 |lean|)^2 + 2.95^2)` flame heights: 3.03 in still air and 5.27 at the lean limit of `sin 70° = 0.94`. It depends on the lean, so the extents take the lean (`ember_cull_extents(height, took, lean)`) and the box is rewritten with the scale, on the same frames; a fire in still air is written once.
+
+The box covers the *quad*, not the sparks. The sparks climb at most 1.5 flame heights (`rise_start` 0.8 plus `speed / DRAG` times the drag's decay) and the quad rises to 2.6, so the box is looser than the sparks need; but a box that tracks the quad is one constant to keep in step with the shader, where one that tracks the sparks is the sparks' whole law, and Ericson's trade-off is paid in a cull that comes a flame's width late for fires at the very edge of the frame, which costs nothing a viewer can see.
+
+### Parameters
+
+| Parameter | Value | Source |
+|---|---|---|
+| ember quad half width | 0.7 flame heights | `HALF_WIDTH` in `src/embers.wesl`, mirrored |
+| ember quad rise | 2.6 | `RISE_MAX`, mirrored |
+| ember quad margin | 0.35 | `MARGIN`, mirrored |
+| spark drift against the lean | 1.5 | `DRIFT`, mirrored |
+| the ball's reach | `sqrt((0.7 + 3.9 L)^2 + 2.95^2)` flame heights, `L` the lean's length | derived above; the test below fails if any of the four constants above is lowered |
+
+### Validation targets
+
+- **No culled ember quad has a point on screen.** The same sweep as the flame's (40 000 random flames, catches, leans to the shader's 0.995, parents turned any way, cameras at any distance and elevation) over a port of the ember vertex stage's corners; a quad any point of which is inside the frame is never culled by Bevy's own sphere and box test. Fails with `RISE_MAX` or `DRIFT` raised in the shader's port without the model following, and with the scale left undivided.
+- **The box keeps its world size through a catch and a lean**, every frame of a kindle in a 3 m/s wind.
+- **The box follows the flame's scale on the same frame**: an ember quad's box is never one frame behind its flame's scale.
+- **Off-screen embers are cheap**: with about twenty fires in view, a town whose torches all shed sparks costs at most 1.5 times the same town without sparks at 5 000 flames (2.6 times before: 9.5 ms against 3.7), and `embers_visible` is the fires in view and not the fires in the world. (The first draft of this target was "a third of the 9.5 ms", 3.2 ms, which is below the floor: the flames alone, with no sparks at all, cost 3.7 ms in that run, so no cull of the sparks could reach it. The target is restated against the floor, and the restatement is recorded here.)
+- **Nothing visible changes**: the courtyard's captures (four braziers and 48 torches, embers on) at the default, ground, graze, top-down and closefire cameras and a sweep that carries every fire across both frame edges differ from the old build by GPU noise only.
+
+### Results (iteration 278)
+
+`bench_flames`, the new bench over the old and over the new `src/`, best of three alternating runs, `BENCH_EMBERS=1`, mean ms a frame, on a machine at load average 15-26:
+
+| | 5 000 flames | 20 000 flames | 5 000, `BENCH_WIND=3,0` | `embers_visible` |
+|---|---|---|---|---|
+| before (`NoFrustumCulling`) | 11.5 | 37.2 | 8.8 | every quad in the world |
+| after (the quad's own box) | 4.2 | 9.2 | 3.6 | 18-21 |
+
+The residual, with the same binary and `BENCH_EMBERS` 0 against 1 at 5 000 flames, interleaved three times at load average 43: 7.5, 6.1, 5.8 ms without sparks and 9.3, 7.9, 8.0 with, so an embered fire off the screen costs 0.4 µs a frame (1.2 µs before): the ratio is 1.2-1.4, inside the 1.5 target. The 0.4 µs is `update_embers`' per-quad query and box comparison and Bevy's visibility pass over a second box a fire.
+
+Nothing visible changed. Eighteen captures of the courtyard (`LIGHTS_EMBERS=6`, 1280x720, 600 frames at a fixed step, 300 for the sweep; default, ground, edge, top-down, graze and closefire cameras, two more seeds with pool 4 and 16, a cut-edge shot in a 2 m/s wind and a nine-step sweep of the camera's aim from x = -16 to +16 with fires crossing both frame edges) are bit-identical to the old build's except one pixel of one DN in four of them; and a 51-frame sequence (every second frame from 30) with the aim at x = -14, a gusting 2,1 m/s wind and `LIGHTS_EMBERS=8` differs by one DN in one pixel of one frame.
+
 ## What great looks like
 
 Nothing: a culling change is great when it cannot be seen. A flame slides off the edge of the frame and back on without a pop, a flicker, or a frame of the wrong size, at any camera angle, in wind, and while it catches; the same scene with a thousand more fires in the world costs the frame what the fires in view cost it.
@@ -86,4 +165,4 @@ Nothing: a culling change is great when it cannot be seen. A flame slides off th
 
 ## Pending index
 
-None. The three sources above are in the corpus and were read from its markdown; `distill_search` was not needed.
+None. Every source above is in the corpus and was read from its markdown (`distill_search` was up and not needed). The Techland paper and Ericson's book were not in this note's list before iteration 278.
