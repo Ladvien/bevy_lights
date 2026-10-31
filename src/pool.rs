@@ -21,10 +21,12 @@ use crate::model::pool::{
     fade_factor, fade_out_factor, focus_quota, preferred, quota_cutoff, shadow_set, shared_value,
 };
 use crate::model::{
-    DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, SNUFF_SECONDS, kindle_gain, lean_light_shift, snuff_gain,
+    DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, SNUFF_SECONDS, kindle_gain, lean_light_shift, relative_air,
+    snuff_gain,
 };
+use crate::motion::MovingSites;
 use crate::{FADE_SECONDS, HYSTERESIS, LightsSystems, chain_sets};
-use crate::{FlameSite, FlameWind};
+use crate::{FlameMotion, FlameSite, FlameVelocity, FlameWind};
 
 /// [`LightPoolPlugin`]: keeps [`LightPool::size`] real lights and hands them to the nearest
 /// [`PoolCandidate`]s.
@@ -770,8 +772,10 @@ fn assign_pool<F: Component>(
     focus: Query<&GlobalTransform, With<F>>,
     candidates: CandidateRead,
     fires: Query<(Option<&Kindle>, Option<&Snuff>), With<PoolCandidate>>,
-    sites: Query<&FlameSite>,
+    sites: Query<(&FlameSite, &FlameVelocity)>,
     wind: Option<Res<FlameWind>>,
+    motion: Option<Res<FlameMotion>>,
+    moving: Option<Res<MovingSites>>,
     mut slots: Query<(Entity, &PoolLight, &mut Transform, &mut Visibility, &mut Flicker, &mut PointLight)>,
     mut state: Local<HandOffState>,
     time: Res<Time>,
@@ -1200,21 +1204,27 @@ fn assign_pool<F: Component>(
     // one that names it as its `fire`. `diameter` is the candidate's own fire diameter, if it gives one.
     // One rule for the slot and for the reserve fading the same light out, so the two ends of a cross-fade
     // cannot stand apart.
+    let wind_velocity = wind.as_deref().map_or(Vec2::ZERO, |wind| wind.velocity);
+    let gain = motion.as_deref().map_or(1.0, |motion| motion.gain);
+    let searching = wind_velocity != Vec2::ZERO || moving.as_deref().is_some_and(|moving| moving.0 > 0);
     let lean_of = |entity: Entity, diameter: Option<f32>| -> Vec3 {
-        match &wind {
-            Some(wind) if wind.velocity != Vec2::ZERO => {
-                match sites.get(entity).ok().or_else(|| sites.iter().find(|s| s.fire == Some(entity))) {
-                    Some(site) => {
-                        let speed = wind.velocity.length();
-                        let diameter = diameter.or(site.diameter).unwrap_or(DEFAULT_FIRE_DIAMETER);
-                        let toward = wind.velocity / speed;
-                        Vec3::from(lean_light_shift(site.height, speed, diameter, [toward.x, toward.y]))
-                    }
-                    None => Vec3::ZERO,
-                }
-            }
-            _ => Vec3::ZERO,
+        // The candidate's own site is one lookup; the site that names it as its `fire` is a search, so with nothing blowing and
+        // nothing moving it is not made.
+        let found = sites.get(entity).ok().or_else(|| {
+            searching.then(|| sites.iter().find(|(site, _)| site.fire == Some(entity))).flatten()
+        });
+        let Some((site, travel)) = found.map(|(site, travel)| (site, travel.ground)) else {
+            return Vec3::ZERO;
+        };
+        // The air the fire meets: the wind less the fire's own velocity, as the flame's lean is drawn from.
+        let air = Vec2::from(relative_air(wind_velocity.to_array(), travel.to_array(), gain));
+        let speed = air.length();
+        if !(speed > 0.0 && speed.is_finite()) {
+            return Vec3::ZERO;
         }
+        let diameter = diameter.or(site.diameter).unwrap_or(DEFAULT_FIRE_DIAMETER);
+        let toward = air / speed;
+        Vec3::from(lean_light_shift(site.height, speed, diameter, [toward.x, toward.y]))
     };
 
     for (_, slot, mut transform, mut visibility, mut flicker, mut light) in &mut slots {

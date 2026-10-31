@@ -89,6 +89,7 @@ mod fire;
 mod flame;
 mod flicker;
 mod kind;
+mod motion;
 mod pool;
 mod report;
 mod smoke;
@@ -103,16 +104,18 @@ pub use kind::{FireKind, UnknownFireKind};
 pub use model::{
     CALM_FLICKER_DEPTH, DEFAULT_BED_COOLING, DEFAULT_FIRE_DIAMETER, EMBER_AT, FADE_SECONDS, FIRE_KELVIN,
     FLAME_REACH, FLAME_TILT_LIMIT, FLICKER_DEPTH, HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY,
-    MAX_FLICKER_DEPTH, MAX_TONGUES, MERGE_RATIO, MOON_KEY, Problem, ProblemKind, RANGE_MARGIN,
-    SMOKE_TAIL_SECONDS, SNUFF_SECONDS, Tongue, WHIPPING_FLICKER_DEPTH, bed_drawn_heat, bed_heat_step,
-    bed_radiance, bed_visible_heat, blackbody_colour, blackbody_luminance, blackbody_radiance, char_field,
-    char_radiance, char_tile, coal_radiance, ember_cull_extents, ember_reach, fade_factor, fill_for,
-    fire_lumens, fire_lux, fire_phase, fire_reach, flame_cull_extents, flame_light_offset, flame_mid,
-    flame_tilt, flame_tongue, flicker_depth, flicker_factor, flicker_mean, flicker_swing, focus_quota,
-    ground_lux, ground_ramp, ground_reach, hand_off, key_to_fill, kindle_gain, lean_light_shift,
-    pack_flame_tag, preferred, quota_cutoff, raised_light, retint, shadow_set, shared_value, snuff_gain,
-    stops, unpack_flame_tag, white_balanced,
+    MAX_FLICKER_DEPTH, MAX_TONGUES, MAX_TRACKED_SPEED, MERGE_RATIO, MIN_TRACKED_SPEED, MOON_KEY,
+    MOTION_RESPONSE, Problem, ProblemKind, RANGE_MARGIN, SMOKE_TAIL_SECONDS, SNUFF_SECONDS, Tongue,
+    WHIPPING_FLICKER_DEPTH, bed_drawn_heat, bed_heat_step, bed_radiance, bed_visible_heat, blackbody_colour,
+    blackbody_luminance, blackbody_radiance, char_field, char_radiance, char_tile, coal_radiance,
+    ember_cull_extents, ember_reach, fade_factor, fill_for, fire_lumens, fire_lux, fire_phase, fire_reach,
+    flame_cull_extents, flame_light_offset, flame_mid, flame_tilt, flame_tongue, flicker_depth,
+    flicker_factor, flicker_mean, flicker_swing, focus_quota, ground_lux, ground_ramp, ground_reach,
+    hand_off, key_to_fill, kindle_gain, lean_light_shift, pack_flame_tag, preferred, quota_cutoff,
+    raised_light, relative_air, retint, shadow_set, shared_value, smooth_velocity, snuff_gain, stops,
+    unpack_flame_tag, white_balanced,
 };
+pub use motion::{FlameMotion, FlameVelocity};
 pub use pool::{FocusRule, LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
 pub use smoke::{FlameSmoke, MAX_SMOKE_DENSITY};
 pub use tongues::{FlameTongue, FlameTongues};
