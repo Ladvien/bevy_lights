@@ -8,7 +8,7 @@
 //! window and no display; and prints one line:
 //!
 //! ```text
-//! bench_flames flames=5000 visible=21 embers=0 embers_visible=0 smoke=0 smoke_visible=0 tongues=0 beds=0 beds_visible=0 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
+//! bench_flames flames=5000 fire=0 visible=21 embers=0 embers_visible=0 smoke=0 smoke_visible=0 tongues=0 beds=0 beds_visible=0 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
 //! ```
 //!
 //! `visible` is the number of flames the renderer counted as in view at the last frame (a fire's tongues are flames too), which is what
@@ -70,7 +70,7 @@ fn main() {
     ))
     .insert_resource(FlameWind { velocity: wind.unwrap_or_default() })
     .add_systems(Startup, move |commands: Commands, images: ResMut<Assets<Image>>| {
-        scene(commands, images, flames, embers, smoke, tongues, beds, fire)
+        scene(commands, images, flames, Dress { embers, smoke, tongues, beds, fire })
     });
     if fire == 1 {
         app.add_plugins(FirePlugin);
@@ -119,17 +119,19 @@ fn main() {
     );
 }
 
-/// The torches, and one camera at the grid's corner, drawing to an image no one reads.
-fn scene(
-    mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    flames: usize,
+/// What each torch is given besides its flame (the `BENCH_*` switches).
+#[derive(Clone, Copy)]
+struct Dress {
     embers: bool,
     smoke: bool,
     tongues: u8,
     beds: bool,
     fire: u8,
-) {
+}
+
+/// The torches, and one camera at the grid's corner, drawing to an image no one reads.
+fn scene(mut commands: Commands, mut images: ResMut<Assets<Image>>, flames: usize, dress: Dress) {
+    let Dress { embers, smoke, tongues, beds, fire } = dress;
     let mut target = Image::new_fill(
         Extent3d { width: 1280, height: 720, depth_or_array_layers: 1 },
         TextureDimension::D2,
