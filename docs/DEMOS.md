@@ -200,6 +200,43 @@ LIGHTS_FRAMES=300 LIGHTS_COLOURS=1 LIGHTS_EMBERS=4 LIGHTS_EYE=-5,2.6,8.4 LIGHTS_
 
 A coloured fire is judged by whether the light it throws and the flame it is drawn on are one colour: the stone beside the brazier should lean to the flame's hue and the nearest torch-bearer's near side take it, and the rim and core of the flame should read as the orange flame's do (a darker, more saturated rim, a paler core). A pool light that changes owner between two colours changes colour while it is fading in from nothing, so no frame should depart from the mean of its neighbours by more than the pool's usual pop test in any channel: record a sequence (`LIGHTS_FOCUS_WALK=18 LIGHTS_POOL=4 LIGHTS_HYSTERESIS=1.0 LIGHTS_SHOT_DIR=... LIGHTS_SHOT_EVERY=1 LIGHTS_SHOT_FROM=100`) and plot each channel's mean per frame.
 
+## Seeing the depth fade (`examples/occlusion`)
+
+A torch behind a wall edge leaves a tongue of fire hanging over the stone with nothing under it, unless
+its site has `FlameSite::depth_fade` and its camera a `DepthPrepass` (`docs/research/flame-occlusion.md`).
+`examples/occlusion` is that scene: three torches — one behind the wall, one on its face, one past its end
+— and `LIGHTS_DEPTH_FADE=1` turns the fade on, so the same run is the comparison. `LIGHTS_PAN=1` swings
+the camera down the wall's length, which is what carries the hidden torch's source out past the wall's end
+and back into view:
+
+```sh
+# the pan: the flame goes out while the stone hides its source (big has no display, so Xvfb)
+LIGHTS_FRAMES=272 LIGHTS_PAN=1 LIGHTS_DEPTH_FADE=1 LIGHTS_SHOT_DIR=/tmp/fade \
+  LIGHTS_SHOT_FROM=1 LIGHTS_SHOT_EVERY=2 xvfb-run -a -s "-screen 0 1280x720x24" \
+  ./target/release/examples/occlusion
+# and the two stills it is judged by
+for f in 0 1; do
+  LIGHTS_FRAMES=200 LIGHTS_DEPTH_FADE=$f LIGHTS_EYE=-2.2,1.9,4.2 LIGHTS_LOOK=-2.5,1.9,-1.2 \
+    LIGHTS_SHOT=/tmp/depthfade_$f.png xvfb-run -a -s "-screen 0 1280x720x24" ./target/release/examples/occlusion
+done
+```
+
+`docs/media/depth-fade.gif` is frames 9 to 136 of the first run (the first eight saved frames are black:
+the flame material's pipeline is still compiling), renumbered from 0 and encoded at `FPS=15 STRIDE=2
+WIDTH=640`; 64 frames, 172 KB. `docs/media/depth-fade.png` is the two stills, each cropped to 360 × 230 at
+`+470+250`, doubled with `-filter point`, captioned and appended.
+
+What to look for, and what to measure:
+
+- **The flame's presence follows the source, not the frame.** Read on the region above the wall
+  (`-crop 640x300+320+120`), the peak grey level is 183 to 210 of 255 while the source is visible and 24 at the end of the pan, when the wall is between; the fade is a few pixels of the wall's edge, not a pop.
+- **The comparison still measures it.** The region above the wall (`-crop 160x170+560+260` of the
+  full frame, which is `-crop 720x420+380+280` before the 2x scale and the splice): 1 542 pixels above 60
+  with `LIGHTS_DEPTH_FADE=0`, a peak of 162, and none with it on, a peak of 24.
+- **A site that does not ask for it is unchanged.** `depth_fade: false` (every example's default except
+  this one) draws exactly as before, with no depth read and no `DepthPrepass` needed: the courtyard's
+  captures are pixel-identical to the build before the feature.
+
 ## Seeing a cross-faded hand-off
 
 The pool's `reserve` light is what makes a hand-off cross-fade rather than dip. The example takes

@@ -21,7 +21,10 @@ fn quick_start() -> String {
     let readme = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("README.md");
     let text = std::fs::read_to_string(&readme).expect("the crate ships its README");
     let after = text.split_once("## Quick start").expect("the README has a Quick start section").1;
-    let body = after.split_once("```rust").expect("the section opens a rust block").1;
+    // The fence may carry a rustdoc attribute — `rust,no_run`, because the program opens a window and
+    // `src/lib.rs` compiles this README as a doctest too, which must not run it.
+    let (_, body) = after.split_once("```rust").expect("the section opens a rust block");
+    let body = body.strip_prefix(",no_run").unwrap_or(body);
     let source = body.split_once("```").expect("and closes it").0;
     assert!(source.contains("fn main"), "the block is a program, not a fragment: {source}");
     source.to_string()

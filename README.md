@@ -1,424 +1,109 @@
 # bevy_lights
 
-Practical lights for Bevy 0.20: fires that flicker and flare as they kindle, a budgeted pool of real
-lights placed over thousands of virtual ones, and billboard shader flames.
+Practical lights for Bevy: the fires a scene's props actually carry — a budgeted pool of real lights
+over thousands of virtual ones, with shader flames and the flicker that makes them read.
 
+> ⚠️ **Vibe Coded.** Written by AI agents working from a human's direction, covered by tests rather than a line-by-line human review. Read the code before you rely on it for something you care about.
+
+[![crates.io](https://img.shields.io/crates/v/bevy_lights.svg)](https://crates.io/crates/bevy_lights)
+[![docs.rs](https://docs.rs/bevy_lights/badge.svg)](https://docs.rs/bevy_lights)
 [![CI](https://github.com/bevy-coven/bevy_lights/actions/workflows/ci.yml/badge.svg)](https://github.com/bevy-coven/bevy_lights/actions/workflows/ci.yml)
+[![Bevy](https://img.shields.io/badge/bevy-0.20-blue.svg)](https://bevyengine.org)
+[![licence](https://img.shields.io/badge/licence-MIT%20OR%20Apache--2.0-blue.svg)](#who-and-licence)
 
-> ⚠️ **Vibe Coded**
->
-> This crate was written with heavy LLM assistance, under human direction and review. Every model is
-> researched and every default is cited or marked a design default; the code is tested, gated in CI
-> and reviewed against captures. It is still code an agent wrote, and you should treat it as such.
+![Four braziers, each with a real light of its own, and 48 torch-bearers sharing an 8-light pool in a dark courtyard](docs/media/showcase.gif)
 
-![Four braziers, each with a real light of its own, and 48 torch-bearers sharing an 8-light pool](docs/media/showcase.gif)
+*`examples/courtyard`: four braziers burning with real lights and a 0.34 m bed of coals, and 48 walking torch-bearers whose flames lean back as they walk, sharing eight pooled lights of which three cast shadows.*
 
-*Two seconds of `examples/courtyard`, 400 × 225 at 30 fps: four braziers — real lights, each with a
-`Kindle` and a 0.34 m coal bed, which the puffing law sizes to `1.5/√0.34 ≈ 2.57 Hz` — and 48
-torch-bearers, each a `PoolCandidate`, sharing the example's eight pooled real lights, of which the three best-ranked cast shadows (`LightPool::max_shadowed`); every figure throws a shadow from the braziers and from those three. Each brazier also throws `FlameEmbers` (`LIGHTS_EMBERS=4` in the capture, the example's default is off). The torch-bearers are walking, and their flames lean back from their motion (`FlameMotion`; the braziers, standing still, are upright). The clip opens
-while the courtyard is still lighting up and the fires breathe from there; the coals are the
-`char_field` texture the example builds at startup. The opening cannot show a **flame** catching: a
-flame's catch runs on `Time<Real>`, and on a headless capture the material's first pipeline compile
-outlasts `KINDLE_SECONDS`. A *re*-light does not have that problem, so the catch is the next clip.
-[`docs/DEMOS.md`](docs/DEMOS.md) has that trap and the frequencies measured in this file. The same
-courtyard at 640 × 360 is [`courtyard.gif`](docs/media/courtyard.gif).
+**Status:** usable · Bevy 0.20 · MSRV 1.97.1
 
-![The courtyard's fires put out and lit again: the light and the flame fall away together, then catch together](docs/media/relight.gif)
-
-*`LIGHTS_SNUFF=1.0 LIGHTS_RELIGHT=2.3` on the same courtyard, 400 × 225 at 30 fps, 64 frames (about 2.1 s): every
-brazier and torch is snuffed (`Snuff`, 1.2 s) so the stone falls to the cool moonlight with only the coals glowing,
-then re-lit (`Kindle`), and each flame grows out of its coals as its light flares up; sparks are `FlameEmbers`.
-
-## What you get
-
-- **Flickering, kindling fires** (`FlickerPlugin`): a point or spot light modulated below its base by a
-  summed sine, at a rate its fuel bed sets and a depth the host chooses, plus a `Kindle` that flares a
-  fire up over 0.6 s and a `Kindled` message for the sound of it, and a `Snuff` that puts one out over 1.2 s
-  (light and linked flame together) with a `Snuffed` message for the hiss; both work on a pooled torch too, via its `PoolCandidate`,
-  and a pooled fire that stays out costs the pool less than one that is lit, however many there are.
-- **A budgeted pool of real lights** (`LightPoolPlugin::<YourFocusMarker>`): a fixed number of real
-  point lights handed to the best-ranked candidates around the entity carrying your focus marker (or, with
-  `FocusRule::Shared`, one per viewer, as in split-screen co-op),
-  with hysteresis, a cross-fade and a per-frame hand-off budget, so a light that changes owner does not
-  pop — and a shadow budget, so only the nearest few cast shadows and a shadow that moves fades rather
-  than pops.
-- **Flames drawn where the fire is** (`FlamePlugin`): one additive billboard material and one draw per
-  flame, each breathing on the same curve as the light it motivates — and at that light's own rate,
-  phase and depth when the site is given them, and catching again or going out when its light is re-lit or snuffed (`FlameSite::fire`).
-  A fire carried or swung leans against its own motion, so a torch-bearer's flame streams behind them (`FlameMotion`). A fire can shed sparks (`FlameEmbers`) and go on up as a lit plume of smoke (`FlameSmoke`) that bends over in a wind, and a fire that is put out leaves a trail of that smoke lifting off and thinning for five seconds after its flame is gone. A fire wider than it is tall (a campfire, a bonfire) burns as a mound of tongues (`FlameTongues`), not one slender flame, on a bed of coals (`FuelBed`) that breathes with it and glows on, cooling, after it is put out.
-- **A whole fire as one component** (`FirePlugin`, `Fire`): `Fire::lit(FireKind::Campfire, 250.0, 0.4)` on an entity gives it the kind's flame, the light the pool hands it, and its sparks, smoke, tongues and bed of coals, each fire on a clock of its own and in one colour if you name one; it is `serde`, so a placed fire is one line of a scene file.
-- **The maths as plain functions** (`bevy_lights::model`): the flicker law and its depth, the kindle,
-  the pool's hold-and-fade rules, the cinematographer's key against fill, the blackbody, and the
-  temperature field of a fuel bed — no `bevy` in any of them, so a host can reuse them in its own
-  systems.
-
-## Install
-
-`0.5` is on crates.io:
-
-```toml
-[dependencies]
-bevy_lights = "0.5"
-```
-
-Everything this README describes is in that release. `main` may be ahead of it (`CHANGELOG.md`'s
-`Unreleased`); depend on the branch if you want that:
-
-```toml
-[dependencies]
-bevy_lights = { git = "https://github.com/bevy-coven/bevy_lights", branch = "main" }
-```
-
-The crate is pinned to Bevy 0.20; its MSRV is Rust 1.97.1. `serde` is an optional feature: it derives
-`serde` on the components and resources a host saves — `Flicker`, `Kindle`, `Snuff`, `PoolCandidate`, `PoolLight`,
-`FlameSite`, `FlameLook`, `Rank`, `LightPool` — and turns on Bevy's own `serialize` for the colours they carry.
-`PointLight` has no serde derive, so `LightPool` saves its slot template as the fields the pool copies onto
-its lights — all of them but `intensity` — and every field is optional on the way in.
+**Why:** Bevy will happily shade a hundred `PointLight`s and give you no way to choose which hundred of
+your thousand torches they are — this crate ranks candidates by the light they put on you, hands the
+budget over without a pop, and draws the flame that motivates each one.
 
 ## Quick start
 
-```rust
+```sh
+cargo add bevy_lights
+```
+
+```rust,no_run
 use bevy::prelude::*;
 use bevy_lights::*;
 
-/// The one thing the pool measures distance from: your camera focus, your player, a squad.
 #[derive(Component)]
 struct MyFocus;
 
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
-        .add_plugins((
-            FlickerPlugin,
-            LightPoolPlugin::<MyFocus>::default(),
-            FlamePlugin,
-            FirePlugin,
-        ))
-        .add_systems(Startup, setup)
+        .add_plugins((FlickerPlugin, LightPoolPlugin::<MyFocus>::default(), FlamePlugin, FirePlugin))
+        .add_systems(Startup, |mut commands: Commands| {
+            let fire = Fire::lit(FireKind::Campfire, 250.0, 0.35);
+            commands.spawn((fire, Transform::from_xyz(4.0, 0.0, 2.0)));
+            commands.spawn((MyFocus, Transform::default()));
+        })
         .run();
-}
-
-fn setup(mut commands: Commands) {
-    // A whole fire is one component. A campfire: the kind's flame, tongues, bed of coals, sparks and
-    // smoke, and a light the pool hands it when it is near, sized so its pool puts 250 lx on the ground
-    // at its edge (the light sits in the flame: 0.35 m up). Every fire gets a clock of its own.
-    commands.spawn((Fire::lit(FireKind::Campfire, 250.0, 0.35), Transform::from_xyz(4.0, 0.0, 2.0)));
-    // A torch in a colour of its own: the light is that colour and the flame is the same hue.
-    commands.spawn((
-        Fire { color: Some(Color::srgb(0.2, 0.9, 0.3)), ..Fire::new(FireKind::Torch) },
-        Transform::from_xyz(-2.0, 1.5, 3.0),
-    ));
-
-    // The same parts by hand, when you want every number yourself. A brazier with a real light of its
-    // own, sized by the pool it lights (1000 lx at 4 m, from 0.9 m up) and coloured by the temperature
-    // it burns at.
-    let lumens = fire_lumens(1000.0, 4.0, 0.9);
-    let [r, g, b] = blackbody_colour(1900.0, 1.0);
-    commands.spawn((
-        PointLight { color: LinearRgba::rgb(r, g, b).into(), intensity: lumens, range: 10.0, ..default() },
-        // `diameter` sizes the flicker by the fuel bed (`f = 1.5/√D` Hz); `None` uses the un-sized rate.
-        Flicker { phase: 0.0, diameter: Some(0.34), ..Flicker::at_mean(lumens, FLICKER_DEPTH) },
-        Kindle::default(),
-        // `kindle` grows the flame with its light, on the same 0.6 s envelope, and `diameter` matches
-        // the `Flicker`'s so the drawn flame breathes at the same rate the light does. `depth` is how
-        // far it dips: give the flame the same one as its light, or the two disagree.
-        FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS, diameter: Some(0.34), depth: FLICKER_DEPTH, depth_fade: false, fire: None, color: None },
-    ));
-
-    commands.spawn((MyFocus, Transform::default()));
-
-    // The fill: what the fires read against. The crate does not own the moon — a host adds the light and
-    // asks the crate for the illuminance that makes the ratio it wants.
-    commands.spawn(night_fill());
-}
-
-/// The night's fill: two stops under the fire. The crate does not own the moon, so the host adds it
-/// and asks the crate for the illuminance.
-fn night_fill() -> DirectionalLight {
-    let [r, g, b] = white_balanced(8000.0, 2856.0, 1.0);
-    DirectionalLight {
-        color: LinearRgba::rgb(r, g, b).into(),
-        illuminance: fill_for(1000.0, MOON_KEY),
-        ..default()
-    }
 }
 ```
 
-A light you want to be able to *re-light* is re-inserted with `Kindle::default()`, which writes
-`Kindled` again. A fire you want dimmer or brighter is changed through the `Flicker` (`set_mean`, never the light's
-`intensity`: the crate writes the intensity every frame).
+`Fire::lit(kind, lux, over)` is a whole fire in one component: the kind's flame, the light the pool hands
+it, its sparks, smoke, tongues and bed of coals, each on a clock of its own. For every number spelled out
+by hand, [`fires.md`](docs/guide/fires.md) has the same fire as loose components.
 
-`examples/courtyard.rs` is the full showcase, `examples/bench_lights.rs` the CPU bench for the pool and the flicker, and `examples/bench_flames.rs` the bench for thousands of flames with few of them on screen (it renders off-screen and needs a GPU adapter).
+`serde` is an optional feature (`cargo add bevy_lights --features serde`) that derives `serde` on the
+components and resources a host saves, so a placed fire is one line of a scene file.
 
-## Features
+## Try it
 
-### Fires: flicker, depth and kindle
+```sh
+cargo run --release --example courtyard
+```
 
-Every `PointLight` and `SpotLight` carrying `Flicker` is modulated **below** its base intensity by a
-summed sine: the multiplier runs `1 - 2·depth ..= 1`, so `Flicker::base` is the fire's brightest moment
-and a deeper flicker is a darker trough rather than a brighter crest. At the default `Flicker::depth`
-of `FLICKER_DEPTH` that is 0.70–1.00 of base with a mean of 0.85 — the window a lumen budget written
-against the mean assumes. `Flicker::depth` is how far that fire dips, so a lantern can ask for 0.03 and
-a gusting torch for 0.3; `flicker_depth` clamps the value to `0..=MAX_FLICKER_DEPTH` (0.5, the deepest
-whose trough is still zero) and reads a `NaN` as the default. `CALM_FLICKER_DEPTH` (0.05) and `WHIPPING_FLICKER_DEPTH` (0.3) name the two ends, and `flicker_mean(depth)` is the multiplier's mean, so a budget is written with `Flicker::at_mean(lumens, depth)` (or `PoolCandidate::at_mean`) rather than a hand-divided `0.85`. A system that rewrites a light's lumens every frame calls `Flicker::set_mean`, and a fire that changes how it breathes calls `Flicker::set_depth`, which keeps the mean: a deeper depth never silently dims the fire.
+That is the courtyard the GIF above shows. `cargo run --release --example fires` is the same crate as six
+single fires — a candle to a bonfire — one per run: `LIGHTS_KIND=bonfire cargo run --release --example fires`.
 
-Give a fire its fuel-bed size (`Flicker { diameter: Some(0.34) }`) and its flicker runs at the measured
-puffing rate, `1.5/√D` Hz — a brazier at 2.6 Hz, a pyre at 0.75 — so a large fire breathes more slowly
-than a small one. `diameter: None` is the crate's inherited un-sized rate, for a fire whose size is not
-modelled.
+![The six fire kinds, each one Fire component on an otherwise empty entity, each with its flame, the pool its light throws on the ground, and its own sparks, smoke, tongues and bed of coals](docs/media/fires.png)
 
-**Fire kinds.** `FireKind::{Candle, Lantern, Torch, Brazier, Campfire, Bonfire}` (`FireKind::ALL`, serde as the name) bundles a fuel-bed diameter, a flicker depth and a flame height, so a picker or a project file stores one word: `FireKind::Torch.flicker(lumens)` is a `Flicker` averaging `lumens` and `FireKind::Torch.site()` a `FlameSite`, built from the same three numbers so the light and its flame breathe together (spell the rest with `..`: `FlameSite { phase: 1.3, ..FireKind::Torch.site() }`). `rate()` is the puffing law at that size, 13 Hz for a candle to 0.87 Hz for a bonfire. Only the brazier row is a number the crate shipped before; the rest are design defaults (`docs/research/fire-kinds.md`). `LIGHTS_KIND=<name>` dresses the courtyard's braziers as a kind. `FireKind::reach()` is the metres of ground a kind lights to its pool's edge (1 m for a candle to 9 m for a bonfire), and `FireKind::light(lux, over)` is the `Flicker` whose lumens put `lux` there, so a picker places a fire without typing a lumen number; the brazier's 4 m and the torch's 2 m are the courtyard's own pools, the rest design defaults (`docs/research/fire-reach.md`).
+*`LIGHTS_KIND=<kind> cargo run --release --example fires`: a candle, a lantern, a torch, a brazier, a campfire and a bonfire, the camera standing the same number of flame heights back each time.*
 
-A light with `Kindle` flares up over `KINDLE_SECONDS` (0.6 s) instead of switching on, on
-`kindle_gain`'s curve: a smoothstep with a flare running ahead of it, so it is 0.85 of the way at half
-time, tips nine tenths of one percent above its base at about 0.46 s, and settles at exactly 1.
-`Kindled { entity }` is the message a host hears on the frame a fire catches, for the sound of it. An
-invisible light is not rewritten (nothing is extracted for it) but its kindle still counts.
+## What you can do
 
-**A whole fire.** A fire is up to six components that must agree (`FlameSite`, `PoolCandidate`, and for the kinds that have them `FlameEmbers`, `FlameSmoke`, `FlameTongues`, `FuelBed`), and `Fire` is the one value that writes them: `Fire::lit(FireKind::Campfire, 250.0, 0.4)` (a kind, and the lux its pool puts on the ground at its edge from a light 0.4 m up) or `Fire { color: Some(blue), ..Fire::new(FireKind::Torch) }`. `FirePlugin` (add it with `FlamePlugin`, `FlickerPlugin` and `LightPoolPlugin`, which it reports missing rather than adds) gives the entity the kind's flame, a `PoolCandidate` the pool hands a light with the flame's own rate, depth and phase and the light standing in the flame, and the kind's sparks, smoke, tongues and bed. A `phase` of `None` is derived from the entity (`fire_phase`), so fires placed alike do not breathe together. `color` is the light's colour and the flame's middle at the shipped flame's brightness (`flame_mid`); `None` is a wood fire, a 1900 K light (`FIRE_KELVIN`; a `PoolCandidate` with no colour takes the pool template's, which is white) and the scene's own flame. `embers`, `smoke`, `tongues` and `bed` turn a kind's extra off (the bed stays coal-coloured under a coloured flame, so a magic fire turns it off). What a host spawns beside a `Fire` wins (`(Fire::new(kind), FlameSmoke { density: 0.2 })`), and a `Fire` that is changed afterwards (replaced, or edited through reflection or BRP) writes every part again and removes what it no longer names, so a picker that turns a campfire into a lantern leaves no tongues behind. Put it out and light it again with `Snuff` and `Kindle` on the same entity. It is `serde` with every field optional (`(kind: Campfire)` is a campfire). `docs/research/fire-component.md`.
+- **Light a fire that flickers, flares and goes out** (`FlickerPlugin`): `Flicker` modulates a light below its base at a rate its fuel bed sets, `Kindle` flares it up over 0.6 s, and `Snuff` puts it out over 1.2 s with the linked flame — see [fires](docs/guide/fires.md).
+- **Spend eight real lights on a town of thousands** (`LightPoolPlugin`): ranked by the light each candidate puts on you, held with hysteresis, cross-faded on a hand-off, with a shadow budget of its own — see [the light pool](docs/guide/light-pool.md).
+- **Draw the flame that motivates the light** (`FlamePlugin`): one additive billboard per fire, breathing on its light's clock, in a colour of its own, shedding sparks, smoking, leaning in a wind and streaming behind a torch you carry — see [shader flames](docs/guide/flames.md).
+- **Let a fire leave coals behind:** `FuelBed` is a temperature field that breathes with the flicker, warms as the fire catches and goes on glowing, cooling, after it is put out — see [the fuel bed](docs/guide/fuel-bed.md).
+- **Size and colour a fire like a cinematographer:** `fire_lumens`, `fill_for`, `blackbody_colour` and `white_balanced` turn "1000 lx at 4 m" and "1900 K" into a light — see [the lighting look](docs/guide/lighting-look.md).
+- **Reuse every curve outside the engine:** `bevy_lights::model` is the same maths with no `bevy` in it — see [engine-free maths](docs/guide/model.md).
 
-![The six fire kinds, each one Fire component on an otherwise empty entity: a candle, a lantern, a torch, a brazier, a campfire and a bonfire, each with its flame, the warm pool its light throws on the ground and its own sparks, smoke, tongues and bed of coals where the kind has them](docs/media/fires.png)
+## Part of the Coven
 
-*`LIGHTS_KIND=<kind> cargo run --release --example fires` (1578 × 654, an 8-bit PNG: frame 240 of six 1280 × 720 runs, each scaled to 520 × 293 with the kind's name burned in). The camera stands the same number of flame heights back, so each kind fills its panel. The brazier has no bowl in this example, so its flame stands on its bed of coals, which is the small red disc; every light is a pooled one the `Fire` was handed.*
-
-### The light pool
-
-A fixed number of real point lights (`LightPool::size`, default 16) is handed every frame to the
-best-ranked `PoolCandidate`s around the entity carrying your focus marker (exactly one, unless the pool is shared, below), each light at the
-candidate's position plus its own world-space offset. Everything else is a flame and nothing else. The
-assignment is deterministic: rank, then `Entity`.
-
-`PoolBudget` is the pool's lamp schedule, rewritten every frame: `holds(entity)` and `holder_of(slot)` say which candidates are real lights right now, `casts_shadow(entity)` (and `shadowed`) which of those lights throw a shadow, and `starved()` counts the candidates that wanted one and are only flames, so an editor can show the budget and a game can see `size` is too small.
-
-**More than one viewer.** The pool measures from the entity carrying your focus marker, and by default needs exactly one: two are reported and leave the pool dark. A game with a split screen, or a map camera beside the player's, sets `LightPool::focus` to `FocusRule::Shared` and puts the marker on each viewer. The pool's `size` is then **shared**, not multiplied: each focus is entitled to `ceil(size / foci)` lights, ranked by `rank` among the candidates in `reach` of it, and what one viewer does not use goes to the others, so a viewer among twenty fires cannot take the lights of one standing by three (on a plain nearest-focus distance it would take all of them). A fire between two viewers is one light. A viewer joining or leaving re-divides the lights through the ordinary hand-off (give the pool `reserve` at least as large as the number of lights that move, and its total brightness holds at every frame). With one focus it is the default rule, to the bit; with two, the pool's own work on 5 000 candidates went from 490 to 619 µs (best of eight runs; four foci, 660 µs). Run `LIGHTS_SPLIT=1` on the courtyard example for two cameras on one window, and `LIGHTS_FOCUS_RULE=one` over them for the pool without the rule.
-
-A candidate is ranked by the **light it puts on the subject** (`intensity / distance²`), not by its
-distance alone, so a bright brazier at 3 m outranks a dim torch at 2 m; `LightPool::rank` switches to
-`Rank::Distance` for the old rule. A slot keeps the candidate it holds until a challenger is
-`hysteresis` times better (default 1.15, the overlap rule, measured in the same quantity the rank
-uses), and only a candidate **no other slot holds** is ever a challenger, so a newcomer displaces the
-pool's *worst* light rather than reshuffling all of them. A slot that does change owner fades back up
-over `fade_seconds` (0.35 s) rather than popping, and `reserve` (default 1) both keeps a spare light so
-the owner a hand-off leaves behind fades *out* at the same time — the subject's light is continuous
-through the change rather than dipping, which is the craft's "overlapping key lights" — and caps how
-many lights change owner in one frame, so a hand-off is never made without a cross-fade to hide it.
-
-`PoolCandidate::phase`, `diameter` and `depth` let a slot adopt its winner's own fire clock, fuel-bed
-rate and depth, so a light handed to a torch breathes as that torch's flame does. Each is optional:
-`phase: None` leaves the slot's own `1.3 · slot` clock alone, `diameter: None` gives the pool's un-sized
-rate, and `depth: None` restores `FLICKER_DEPTH` — so a host that models no per-prop fire keeps the
-pool's uniform one.
-
-**Shadows are budgeted apart from lights.** The template's `shadow_maps_enabled` turns the pool's
-shadows on, and `LightPool::max_shadowed` caps them: `Some(3)` gives a shadow to the three best-ranked
-lights the pool holds (the closest and brightest, held with the same `hysteresis`) and lets the rest
-light without one; `None`, the default, shadows every light, as before. Every shadowed point light
-renders six shadow views a frame — about 0.6 ms a light on an RTX 3090 in the courtyard — so sixteen
-lights can afford three shadows where they could not afford sixteen. A light that earns or loses its
-shadow because the ranking moved is cross-faded to itself through a reserve light, so the shadow
-deepens over `fade_seconds` while the lit ground around it holds still; give a pool with shadows
-`reserve: 2`, since hand-offs and shadow changes share the reserves. A change to the cap or the flag
-applies at once, as a graphics setting should: shadows turned off, by the flag or a cap of `Some(0)`, are
-off on that frame for the reserve lights fading a light out too.
-
-**One template, every light, live.** Every field of `LightPool::light` but `intensity` and
-`shadow_maps_enabled` is every pool light's: colour, range, radius, the shadow's biases and near plane,
-`contact_shadows_enabled`, and Bevy's `soft_shadows_enabled` where its `experimental_pbr_pcss` feature
-gives the light one. A change to the template reaches every light, reserves included, on the next frame,
-so an editor's slider moves the whole pool and a light spawned later matches the ones already burning.
-Contact and soft shadows are off by default: Bevy's contact shadows need a `ContactShadows` camera (and
-TAA, or they dot a lit wall), and its point-light soft shadows only soften at a `radius` of metres, which
-also widens every highlight.
-
-### Shader flames
-
-An additive billboard fire (`src/flame.wesl`) is drawn on every `FlameSite`, out of one material and one
-draw per flame, with each fire's phase, height and brightness packed into its `MeshTag` so two fires
-never burn in step. One shared shape clock, written once a frame, on `Time<Real>` — a paused world's
-shape still moves.
-
-A site with a `kindle` grows its flame from nothing on the same curve its light kindles by, so the two
-arrive together. `FlameSite::diameter` given the same value as the light's `Flicker::diameter` makes the
-flame **breathe at the light's own rate and phase**, so the fire and the ground it lights are one fire
-rather than a still flame over a moving pool; `FlameSite::depth` is the same choice for the flame's
-brightness, and giving it the light's `Flicker::depth` is what keeps the two dipping together.
-`PoolCandidate::phase` does the same for a light the pool hands over.
-`FlameSite::fire: Some(light)` removes the choice: the flame then reads the `diameter`, `depth` and `phase` of that
-entity's `Flicker` (or `PoolCandidate`) every frame, so the two cannot be set apart and a `Flicker::set_depth` moves
-the flame with it. The light need not be the site's parent; `None` keeps the site's own values.
-
-A flame is taller than its torch, so a torch behind a wall edge can leave a tongue of fire hanging over the
-wall with nothing under it. `FlameSite::depth_fade` fades the flame by how much of its source the camera
-can see: the shader reads the depth prepass at the flame's source over a disc of taps, so a wall edge
-sliding across a torch dims its flame over a few pixels instead of popping it. Give the camera
-`DepthPrepass` (without it the flame draws whole); a site that leaves `depth_fade` `false` draws exactly
-as before, with no depth read. `cargo run --release --example occlusion` shows both, and
-`LIGHTS_DEPTH_FADE=1` runs the same scene faded.
-
-**A fire's own colour.** `FlameSite::color: Option<Color>` gives one fire a colour of its own: a blue gas lantern, a green witch-fire or a violet shrine brazier among orange torches. `None` is the scene's `FlameLook::color`, drawn exactly as before. The colour is the middle of the flame's ramp and the rest is the same flame in that hue, a darker and more saturated rim and a paler core (`retint`, in `bevy_lights::model::fire_colour`); a red, orange or yellow keeps the shipped rim and core, which were tuned for them, so no existing scene changes. The flame's sparks (`FlameEmbers`) follow it. **Give the light the same hue**, so the flame and the ground it lights are one colour (a flame colour above 1 is a brighter fire, and a blue has half the luminance of the scene's orange at the same channel values, so scale a dim hue up on the flame, not on the light): the fire's own `PointLight::color` for a `Flicker`, `PoolCandidate::color` for a prop the pool lights (the pool's light takes it on the frame the light changes owner, while it is fading in from nothing, the light fading out keeps its owner's, and a candidate with no colour gets the template's, or your palette's, back). Every distinct colour is one more material and one more batch, shared by every flame of it and released with the last: a handful is free, and a colour changed every frame is a material a frame. `LIGHTS_COLOURS=1 cargo run --release --example courtyard` is the picture below, `docs/research/fire-colour.md` the sources.
-
-![The courtyard with a blue and a green brazier among the orange ones and some blue and violet torches: each flame, its sparks and its light on the stone are one colour](docs/media/colours.png)
-
-*`LIGHTS_COLOURS=1` on the courtyard (seed 7, pool 8, 1280 × 720, frame 300): braziers 1 and 2 are a gas-flame blue `(0.10, 0.32, 1.0)` and a witch-fire green `(0.20, 1.0, 0.30)`, braziers 0 and 3 stay the scene's orange, and every fifth torch carries a blue or a violet `(0.62, 0.20, 1.0)`. Each coloured fire has `FlameSite::color` on its flame (the blue ones scaled 1.8 and the violet 1.6 to be as prominent as the orange), the same hue on its light (`PointLight::color` for a brazier, `PoolCandidate::color` for a torch), and the stone round it is lit in that hue.*
-
-![A campfire and a bonfire, each drawn first as one flame and then with FlameTongues: a mound of tongues of different heights leaning in towards the tallest, in place of one slender flame standing on a wide bed](docs/media/tongues.png)
-
-*`cargo run --release --example campfire` (1280 × 720, frame 240; each panel a crop, the captions burned in): left, `LIGHTS_TONGUES=0`, the two `FireKind`s drawn as the one flame they were; right, the kinds' own `FlameTongues` (`FireKind::Campfire.tongues()`, `FireKind::Bonfire.tongues()`). Both have their kind's sparks and smoke, which stay one quad each.*
-
-**Tongues.** A flame is one teardrop, `0.4` of its height wide: a candle's and a torch's shape, and the wrong one for a campfire's 0.8 m bed under a 0.7 m flame or a bonfire's 3 m pyre under a 2 m one, which drew one slender tongue in the middle of a heap of fuel. Add `FlameTongues { count, spread }` (`count` up to `MAX_TONGUES`, 9; `spread` the width of the bed, in your units; `FireKind::tongues()` gives a campfire's and a bonfire's, and `None` for the rest) to a `FlameSite` and the site keeps its own flame as the middle tongue and gains `count - 1` more `Flame` children round it, each a `FlameTongue`: shorter the further from the middle it stands, on a clock of its own, and leaning in towards the middle one, so the fire is a mound that parts and rejoins as one fire breathes and converges on a tip. `flame_tongue(index, count, spread, height, seed)` is the layout as a plain function; no tongue stands taller than three times its distance from the middle one, the height at which two flames that far apart are one flame (`docs/research/flame-tongues.md`). A tongue is an ordinary flame, so it catches and goes out with its fire, leans in a wind, fades behind a wall edge by the depth fade and is culled by a box of its own; it is one more draw, so a fire that does not ask pays nothing and a campfire is six draws. Changing the component at run time rebuilds the tongues and removing it takes them away.
-
-**Embers.** Add `FlameEmbers { rate }` (sparks a second, `0..=MAX_EMBER_RATE`, default 3) to a `FlameSite` and its flame sheds sparks: short streaks, orange or the fire's own colour, that leave the flame, climb under drag, weave, and cool from yellow through orange to red before they go out (`src/embers.wesl`). It is one extra camera-facing quad per fire, a child of the flame, with no particle state: every spark is a function of the shared clock and an integer hash, so a fire's sparks are the same on every machine and cost one draw. The quad takes the flame's catch and wind lean, so a fire not yet caught sheds nothing, a snuffed one stops, and a wind carries the sparks 1.5 times as far downwind as it leans the flame; `depth_fade` hides the sparks of a hidden source too. A site without the component draws exactly as before. Measured with `LIGHTS_GPU_TIMING=1` on an RTX 3090 (the courtyard's 52 flames, 8 sparks a second each), the transparent pass takes about 11 µs without embers and 107 to 137 µs with them, so the sparks cost about 0.1 ms a frame there. `LIGHTS_EMBERS=3 cargo run --release --example courtyard` shows it; `docs/research/flame-embers.md` has the sources.
-
-![The courtyard's brazier from 3 m at night: a warm-grey lit column rising from the flame's tip, and the same fire in a 3 m/s wind, the column bent over downwind](docs/media/smoke.png)
-
-*`LIGHTS_SMOKE=0.8` (the default density) on the courtyard with `LIGHTS_EMBERS=4` (seed 7, pool 8, each panel a 680 × 680 crop of a 1280 × 720 frame at 300 frames): left, still air; right, `LIGHTS_WIND=3,0`. The smoke is lit by the flame and by nothing else, so it is brightest just above the tip and gone into the dark before the top of its quad.*
-
-**Smoke.** Add `FlameSmoke { density }` (`0.0..=MAX_SMOKE_DENSITY`, default 0.8; `FireKind::smoke()` gives each kind its own) to a `FlameSite` and its flame goes on up as a faint plume: a column that leaves the flame's tip, widens the way a turbulent plume does and thins into the dark, whose wisps are lit by the fire (`src/smoke.wesl`). In a `FlameWind` it bends over downwind as a bent-over plume does, so the wind shows from across the courtyard. It is one more camera-facing quad per fire, a child of the flame, with no particle state: the column is a function of the shared clock, so it is the same on every machine and costs one draw, and a fire without the component pays nothing. The quad has the sparks' geometry and carries their culling box, so a fire whose smoke is off the screen draws none of it; it takes the flame's catch (a fire not yet caught smokes nothing; a fire put out leaves a trail, below), `FlameSite::color` (a green fire smokes green-grey) and `depth_fade`. The smoke is **additive**: at night smoke is visible only by the light the fire puts into it, and an additive layer joins no sorting against your other transparent surfaces. It has no dark, occluding half, so it is a night effect; a game that wants daylight smoke draws its own (`docs/research/flame-smoke.md` has the sources and why). `LIGHTS_SMOKE=d` turns it on in the courtyard, and `BENCH_SMOKE=1` for `bench_flames`.
-
-![The courtyard's brazier from 3 m in a 3 m/s wind, in four frames: the fire burning with its plume and sparks, the flame out and the smoke bent over and lifting off, the base of the column well clear of the bowl, and the last thin remains](docs/media/smoke-tail.png)
-
-*`LIGHTS_SNUFF=2.0 LIGHTS_SMOKE=0.8 LIGHTS_EMBERS=4 LIGHTS_WIND=3,0` on the courtyard (seed 7, pool 8, 1280 × 720, frames 120, 192, 264 and 336 of a 420-frame run, each scaled to 640 × 360; the captions are burned into the file): every brazier and torch is put out at 2.0 s with `Snuff`. The walkers are the example's own and pass in front of the bowl.*
-
-**A put-out fire's trail.** The flame of a fire that gets a `Snuff` goes out over `SNUFF_SECONDS` (1.2 s), and its smoke does not go with it: the smoke already made is carried on up the way the air carries it, the base of the column lifts off the wick and thins as the wick smoulders out, and after `SMOKE_TAIL_SECONDS` (5 s) the trail ends, exactly dark, so nothing pops. It is lit by the dying flame and then by a weak, broad glow from the coals (`docs/research/flame-smoke-tail.md`: smoke density is advected, so a source switched off leaves what it made travelling on). It follows the light a site's `FlameSite::fire` names, on virtual time (a paused world's trail holds still); a site that names no fire has no douse to follow, a fire loaded as already out begins no trail, and re-lighting a fire ends its trail at once. It is the same quad, so it costs nothing a fire without a douse does not, and a scene that puts nothing out draws what it always drew. `LIGHTS_SNUFF=<seconds>` shows it in the courtyard (`docs/DEMOS.md`).
-
-**Wind.** Insert `FlameWind { velocity }` (metres per second on the ground plane; the host copies it from
-its weather, which this crate does not own) and every flame leans downwind by the Welker–Sliepcevich
-pool-fire tilt for *its own fire's* `diameter`, so a brazier bends less than a torch in the same gust and
-every flame in the scene bends the same way. The flame keeps its foot and its length and turns about its
-foot (a 3 m/s wind lays a 0.34 m brazier's flame over by about 60°; the lean is capped at 70°), and it is
-drawn upright from straight overhead. No `FlameWind` (or a zero one) draws every flame exactly as before.
-`flame_tilt(speed, diameter)` is the same law as a plain function. The pool's light for a fire moves with the
-lean, to where the leaned flame's middle is (`lean_light_shift`), so a fire built from a `FireKind` (a `Fire`, or its
-`site()` and `candidate()`: its light is handed to the flame's middle, not its foot) keeps its key
-light in the flame in a wind. `LIGHTS_WIND=x,z cargo run --release --example courtyard` shows it; `docs/research/flame-wind.md`
-has the sources.
-
-**Gusts.** Insert `FlameGust { mean, intensity, timescale, seed }` instead of writing `FlameWind` yourself and `FlamePlugin` writes `FlameWind::velocity` every frame from `gust_velocity`: the mean wind with a stationary Gaussian fluctuation of relative size `intensity` (the turbulence intensity, 0.25 by default) that stays correlated for `timescale` seconds (2 by default), with the heading wandering about `intensity` radians. It is a pure function of `Time<Real>` and the `seed`, so two machines see the same wind and a paused world's fires still sway. The tilt law is steep at a breeze and flat at a gale, so gusts read best at 0.2–0.8 m/s (a flame easing between roughly 20° and 40°); at 3 m/s the flame is already near its cap. `LIGHTS_WIND=0.4,0 LIGHTS_GUST=0.5 cargo run --release --example courtyard` shows it; `docs/research/flame-gust.md` has the sources and what is a design default.
-
-**A fire that moves.** The air a moving fire meets is the air it moves through, so a torch carried at a walking pace is in a wind of its own: `FlamePlugin` tracks every `FlameSite`'s ground velocity from its `GlobalTransform` (a component, `FlameVelocity`, that a host reads and never writes) and each flame leans on the wind **less that velocity**, by the same `flame_tilt` of the relative speed. A bearer's flame streams behind them (a 0.1 m torch at 1.4 m/s is laid over by about 55°; at a stroll of 0.5 m/s, 40°), more at a jog, with the wind behind them less and into it more, and stands up again over about half a second when they stop; the pooled light stands in the leaned flame and the sparks and smoke stream with it. A fire that stands still is drawn exactly as before, and a lantern swung on a pole sways its flame against the swing with no code of yours. A host sets how much of its own velocity counts with `FlameMotion { gain, response }` (`1.0` is physics; `0.0` is every flame upright however it is carried; `response` is the filter's time constant, 0.15 s, which averages a fixed-step character's uneven frames). A step of more than 40 m/s in a frame is a teleport and carries no velocity. `smooth_velocity` and `relative_air` are the maths as plain functions; `LIGHTS_WALK=1.4 LIGHTS_KIND=torch cargo run --release --example fires` carries one, and `docs/research/flame-motion.md` has the sources.
-
-![A torch carried to the right at 1.4 m/s and then stopped, in six frames: its flame, smoke and sparks stream behind it while it moves, and stand up again over about half a second after it stops](docs/media/carried.png)
-
-*`LIGHTS_KIND=torch LIGHTS_WALK=1.4 LIGHTS_WALK_FOR=1.5` on `examples/fires.rs`, a `Fire::lit(FireKind::Torch, …)` and nothing else, carried along +X for 1.5 s and then still (six 420 px crops of 1280 × 720 frames, captured at a fixed 1/60 s step: frames 50 and 90, the last of the walk, then 100, 110, 120 and 140; the captions are burned into the file): the flame's bright axis is 57° and 50° from vertical in the first two frames (the law says 55°), 20° a third of a second after it stops and under 10° from half a second on, and the smoke and the sparks stream the same way while it moves.*
-
-**A fire off the screen costs almost nothing.** A flame outside every camera's frustum is neither extracted nor drawn, so a town of thousands of `FlameSite`s costs the frame what the dozens in view cost it: `cargo run --release --example bench_flames` (no window, off-screen, a GPU adapter) puts 5 000 torches in the world with about twenty in view and reads 2.2 ms a frame, where drawing every one read 7.8 (20 000: 6.4 against 30.0). The box that does it is the crate's own, because the flame's catch and the wind's lean ride in the transform's scale and a box built once would shrink as a fire catches or leans: `flame_cull_extents` is that box, for a host that draws its own flames with `FlameMaterial`. The sparks of a `FlameEmbers` fire are culled the same way by a wider box that grows with the lean (`ember_cull_extents`): with `BENCH_EMBERS=1` every torch sheds sparks, and 5 000 of them read 4.2 ms a frame where drawing every quad read 11.5 (20 000: 9.2 against 37.2), the renderer counting about twenty quads in view instead of all of them. `docs/research/flame-culling.md` has the geometry and the measurements. A fire's *light* is the pool's, ranked by distance and never by what the camera sees, so a fire off the screen still lights the screen.
-
-### The lighting look
-
-The numbers a cinematographer sets, as plain functions in `bevy_lights::model::cinematography`:
-`key_to_fill` and `stops` (with `LOW_KEY` 8:1, `MOON_KEY` 4:1 and `HIGH_KEY` 2:1), `fill_for`,
-`fire_lumens` (the lumens a pool of a given size and brightness needs), `blackbody_colour` (a light's
-colour from its temperature), `blackbody_luminance` (that temperature's **magnitude** in cd/m², which a
-glowing *surface* needs and a light's colour does not carry) and `white_balanced` (the same as a camera
-balanced elsewhere records it). Size a fire by the pool it lights and colour it by the temperature it
-burns at, instead of picking lumens and an RGB by eye.
-
-### The fuel bed
-
-A bed of coals is a *surface with a temperature field on it*, and a constant `emissive` is the one thing
-a real bed never is: it clips to a white slab the moment the camera looks down at it, and hides the flame
-standing in it. `char_field` is the field — a heap of overlapping coal shards, bright lumps with dark ash
-between them, seeded so a capture is reproducible — and `char_radiance` / `coal_radiance` map a sample to
-a colour through char, ember and fuel. `coal_radiance` writes those three stops as **temperatures**, so a
-bed's brightness and its hue come from one model and cannot drift apart at a different exposure.
-
-**`FuelBed`: a bed that lives with its fire.** Add `FuelBed { diameter, seed, cooling }` to a `FlameSite`
-(`FireKind::bed()` gives a campfire's, a bonfire's and a brazier's, and `None` for the rest) and the site gains one
-flat disc at its foot with the field laid on it at the coals' own size (a wider bed has more coals, not larger ones):
-dark ash with orange and yellow lumps in it, hottest under the flame and ragged at the rim. The coals follow
-the site's fire (`FlameSite::fire`): they **breathe with its flicker**, **warm as the fire catches** (`Kindle`) and, when
-it is put out (`Snuff`), **go on glowing and cool** with time constant `cooling` seconds (60 by default; the
-glow is gone in a minute and a half) instead of vanishing with the flame, the way a campfire that is out is a ring of dull red
-going to black (`docs/research/fuel-bed-heat.md`). A heat moves every temperature of the ramp by the same number of
-kelvin, so the bed goes from orange through a deepening red to nothing, not through grey: `bed_radiance(field, heat)`
-is that ramp and `bed_heat_step` the dynamics, as plain functions. One shared material draws every bed (a bed's own heat and
-offset ride its `MeshTag`), so fifty campfires are fifty draws, and a site without the component pays nothing.
-
-![A campfire's bed of coals from 2.4 m straight down, in four panels: burning, 0.75 s after the fire is put out with the flame nearly gone and the coals still orange, 2.0 s after with a dim ground and the coals glowing red, and 4.5 s after with only a dull red left](docs/media/fuel-bed.png)
-
-*`cargo run --release --example campfire` with `LIGHTS_EYE=-2.6,2.4,0.5 LIGHTS_LOOK=-2.6,0,0 LIGHTS_SNUFF=1.0 LIGHTS_COOLING=6` (the campfire's `FireKind::bed()`; an 840 × 728 PNG of four 420 × 330 crops of a 1280 × 720 run at frames 30, 105, 180 and 330, the captions burned in): the fire is put out at 1.0 s, its light and flame are gone in 1.2 s and the coals go on glowing, cooling here with a 6 s time constant instead of the default 60 s so a capture can show it. The logs are lit by the fire's light and stand dark against the coals once it is out.*
-
-`examples/courtyard.rs` still lays its own bed on its brazier bowls (an `Rgba32Float` image of the field as a box's `emissive_texture`, its numbers chosen by measuring the stops in display DN, because a ramp whose middle stop is past the display's white point cannot show the structure underneath it): a bowl is a prop with a soot lining the example paints by hand, and its bed does not follow the fire.
-
-### Engine-free maths
-
-Every curve the crate runs, as plain `f32` functions with no `bevy` in them, so a host can reuse them in
-its own systems: `flicker_factor` and `flicker_factor_of` with `flicker_rate` and `PUFFING_CONSTANT`,
-`flicker_swing` (the sized-or-un-sized choice, and the depth, the light and the flame both read) with
-`flicker_depth` and `FLICKER_DEPTH` / `MAX_FLICKER_DEPTH`, `kindle_gain`, `raised_light` and
-`flame_tilt` (how far a flame leans in a wind, with `FLAME_TILT_LIMIT`), `relative_air` and `smooth_velocity` (the air a moving fire meets, and the velocity it feels), `flame_light_offset` (where a fire's light belongs, so a flame and the real light it motivates cannot
-drift apart), `pack_flame_tag` and its inverse with `set_flame_brightness`; the pool's `hand_off` and
-`preferred` (the overlap rule, on distances and on any "smaller is better" quantity) with its
-`fade_factor` / `fade_out_factor`, `HYSTERESIS` and `FADE_SECONDS`; the whole of
-`model::cinematography` above, and the whole of `model::char` with `EMBER_AT`. `tests/leaf.rs` keeps them
-engine-free.
-
-### What a host touches
-
-The components a game spawns or marks are `Reflect` and registered by the plugins — `Fire`, `Flicker`, `Kindle`,
-`PoolCandidate`, `FlameSite` — so a BRP front end can read and drive them, and so are the resources a
-host sets, `LightPool` (size, reach, gain, rank, hysteresis, fade, reserve, shadow cap, the slot light's template)
-`FlameLook` (colour, strength, the set-once `max_height`), `FlameWind` / `FlameGust` (the wind the flames lean in, and a gusting one the plugin writes into it) and `FlameMotion` (how much of a moving fire's own velocity counts as wind). The crate spawns `PoolLight` (registered
-too: recolour it for a palette; name its lights what you like) and `Flame`, a plain component a host
-finds or counts and never spawns. `Kindled { entity }` is the message a host hears when a fire catches.
-
-## Plays well with
-
-This crate owns **practical lights** and nothing else.
-
-| what | whose |
-|---|---|
-| Sun, moon, sky, exposure, weather, the lightning flash | [`bevy_elements`](https://github.com/bevy-coven/bevy_elements) (this crate never meters exposure and never adds a `DirectionalLight`) |
-| A gameplay illuminance grid (how lit a tile is, for AI or stealth); feed it a fire with `ground_ramp`, a linear ramp fitted to the two lux circles the grid is read at | [`bevy_light_grid`](https://github.com/bevy-coven/bevy_light_grid) |
-| Trees, forest-fire spread | [`bevy_flora`](https://github.com/bevy-coven/bevy_flora) |
-| Who lights a lamp, and when | [`bevy_society`](https://github.com/bevy-coven/bevy_society) or the game |
-| Flicker, kindle, the pool of real lights, the shader flames, the placement helpers | **this crate** |
-
-A pool light is a light in mid-air with no source of its own: a host styles it (recolour it for the
-palette) and usually tags it so its flame is not drawn there — the flame belongs on the torch.
-
-## Built on
-
-| crate | why |
-|---|---|
-| [`bevy`](https://github.com/bevyengine/bevy) 0.20 | the engine: `PointLight`, `SpotLight`, `Material`, `MeshTag` |
-| [`serde`](https://github.com/serde-rs/serde) | optional derives on every public component and resource (`serde` feature) |
-
-## The craft and the science
-
-Every default is researched and cited, or marked a design default. The notes:
-
-| note | what it settles | key sources |
-|---|---|---|
-| [`docs/research/fire-light.md`](docs/research/fire-light.md) | the flicker's rate and amplitude, the kindle's flare | Sanctuary decisions 0127/0148; Team Fortress 2's illustrative ramp (SIGGRAPH 2007 *Advances*); the fire-physics literature this crate is still missing |
-| [`docs/research/light-pool.md`](docs/research/light-pool.md) | the pool's budget, reach, sort and phases | Olsson, Billeter & Assarsson 2012 (clustered shading); Ghost of Tsushima (SIGGRAPH 2021 *Advances*); *Stochastic tile-based lighting* (SIGGRAPH 2025 *Advances*); RTR4's many-light chapter |
-| [`docs/research/flame.md`](docs/research/flame.md) | the flame's shape, noise, ramp and packing | Nguyen, *GPU Gems* ch. 6 §6.1; RTR4 §6.3; Sanctuary decision 0228 |
-| [`docs/research/flame-flicker.md`](docs/research/flame-flicker.md) | why a drawn flame breathes with the light it motivates, and how the two share one function | Xia & Zhang 2018; SIGGRAPH 2011 *Advances*' fire talk; Doğaner on motivated sources |
-| [`docs/research/flicker-depth.md`](docs/research/flicker-depth.md) | how far a fire dips, who chooses, and a measured ceiling for the default | Mandin & Most (IAFSS 6) on flame fluctuation; Gergely et al. 2020; Doğaner |
-| [`docs/research/fuel-bed.md`](docs/research/fuel-bed.md) | why a bed is a temperature field and not a constant `emissive` | Pirk et al. 2017 (wood combustion); Xia & Zhang 2018; *PBR* 3rd ed. ch. 12 on blackbody emitters; Prince 2004 on clipped highlights |
-| [`docs/research/corpus.md`](docs/research/corpus.md) | what the home-still library holds for cinematography, photography, CG lighting, game-lighting craft, many-light rendering, fire physics and perception — and what it does not | the live corpus |
-
-The full index, with the notes behind the flame's silhouette, its catch and its read from overhead, is
-[`docs/research/README.md`](docs/research/README.md).
+`bevy_lights` is one of the [Bevy Coven](https://github.com/bevy-coven) crates: the family table there
+says which crate owns what, so two of them never both own the sun. Grimoire, the Coven's level editor,
+takes it as an optional feature and edits a placed fire's own settings — see
+[use it in Grimoire](https://bevy-coven.github.io/crates/bevy_lights.html#use-it-in-grimoire).
 
 ## Bevy compatibility
 
 | `bevy_lights` | Bevy |
 |---|---|
-| 0.1 | 0.20 |
+| 0.1 – 0.5 | 0.20 |
 
-## Documentation
+## Learn more
 
-`cargo doc --open`. The crate's own docs are the reference; `AGENTS.md` is the guide for anyone — human
-or agent — changing it.
+- [docs.rs](https://docs.rs/bevy_lights) — the API reference (`cargo doc --open`).
+- [The book page](https://bevy-coven.github.io/crates/bevy_lights.html) — the same guide with the pictures.
+- [`docs/guide/`](docs/guide/README.md) — the detail the README used to carry: the flicker's law, the pool's hand-off, the flame shader, the coals.
+- [`examples/`](examples) — `courtyard` (the showcase), `fires` (one fire of each kind), `campfire`, `occlusion`, and the benches `bench_lights` and `bench_flames`.
+- [`docs/DEMOS.md`](docs/DEMOS.md) — how every capture in `docs/media/` is made.
+- [`CHANGELOG.md`](CHANGELOG.md) — what each release changed, and what it broke.
 
-## Contributing
+## Who and licence
 
-Read `AGENTS.md`. The short version: every feature lands with a research note, every default is cited or
-marked a design default, `src/model/` stays engine-free, `src/` stays free of game vocabulary
-(`tests/leaf.rs` enforces both), and a shader change is checked with `tools/wesl-check` before any
-capture.
-
-## License
+Maintainer [@Ladvien](https://github.com/Ladvien). Questions and bugs go to
+[the issues](https://github.com/bevy-coven/bevy_lights/issues), and a game asking for a change here uses
+the `consumer` label. Contributions follow the org's
+[`CONTRIBUTING.md`](https://github.com/bevy-coven/.github/blob/main/CONTRIBUTING.md); the crate's own
+rules for changing it are in [`AGENTS.md`](AGENTS.md).
 
 MIT OR Apache-2.0, at your option.

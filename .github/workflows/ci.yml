@@ -63,6 +63,12 @@ jobs:
       - name: Test with the serde feature
         run: cargo test --features serde
 
+      # `cargo test` above includes the doctests, and so does the line below it; the step is here
+      # explicitly because the README is compiled as doctests (`src/lib.rs`'s `ReadmeDoctests`) and a
+      # runner switched to `cargo nextest` would silently stop checking it.
+      - name: Test the docs (the README is compiled as doctests)
+        run: cargo test --doc --all-features
+
       # Debug-info debugprofile links of a Bevy example ran a sibling crate's runner out of memory:
       # `ld terminated with signal 7 [Bus error]`. Examples only have to load; debuginfo is turned off
       # through the dev profile (`CARGO_PROFILE_DEV_DEBUG`) for this build alone, not through

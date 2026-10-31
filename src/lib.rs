@@ -120,6 +120,13 @@ pub use pool::{FocusRule, LightPool, LightPoolPlugin, PoolBudget, PoolCandidate,
 pub use smoke::{FlameSmoke, MAX_SMOKE_DENSITY};
 pub use tongues::{FlameTongue, FlameTongues};
 
+// The README's Rust examples are doctests, so a snippet the README shows cannot rot: `cargo test --doc`
+// compiles it. `tests/readme.rs` is the stronger check (it builds the quick start as an example, so a
+// `no_run` block's body is compiled *and* its warnings are caught); this one makes `--doc` alone enough.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctests;
+
 use bevy::prelude::*;
 
 /// The order the crate's systems run in `Update`.

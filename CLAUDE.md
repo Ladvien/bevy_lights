@@ -1,5 +1,7 @@
 # bevy_lights — notes for agents
 
+README and docs follow https://github.com/bevy-coven/.github/blob/main/DOCUMENTATION.md; a feature is not done until its README line and, if visible, its GIF exist.
+
 A Bevy 0.20 library for the **practical lights** a scene's props actually carry: fires that flicker
 and flare as they kindle, a budgeted pool of real lights handed to the nearest props over thousands
 of virtual ones, and billboarded shader flames. Small on purpose: three plugins, three public

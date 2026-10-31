@@ -22,6 +22,8 @@ They override the choice of item in section 4, not the gates.
 State lives in `docs/loop-log.md`; rules and traps live in `AGENTS.md`. Follow them; do not
 re-derive them.
 
+README and docs follow https://github.com/bevy-coven/.github/blob/main/DOCUMENTATION.md; a feature is not done until its README line and, if visible, its GIF exist.
+
 ## Your work is saved even if you are killed — read this before you start
 
 **The driver saves whatever you leave uncommitted, without touching your branch.** Every ten minutes
