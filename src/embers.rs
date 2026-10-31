@@ -283,8 +283,9 @@ pub(crate) fn dress_embers(
     }
 }
 
-/// A flame that has no ember quad yet.
-type UndressedFlame = (With<Flame>, Without<Embered>);
+/// A flame that has no ember quad yet. The extra tongues of a wide fire ([`FlameTongue`](crate::FlameTongue)) have none: the sparks leave
+/// the fire once, from the middle flame.
+type UndressedFlame = (With<Flame>, Without<Embered>, Without<crate::FlameTongue>);
 
 /// What an ember quad is read through: itself, its flame (its parent), its tag, its culling box and its material.
 type EmberQuad = (

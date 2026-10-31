@@ -13,6 +13,7 @@ pub mod pool;
 pub mod problem;
 pub mod reach;
 pub mod tag;
+pub mod tongue;
 pub mod wind;
 
 pub use char::{EMBER_AT, char_field, char_radiance, coal_radiance};
@@ -37,4 +38,5 @@ pub use tag::{
     FLAME_REACH, ember_cull_extents, ember_reach, flame_cull_extents, pack_flame_tag, set_flame_brightness,
     unpack_flame_tag,
 };
+pub use tongue::{MAX_TONGUES, MERGE_RATIO, Tongue, flame_tongue};
 pub use wind::{GUST_INTENSITY, GUST_TERMS, GUST_TIMESCALE, gust_unit, gust_velocity};
