@@ -261,3 +261,13 @@ Three `EmbedSkip` rows (`ssrn_1601785`, `sm2_58`, `slatkin_effective_python_3rd`
 | `10.13140_marples.nav.lighting.thesis` (9.5.3, lines 6152 and 8060-8206) | Marples 2017 (already listed above for navigation) | a torch sconce "with an animated flame and smoke effect" against a static glowing torch: a measured preference for the animated one (χ²(1, N = 76) = 19.000) |
 
 Not in the corpus: Morton, Taylor & Turner 1956 on plumes (cited second-hand through `10.5194/npg-21-269-2014`, Matulka et al. 2014, found with `paper_search`; `paper_download` and `distill_index` pending) and Briggs' bent-over plume rise law (textbook, no source on disk).
+
+## Added by the 2026-10-31 re-scan (iteration 283)
+
+`catalog_recent` (200 rows, newest 09:07 UTC) is psychology re-embeds, the SIGGRAPH re-embed iterations 278-282 scanned and Matulka's plume paper (already listed): no new lighting stem. The wide-fire note found one source in the catalog by a semantic search (`distill_search`), not in the local mirror:
+
+| stem | what it is | use |
+|---|---|---|
+| `10.3210_fst.26.1` | Delichatsios 2007, *A Correlation for the Flame Height in "Group" Fires* (Fire Sci. Technol. 26, 1) | flames of burners `S` apart merge above `Z_m = 3 S` (eqs. 6b and 7b, "L_f / S = 3 - 3.3"): the clamp on a side tongue's height in `docs/research/flame-tongues.md` |
+| `10.13140_marples.nav.lighting.thesis` (lines 3426-3440) | Marples 2017 (already listed) | "the motion of flame, this can be in the form of lanterns, flaming barrels, or burning objects" draws the player's gaze: a flame is looked at |
+| GPU Gems 1, ch. 6.2 (`GP/GPU Gems- Programming Techniques ...md`, lines 2925-2935) | Nguyen, *Fire in the "Vulcan" Demo* | "We started with a single animation, and it worked even better with two or more", a random difference in "size, position, rate of decay, animation start frame": a fire is several flames that differ |
