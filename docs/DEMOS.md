@@ -281,7 +281,7 @@ its look, and do not try to line the two up by index.
 LIGHTS_FRAMES=600 LIGHTS_SHOT=docs/media/courtyard.png cargo run --release --example courtyard
 ```
 
-`LIGHTS_EMBERS=r` gives every flame `r` sparks a second (`FlameEmbers`; unset, none). `LIGHTS_GPU_TIMING=1` with `LIGHTS_FRAMES=420` prints the mean GPU microseconds per render pass (`gpu_us <pass> <mean>`, frames 100 to 400; needs Vulkan or DX12 timestamp queries). `LIGHTS_EYE` and `LIGHTS_LOOK` move the camera (`x,y,z`). The default eye is `(0, 9, 16)` looking at
+`LIGHTS_EMBERS=r` gives every flame `r` sparks a second (`FlameEmbers`; unset, none). `LIGHTS_SMOKE=d` gives every flame `FlameSmoke { density: d }` (unset, none; `0.8` is the default density; add `LIGHTS_WIND=3,0` to see the column bend, and a close camera, `LIGHTS_EYE=2.4,1.5,7.2 LIGHTS_LOOK=5,1.6,5`, to see it: from the default 45° camera it is foreshortened to a thin wisp). `LIGHTS_GPU_TIMING=1` with `LIGHTS_FRAMES=420` prints the mean GPU microseconds per render pass (`gpu_us <pass> <mean>`, frames 100 to 400; needs Vulkan or DX12 timestamp queries). `LIGHTS_EYE` and `LIGHTS_LOOK` move the camera (`x,y,z`). The default eye is `(0, 9, 16)` looking at
 the origin; the GIF's angle is the default.
 
 ## The GIF

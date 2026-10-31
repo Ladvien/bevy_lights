@@ -168,7 +168,10 @@ fn fire_kinds_smoke_by_what_they_burn() {
             assert!(smoke.problems().is_empty(), "{}", kind.name());
         }
     }
-    assert!(density(FireKind::Candle) < density(FireKind::Brazier), "a candle is a wisp beside a charcoal brazier");
+    assert!(
+        density(FireKind::Candle) < density(FireKind::Brazier),
+        "a candle is a wisp beside a charcoal brazier"
+    );
     assert!(density(FireKind::Brazier) < density(FireKind::Torch), "charcoal smokes less than a pitch torch");
     assert!(density(FireKind::Torch) <= density(FireKind::Bonfire), "a bonfire is the heaviest");
 }

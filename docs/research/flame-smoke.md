@@ -41,24 +41,25 @@ and of hand-ordered emitters, "manual sorting can result in a lot of side effect
 
 A third quad per fire, a child of the flame like the sparks' (`FlameEmbers`), with the same geometry: `RISE_MAX` 2.6 flame heights up, `HALF_WIDTH` 0.7 either side and the same margin, so it takes the fire's catch and the wind's lean from the flame's instance scale and **reuses the ember quad's culling box** (`ember_cull_extents`: nothing about the smoke's reach differs from the sparks'). It is drawn as a pure function of the shared clock, like the sparks: no state, no buffers, one draw per fire that asks, nothing for a fire that does not.
 
-- **Where the column is.** The centreline leaves the flame's tip and bends downwind: at rise `r` (in flame heights) it is `lean · (r + 0.8125 · max(r − 1, 0))`, which is the flame's own tip offset at `r = 1` (no gap between flame and smoke) and the sparks' reach, `1.5 · lean · 2.6`, at the top. A slow meander grows with height so a calm column wanders.
-- **How wide it is.** A turbulent plume spreads linearly. With the entrainment coefficient `α ≈ 0.13` (Morton, Taylor & Turner, as quoted by Matulka et al.) a plume's top-hat radius grows as `b = 1.2 α z ≈ 0.156 z`, measured from the plume's virtual origin, which is the flame's middle (`0.35`): the half-width is `0.05 + 0.156 · max(r − 0.35, 0)` flame heights (0.40 at the top).
-- **What it looks like inside.** Wisps: three octaves of value noise advected up the column, warped sideways by a slow curl that grows with height, and an edge ragged by the same curl. The structure follows the centreline, so a bent column is bent *all the way through*.
-- **How bright it is.** Lit by the flame: `1 / (1 + ((r − 0.35) / 0.7)²)`, an inverse square softened at the source, so a column is bright above the tip and gone by the top. Coloured by the fire's own hue (the sparks' orange stop going to the dull-red one with height, as the sparks cool), pulled 35 % toward its own luminance so it reads as warm grey smoke and not as a second flame. Faded in over the flame's tip (`r` 0.55 to 1.15) and out over `r` 1.4 to 2.6.
+- **Where the column is.** The centreline leaves the flame's tip and bends downwind as a *bent-over plume*: the textbook rise of a plume in a crosswind is `z ∝ x^(2/3)` (Briggs), so at rise `r` (in flame heights) the centreline is `0.93 · lean · r^1.5`, which is the flame's own tip offset at `r = 1` to within 7 % (no gap between flame and smoke) and the sparks' reach, `1.5 · lean · 2.6`, at the top. The column is steep where the buoyancy rules and flattens where the wind does, so it is a curve and not a ramp. A slow meander grows with height so a calm column wanders.
+- **How wide it is.** A turbulent plume spreads linearly. With the entrainment coefficient `α ≈ 0.13` (Morton, Taylor & Turner, as quoted by Matulka et al.) a plume's top-hat radius grows as `b = 1.2 α z ≈ 0.156 z`, measured from the plume's virtual origin, which is the flame's middle (`0.35`): the half-width is `0.05 + 0.156 · max(r − 0.35, 0)` flame heights (0.40 at the top) **across the plume**. A bent column is cut obliquely by the screen's horizontal, so the width the shader measures along the screen is that times `sqrt(1 + slope²)`; without that a column in a 3 m/s wind drew as a thin straight streak, the "light shaft" look of the first build.
+- **What it looks like inside.** Wisps: three octaves of value noise carried along the column, warped sideways by a slow curl that grows with height, and an edge ragged by the same curl. The noise lives in the plume's own frame (across it, and along its path), so a bent column is bent *all the way through*. The wisps never fall under 30 % of the column's density: a column with true voids reads as a face or a pair of eyes in the dark.
+- **How bright it is.** Lit by the flame: `1 / (1 + (d / 0.7)²)` with `d` the straight distance from the flame's middle (not the path's: a bent column is as close to its fire as the wind lets it be), an inverse square softened at the source, so a column is bright above the tip and gone by the top. Coloured by the fire's own hue (the sparks' orange stop going to the dull-red one with height, as the sparks cool), pulled 35 % toward its own luminance so it reads as warm grey smoke and not as a second flame. Faded in over the flame's tip (`r` 0.55 to 1.15) and out over `r` 1.4 to 2.6. A column too far away for its wisps to be resolved fades them to their mean (a soft haze, not a crawl of noise), and is never drawn thinner than a pixel and a quarter, keeping its energy in a wider, dimmer column.
 - **Whose light.** `FlameLook::strength` and the fire's catch (`took²`, as the sparks) scale it, so a fire that is lit grows its smoke as it catches and one that is put out stops. `FlameSite::depth_fade` applies: a fire whose source cannot be seen sheds no smoke that can.
 
 ## Parameters
 
 | parameter | value | source |
 |---|---|---|
-| `FlameSmoke::density` | `0.0..=1.0`, default 0.6 | design default: the strength at which the column reads at 3 m and is a haze at 12 m (judged in captures) |
+| `FlameSmoke::density` | `0.0..=1.0`, default 0.8 | design default: the strength at which the column reads at 3 m and is a haze at 12 m (judged in captures) |
 | plume half-width | `0.05 + 0.156 · (r − 0.35)` flame heights | Morton, Taylor & Turner via Matulka et al. (`α ≈ 0.13`, `b = 6α z / 5`) |
 | virtual origin | the flame's middle, `0.35` | the light's own height (`flame_light_offset`) |
 | rise speed | 0.32 flame heights a second | design default |
-| lit falloff | `1 / (1 + ((r − 0.35) / 0.7)²)` | inverse square (PBR ch. 11: smoke scatters the light that reaches it), softened at the source |
-| downwind lean | `lean · (r + 0.8125 · max(r − 1, 0))` | design default; `r = 1` is the flame's tip, `r = 2.6` the sparks' reach |
+| lit falloff | `1 / (1 + (d / 0.7)²)`, `d` from the flame's middle | inverse square (PBR ch. 11: smoke scatters the light that reaches it), softened at the source |
+| downwind lean | `0.93 · lean · r^1.5` | bent-over plume (`z ∝ x^(2/3)`, Briggs; not in the corpus, used as a shape); `r = 1` is the flame's tip, `r = 2.6` the sparks' reach |
+| gain at density 1 | 0.85 of a flame core | design default, judged in captures |
 | quad extents | the ember quad's (`RISE_MAX` 2.6, `HALF_WIDTH` 0.7, margin 0.35) | `flame-embers.md`, `flame-culling.md` |
-| `FireKind::smoke()` | candle 0.2, lantern none, torch 0.8, brazier 0.4, campfire 0.8, bonfire 1.0 | design default: pitch and wood smoke, a clean wick and charcoal smoke less |
+| `FireKind::smoke()` | candle 0.25, lantern none, torch 0.8, brazier 0.5, campfire 0.9, bonfire 1.0 | design default: pitch and wood smoke, a clean wick and charcoal smoke less |
 
 ## Validation targets
 
@@ -69,6 +70,15 @@ A third quad per fire, a child of the flame like the sparks' (`FlameEmbers`), wi
 5. **At night it reads as lit smoke, not a second flame**: at 3 m it is a soft warm-grey column with a ragged edge that fades into the dark before its top; at 12 m a faint haze over the fire; never a hard-edged shape, never brighter than the flame's own body.
 6. A fire of another colour has smoke of that colour (`FlameSite::color`).
 7. Cost: with every fire smoking, `bench_flames`' off-screen cost is unchanged (culled), and an on-screen smoke costs fragment work only inside the column (a pixel outside the plume's lateral extent returns before any noise).
+
+
+### Results (iteration 281)
+
+Captured on the courtyard (seed 7, pool 8, `LIGHTS_EMBERS=4`, `LIGHTS_SMOKE=0.8`, 1280 x 720, frame 300). Each target above is a line:
+
+1. A scene with no `FlameSmoke`: the default courtyard and the one with `LIGHTS_EMBERS=4` against the build before this change differ in at most one channel of one pixel (`magick compare -metric AE` prints 0.0013 = 1/765, which two runs of the *new* binary against each other print too: the GPU's own noise).
+4. The first build's column in a 3 m/s wind was a straight, thin streak across the frame (the centreline a ramp, the width measured along the screen's horizontal); the bent-over curve with its oblique width makes it a broad plume that bends over, as the sparks do.
+5. At 3 m, a warm-grey column with a ragged edge that starts at the flame's tip and is gone before the quad's top; from the ground at 9 m a faint wisp above each fire; in the 45° wide shot a thin column over each brazier (the camera looks down it, so it is foreshortened).
 
 ## What great looks like
 

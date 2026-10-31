@@ -105,7 +105,13 @@ fn main() {
 }
 
 /// The torches, and one camera at the grid's corner, drawing to an image no one reads.
-fn scene(mut commands: Commands, mut images: ResMut<Assets<Image>>, flames: usize, embers: bool, smoke: bool) {
+fn scene(
+    mut commands: Commands,
+    mut images: ResMut<Assets<Image>>,
+    flames: usize,
+    embers: bool,
+    smoke: bool,
+) {
     let mut target = Image::new_fill(
         Extent3d { width: 1280, height: 720, depth_or_array_layers: 1 },
         TextureDimension::D2,

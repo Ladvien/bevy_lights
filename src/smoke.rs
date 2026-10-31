@@ -58,7 +58,7 @@ pub struct FlameSmoke {
 
 impl Default for FlameSmoke {
     fn default() -> Self {
-        Self { density: 0.6 }
+        Self { density: 0.8 }
     }
 }
 
@@ -432,7 +432,8 @@ mod tests {
     fn only_a_site_that_asks_gets_a_smoke_quad_and_it_hangs_on_the_flame() {
         let mut app = app();
         let plain = app.world_mut().spawn((site(0.5, 0.0), Transform::default())).id();
-        let smoking = app.world_mut().spawn((site(0.5, 1.0), FlameSmoke::default(), Transform::default())).id();
+        let smoking =
+            app.world_mut().spawn((site(0.5, 1.0), FlameSmoke::default(), Transform::default())).id();
         app.update();
         app.update();
         let quads = smoke_quads(&mut app);
@@ -458,7 +459,8 @@ mod tests {
     #[test]
     fn a_changed_density_rewrites_the_tag_and_a_removed_component_takes_the_quad_away_and_can_return() {
         let mut app = app();
-        let id = app.world_mut().spawn((site(0.5, 0.0), FlameSmoke { density: 0.2 }, Transform::default())).id();
+        let id =
+            app.world_mut().spawn((site(0.5, 0.0), FlameSmoke { density: 0.2 }, Transform::default())).id();
         app.update();
         app.update();
         let before = smoke_quads(&mut app)[0].1;
@@ -508,7 +510,10 @@ mod tests {
             "the scene's smoke is lit by the shipped fire"
         );
         for stop in stops(&smoke_of(&app, tinted)) {
-            assert!(stop[1] > stop[0] && stop[1] > stop[2], "a green fire's smoke is green at both ends: {stop:?}");
+            assert!(
+                stop[1] > stop[0] && stop[1] > stop[2],
+                "a green fire's smoke is green at both ends: {stop:?}"
+            );
         }
         // A colour the host changes later reaches the smoke too.
         app.world_mut().get_mut::<FlameSite>(tinted).expect("the site").color =
