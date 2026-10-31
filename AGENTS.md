@@ -36,6 +36,7 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `src/flame.rs` — `FlamePlugin`, `FlameMaterial`, `FlameLook`, `FlameSite`, `Flame`, `dress_flames`, `update_flames`.
 - `src/flame.wesl` — the flame shader, embedded with `embedded_asset!`.
 - `src/embers.rs`, `src/embers.wesl` — `FlameEmbers` and the spark quad (a child of the `Flame`, registered by `FlamePlugin`).
+- `src/smoke.rs`, `src/smoke.wesl` — `FlameSmoke` and the smoke quad (a child of the `Flame`, the spark quad's geometry and culling box, additive only).
 - `examples/common/mod.rs` — the `LIGHTS_*` run switches and the fly camera.
 - `examples/courtyard.rs` — the showcase and capture scene: four braziers, 48 torch-bearers, an orbit focus.
 - `examples/bench_lights.rs` — the CPU bench, no window and no GPU.
@@ -225,5 +226,10 @@ is an art decision, so it needs the same treatment as a physics constant.
   (`ember_reach`: `sqrt((0.7 + 3.9 · |lean|)² + 2.95²)` flame heights), rewritten by `update_embers` on the frame the flame's
   scale is, *after* `update_flames`. Change `HALF_WIDTH`, `RISE_MAX`, `MARGIN` or `DRIFT` in `src/embers.wesl` and the port in
   `an_ember_quad_any_part_of_which_is_on_screen_is_never_culled` and `model/tag.rs`'s mirrors must change with them.
+  The smoke quad (`FlameSmoke`) is the ember quad's geometry constant for constant and uses `ember_cull_extents`: change `HALF_WIDTH`,
+  `RISE_MAX`, `MARGIN` or `LEAN_TOP` in `src/smoke.wesl` and its own port (`a_smoke_quad_any_part_of_which_is_on_screen_is_never_culled`)
+  and the ember mirrors change together, or the smoke of a fire at the screen's edge pops. A smoke column is **additive only**: a blended
+  smoke sorts against every other transparent surface of the host (`docs/research/flame-smoke.md`), and a column drawn thinner than a pixel
+  crawls, so `smoke.wesl` floors its width at a pixel and a quarter and fades its noise out when it cannot be resolved.
 - **`cargo test` hides holes in a trimmed feature list**, because the full-`bevy` dev-dependency
   unifies features into the library graph. `cargo build` alone compiles a consumer's view.

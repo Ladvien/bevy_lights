@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use crate::model::{
     CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, fire_lumens, flame_light_offset, flicker_rate,
 };
-use crate::{FlameEmbers, FlameSite, Flicker, MAX_EMBER_RATE, PoolCandidate};
+use crate::{FlameEmbers, FlameSite, FlameSmoke, Flicker, MAX_EMBER_RATE, PoolCandidate};
 
 /// A named kind of fire: its fuel-bed diameter, flicker depth and flame height together, so a
 /// picker (or a project file) stores one word instead of three loose numbers.
@@ -151,12 +151,29 @@ impl FireKind {
         Some(FlameEmbers { rate })
     }
 
+    /// The smoke this fire gives off, or `None` for one that gives none worth drawing (a lantern's enclosed wick). A wood or
+    /// pitch fire smokes more than a clean one: a candle a thin wisp, a charcoal brazier little, a torch, a campfire and a
+    /// bonfire a column. Insert the value on the [`FlameSite`] entity, as [`embers`](Self::embers). A design default
+    /// (`docs/research/flame-smoke.md`).
+    pub fn smoke(self) -> Option<FlameSmoke> {
+        let density = match self {
+            FireKind::Lantern => return None,
+            FireKind::Candle => 0.25,
+            FireKind::Torch => 0.8,
+            FireKind::Campfire => 0.9,
+            FireKind::Brazier => 0.5,
+            FireKind::Bonfire => crate::MAX_SMOKE_DENSITY,
+        };
+        Some(FlameSmoke { density })
+    }
+
     /// The flame and its light in one bundle: [`site`](Self::site) and [`candidate`](Self::candidate),
     /// so a flame never goes without the light the pool hands it and both come from the same kind.
     /// Spawn it on the entity at the flame's foot, and the light is handed to the flame's middle (see
     /// [`candidate`](Self::candidate)); `lux` and `over` are [`lumens`](Self::lumens)' arguments, `over`
-    /// being that middle's height above the ground. The sparks stay separate because a candle or a lantern has
-    /// none and a bundle cannot hold an absent component: `if let Some(e) = kind.embers() { entity.insert(e); }`.
+    /// being that middle's height above the ground. The sparks and the smoke stay separate because some kinds have
+    /// neither (a lantern) or only one (a candle smokes and sheds no sparks) and a bundle cannot hold an absent component:
+    /// `if let Some(e) = kind.embers() { entity.insert(e); }`, and the same with [`smoke`](Self::smoke).
     ///
     /// ```
     /// # use bevy_lights::*;

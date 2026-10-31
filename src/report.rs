@@ -34,6 +34,7 @@ checked!(
     crate::Snuff,
     crate::FlameSite,
     crate::FlameEmbers,
+    crate::FlameSmoke,
     crate::PoolCandidate,
     crate::LightPool,
     crate::FlameLook,

@@ -157,6 +157,25 @@ fn fire_kinds_shed_embers_by_size() {
     }
 }
 
+/// Smoke follows the fuel: a lantern's enclosed wick gives none, a candle a thin wisp, and a pitch or wood fire a thicker column than a
+/// clean one; every density is one the shader accepts.
+#[test]
+fn fire_kinds_smoke_by_what_they_burn() {
+    assert_eq!(FireKind::Lantern.smoke(), None);
+    let density = |kind: FireKind| kind.smoke().map(|smoke| smoke.density);
+    for kind in FireKind::ALL {
+        if let Some(smoke) = kind.smoke() {
+            assert!(smoke.problems().is_empty(), "{}", kind.name());
+        }
+    }
+    assert!(
+        density(FireKind::Candle) < density(FireKind::Brazier),
+        "a candle is a wisp beside a charcoal brazier"
+    );
+    assert!(density(FireKind::Brazier) < density(FireKind::Torch), "charcoal smokes less than a pitch torch");
+    assert!(density(FireKind::Torch) <= density(FireKind::Bonfire), "a bonfire is the heaviest");
+}
+
 /// The bundle is the flame and its light together, so nothing a picker spawns can disagree with the kind.
 #[test]
 fn a_fire_bundle_is_the_flame_and_the_light_of_one_kind() {

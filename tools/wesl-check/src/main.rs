@@ -35,7 +35,7 @@ use wgsl_parse::syntax::ModulePath;
 
 /// The crate's own modules. Every one of them: a WESL error is silent at build time, so a module
 /// nobody compiles is a module that fails in the GPU driver.
-const MODULES: &[&str] = &["bevy_lights::flame", "bevy_lights::embers"];
+const MODULES: &[&str] = &["bevy_lights::flame", "bevy_lights::embers", "bevy_lights::smoke"];
 
 /// The Bevy namespaces the crate's shaders import from. Each is mounted under its own name and under
 /// the crate's sub-package spelling.

@@ -109,7 +109,7 @@ const EMBER_DRIFT: f32 = 1.5;
 /// How far from its origin the ember quad's vertex stage can put a corner, in drawn flame heights, for a flame leaning by
 /// `lean` (the scale's `y` and `z` less one): the ball the quad is certain to stay inside whichever way the camera faces.
 ///
-/// **Mirrors `src/embers.wesl`**: the quad is a rectangle in the plane facing the camera, `across` the horizontal camera
+/// **Mirrors `src/embers.wesl` and `src/smoke.wesl`** (the smoke quad is the sparks' quad, constant for constant): the quad is a rectangle in the plane facing the camera, `across` the horizontal camera
 /// axis and `climb` its perpendicular, so a corner is `sqrt(across² + climb²)` from the foot. `climb` reaches at most
 /// `RISE_MAX + MARGIN` (`2.95`, the camera level with the source) and `across` at most `HALF_WIDTH + DRIFT · RISE_MAX · |lean|`,
 /// because the quad widens downwind by the drift a spark has at the top of its rise. That is `3.03` flame heights in still air
@@ -121,7 +121,7 @@ pub fn ember_reach(lean: [f32; 2]) -> f32 {
     across.hypot(EMBER_RISE_MAX + EMBER_MARGIN)
 }
 
-/// [`flame_cull_extents`] for the flame's ember quad (`FlameEmbers`): the half-extents, in the quad's **local** axes, of the box
+/// [`flame_cull_extents`] for the flame's ember quad (`FlameEmbers`), and for its smoke quad (`FlameSmoke`), which has the same geometry: the half-extents, in the quad's **local** axes, of the box
 /// a frustum test must use to hold every corner the embers' vertex stage can draw.
 ///
 /// The quad is a child of the flame at the identity, so it inherits the flame's instance scale, and the box is divided by it as

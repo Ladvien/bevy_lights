@@ -4,6 +4,20 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+No API break: the new items are additive (`FlameSmoke` is a new component, `FireKind::smoke` a new method, and `FlameLook`, `FlameSite` and `PoolCandidate` are untouched).
+
+### Added
+
+- **`FlameSmoke { density }`: a fire's lit plume.** A flame ended in a clean point against the dark; a wood or pitch fire goes on up as smoke, and in the dark that smoke is visible because the fire lights it. Add `FlameSmoke` (`density` `0.0..=MAX_SMOKE_DENSITY`, default 0.8) to a `FlameSite` and its flame gets one more camera-facing additive quad (`src/smoke.wesl`) holding a faint column that leaves the flame's tip, widens as a turbulent plume does (half-width `0.05 + 0.156 · (r − 0.35)` flame heights, from the entrainment coefficient 0.13 of Morton, Taylor & Turner), is lit by the flame with an inverse square, takes the fire's own hue (`FlameSite::color`) and thins into the dark. In a `FlameWind` it bends over downwind as a bent-over plume does (`z ∝ x^(2/3)`), so the wind shows from across the scene. It is a function of the shared clock (no particle state, the same on every machine), one draw per fire that asks and nothing for one that does not. The quad is the sparks' quad's geometry and carries the sparks' culling box (`ember_cull_extents`), so a fire whose smoke is off the screen draws none of it; it takes the flame's catch (a fire not yet caught smokes nothing, a snuffed one stops) and `depth_fade`. **Additive only**: a blended smoke sorts against every other transparent surface of the host, so it has no dark, occluding half and is a night effect (`docs/research/flame-smoke.md`). `docs/media/smoke.png`.
+- **`FireKind::smoke()`**: a lantern's enclosed wick gives none, a candle `0.25`, a brazier `0.5`, a torch `0.8`, a campfire `0.9` and a bonfire `1.0` (design defaults), for `entity.insert(kind.smoke())` beside `kind.embers()`.
+- **What it costs** (`docs/DEMOS.md`, interleaved against the build before it): a scene with no smoke is the same (`bench_flames`, 5 000 flames 2.23 → 2.23 ms a frame, 20 000 4.22 → 4.27); a smoking fire costs about 0.16 µs a frame on the CPU, the per-entity cost of the sparks' quad, and an on-screen column costs the GPU about 11 µs of the transparent pass at a 3 m close-up with 52 fires.
+- **`MAX_SMOKE_DENSITY`, `FlameSmoke::problems`** (reported when a bad component is added, like the sparks').
+- **`LIGHTS_SMOKE=d` for the courtyard example and `BENCH_SMOKE=1` for `examples/bench_flames.rs`**; the bench's line gains `smoke=` and `smoke_visible=`, the renderer's own count of the smoke quads it did not cull.
+
+### Changed
+
+- `tools/wesl-check` also compiles `src/smoke.wesl`, with and without the depth prepass.
+
 ## [0.4.0] - 2026-10-31
 
 API break (`cargo semver-checks` against 0.3.1: 201 of 202 checks pass; `constructible_struct_adds_field` fails for `FlameSite.color`, `LightPool.focus` and `PoolCandidate.color`): a host that builds one of those three naming every field adds the new one (`color: None`, `focus: FocusRule::One`); a host that spreads `..default()` or `..FireKind::Torch.site()` is unaffected. Carries a fire's own colour, the pool for more than one viewer, the come-into-view flash fix, the pop fix for a light handed on mid-fade-in and the ember culling.
