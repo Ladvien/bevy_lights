@@ -213,5 +213,9 @@ is an art decision, so it needs the same treatment as a physics constant.
   distorts any box built once; `set_scale` rewrites the box on exactly the frames it rewrites the scale. The test
   `a_flame_any_part_of_which_is_on_screen_is_never_culled` carries a port of the vertex stage's corner formula: change that
   geometry in `src/flame.wesl` and the port and `FLAME_REACH` must change with it, or flames pop at the screen's edge.
+  The ember quad (`FlameEmbers`) is the same trap with a wider reach that grows with the lean: `ember_cull_extents`
+  (`ember_reach`: `sqrt((0.7 + 3.9 · |lean|)² + 2.95²)` flame heights), rewritten by `update_embers` on the frame the flame's
+  scale is, *after* `update_flames`. Change `HALF_WIDTH`, `RISE_MAX`, `MARGIN` or `DRIFT` in `src/embers.wesl` and the port in
+  `an_ember_quad_any_part_of_which_is_on_screen_is_never_culled` and `model/tag.rs`'s mirrors must change with them.
 - **`cargo test` hides holes in a trimmed feature list**, because the full-`bevy` dev-dependency
   unifies features into the library graph. `cargo build` alone compiles a consumer's view.
