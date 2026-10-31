@@ -94,9 +94,59 @@ const MIN_SCALE: f32 = 1.0e-4;
 /// assert!((y - 10.0 * FLAME_REACH).abs() < 1e-3, "a lean squashes the scale to 0.1, so the box is stretched tenfold");
 /// ```
 pub fn flame_cull_extents(height: f32, took: f32, lean: [f32; 2]) -> [f32; 3] {
+    cull_extents(FLAME_REACH, height, took, lean)
+}
+
+/// The ember quad's width either side of the flame's axis, in flame heights, in still air: `HALF_WIDTH` in `src/embers.wesl`.
+const EMBER_HALF_WIDTH: f32 = 0.7;
+/// How far up the ember quad reaches, in flame heights: `RISE_MAX` in `src/embers.wesl`.
+const EMBER_RISE_MAX: f32 = 2.6;
+/// The ember quad's margin round its sparks, in flame heights: `MARGIN` in `src/embers.wesl`.
+const EMBER_MARGIN: f32 = 0.35;
+/// How far a spark's drift outruns the flame's lean: `DRIFT` in `src/embers.wesl`.
+const EMBER_DRIFT: f32 = 1.5;
+
+/// How far from its origin the ember quad's vertex stage can put a corner, in drawn flame heights, for a flame leaning by
+/// `lean` (the scale's `y` and `z` less one): the ball the quad is certain to stay inside whichever way the camera faces.
+///
+/// **Mirrors `src/embers.wesl`**: the quad is a rectangle in the plane facing the camera, `across` the horizontal camera
+/// axis and `climb` its perpendicular, so a corner is `sqrt(across² + climb²)` from the foot. `climb` reaches at most
+/// `RISE_MAX + MARGIN` (`2.95`, the camera level with the source) and `across` at most `HALF_WIDTH + DRIFT · RISE_MAX · |lean|`,
+/// because the quad widens downwind by the drift a spark has at the top of its rise. That is `3.03` flame heights in still air
+/// and `5.27` at the lean limit `sin 70° = 0.94`. A `lean` that is not finite counts as none.
+pub fn ember_reach(lean: [f32; 2]) -> f32 {
+    let wind = lean[0].hypot(lean[1]);
+    let wind = if wind.is_finite() { wind } else { 0.0 };
+    let across = EMBER_HALF_WIDTH + EMBER_DRIFT * EMBER_RISE_MAX * wind;
+    across.hypot(EMBER_RISE_MAX + EMBER_MARGIN)
+}
+
+/// [`flame_cull_extents`] for the flame's ember quad (`FlameEmbers`): the half-extents, in the quad's **local** axes, of the box
+/// a frustum test must use to hold every corner the embers' vertex stage can draw.
+///
+/// The quad is a child of the flame at the identity, so it inherits the flame's instance scale, and the box is divided by it as
+/// the flame's is. The ball is wider than the flame's ([`ember_reach`] against [`FLAME_REACH`]) and widens with the lean, so a
+/// box built once for still air would cull a downwind fire's sparks while they are still on screen.
+///
+/// ```
+/// # use bevy_lights::model::tag::*;
+/// let [x, y, z] = ember_cull_extents(1.0, 1.0, [0.0, 0.0]);
+/// assert!((x - ember_reach([0.0, 0.0])).abs() < 1e-6 && x == y && y == z, "still air: a cube about the foot");
+/// assert!(x > FLAME_REACH, "wider than the flame it hangs on");
+/// let lean = [0.0, 0.5];
+/// let [_, y, z] = ember_cull_extents(1.0, 1.0, lean);
+/// assert!((y - ember_reach(lean)).abs() < 1e-5, "the scale's y is 1, so the box is the ball");
+/// assert!((z * 1.5 - ember_reach(lean)).abs() < 1e-5, "the frustum test multiplies z by its scale, 1.5, and gets the ball back");
+/// ```
+pub fn ember_cull_extents(height: f32, took: f32, lean: [f32; 2]) -> [f32; 3] {
+    cull_extents(ember_reach(lean), height, took, lean)
+}
+
+/// A cube of side `2 · reach · size` about the foot, divided axis by axis by the instance scale; `size` is the drawn height.
+fn cull_extents(reach: f32, height: f32, took: f32, lean: [f32; 2]) -> [f32; 3] {
     let took = if took.is_nan() { 0.0 } else { took.clamp(0.0, 1.0) };
     let size = height.max(0.0) * took.max(1.0e-4).powf(CATCH_SIZE_EXPONENT);
-    let reach = FLAME_REACH * size;
+    let reach = reach * size;
     [took, 1.0 + lean[0], 1.0 + lean[1]].map(|scale| reach / scale.max(MIN_SCALE))
 }
 
@@ -199,14 +249,57 @@ mod tests {
             (-1.0, 1.0, [0.0, 0.0]),
             (1.0, 1.0, [-1.0, -1.0]),
             (1.0, 7.0, [3.0, 3.0]),
+            (1.0, 1.0, [f32::NAN, 0.2]),
+            (1.0, 1.0, [f32::INFINITY, 0.0]),
         ] {
-            let half = flame_cull_extents(height, took, lean);
-            assert!(
-                half.iter().all(|h| h.is_finite() && *h >= 0.0),
-                "{height} {took} {lean:?} gave {half:?}"
-            );
+            for half in [flame_cull_extents(height, took, lean), ember_cull_extents(height, took, lean)] {
+                assert!(
+                    half.iter().all(|h| h.is_finite() && *h >= 0.0),
+                    "{height} {took} {lean:?} gave {half:?}"
+                );
+            }
         }
         // The catch above 1 is a flare, which the shader clamps: the cube stays the full-grown flame's.
         assert_eq!(flame_cull_extents(1.0, 7.0, [0.0, 0.0]), flame_cull_extents(1.0, 1.0, [0.0, 0.0]));
+        assert_eq!(ember_cull_extents(1.0, 7.0, [0.0, 0.0]), ember_cull_extents(1.0, 1.0, [0.0, 0.0]));
+    }
+
+    #[test]
+    fn an_embers_box_is_the_same_cube_about_its_foot_whatever_the_scale_does_to_it() {
+        // As the flame's, with the reach the lean makes: the world box the frustum test builds is the ball's cube.
+        for (height, took, lean) in [
+            (0.35, 1.0, [0.0, 0.0]),
+            (0.35, 0.2, [0.5, -0.3]),
+            (2.0, 0.001, [-0.94, 0.0]),
+            (1.1, 0.7, [0.3, 0.94]),
+        ] {
+            let half = ember_cull_extents(height, took, lean);
+            let scale = [took, 1.0 + lean[0], 1.0 + lean[1]];
+            let size = height * took.powf(2.0 / 3.0);
+            let want = ember_reach(lean) * size;
+            for axis in 0..3 {
+                let world = half[axis] * scale[axis];
+                assert!(
+                    (world - want).abs() < 1e-4 * (1.0 + world),
+                    "axis {axis}: height {height}, catch {took}, lean {lean:?}: {world} against {want}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn an_embers_reach_grows_with_the_lean_and_never_falls_short_of_the_flames() {
+        let still = ember_reach([0.0, 0.0]);
+        let gale = ember_reach([0.94, 0.0]);
+        assert!(
+            still > FLAME_REACH,
+            "the sparks' quad is wider than the flame: {still} against {FLAME_REACH}"
+        );
+        assert!((still - 3.03).abs() < 0.01, "still air: {still}");
+        assert!((gale - 5.27).abs() < 0.01, "at the lean limit: {gale}");
+        // The lean's direction does not matter, only its length: the quad widens along the camera's horizontal axis, which
+        // may be any way round the fire.
+        assert!((ember_reach([0.6, 0.8]) - ember_reach([1.0, 0.0])).abs() < 1e-6);
+        assert!((ember_reach([-0.6, 0.8]) - ember_reach([1.0, 0.0])).abs() < 1e-6);
     }
 }

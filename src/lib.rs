@@ -94,11 +94,11 @@ pub use model::{
     CALM_FLICKER_DEPTH, DEFAULT_FIRE_DIAMETER, EMBER_AT, FADE_SECONDS, FLAME_REACH, FLAME_TILT_LIMIT,
     FLICKER_DEPTH, HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY, MAX_FLICKER_DEPTH, MOON_KEY, Problem,
     ProblemKind, RANGE_MARGIN, SNUFF_SECONDS, WHIPPING_FLICKER_DEPTH, blackbody_colour, blackbody_luminance,
-    char_field, char_radiance, coal_radiance, fade_factor, fill_for, fire_lumens, fire_lux, fire_reach,
-    flame_cull_extents, flame_light_offset, flame_tilt, flicker_depth, flicker_factor, flicker_mean,
-    flicker_swing, ground_lux, ground_ramp, ground_reach, hand_off, key_to_fill, kindle_gain,
-    lean_light_shift, pack_flame_tag, preferred, raised_light, shadow_set, snuff_gain, stops,
-    unpack_flame_tag, white_balanced,
+    char_field, char_radiance, coal_radiance, ember_cull_extents, ember_reach, fade_factor, fill_for,
+    fire_lumens, fire_lux, fire_reach, flame_cull_extents, flame_light_offset, flame_tilt, flicker_depth,
+    flicker_factor, flicker_mean, flicker_swing, ground_lux, ground_ramp, ground_reach, hand_off,
+    key_to_fill, kindle_gain, lean_light_shift, pack_flame_tag, preferred, raised_light, shadow_set,
+    snuff_gain, stops, unpack_flame_tag, white_balanced,
 };
 pub use pool::{LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
 
