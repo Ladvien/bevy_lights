@@ -7,11 +7,17 @@
 //!
 //! The quad is the flame's child, so it takes the fire's catch and the wind's lean from the flame's own instance scale: a fire
 //! being lit sheds nothing until it has caught, a fire put out stops, and a wind blows the sparks further than it leans the flame.
-//! The design and its sources are in `docs/research/flame-embers.md`.
+//! A fire whose sparks are off the screen draws none of them: the quad carries a culling box of its own
+//! ([`ember_cull_extents`](crate::ember_cull_extents)), wide enough for the quad's downwind reach and kept in step with the
+//! flame's scale.
+//!
+//! The design and its sources are in `docs/research/flame-embers.md` and `docs/research/flame-culling.md`.
 
 use bevy::asset::embedded_asset;
-use bevy::camera::visibility::NoFrustumCulling;
+use bevy::camera::primitives::Aabb;
+use bevy::camera::visibility::NoAutoAabb;
 use bevy::light::NotShadowCaster;
+use bevy::math::Vec3A;
 use bevy::mesh::{MeshTag, MeshVertexBufferLayoutRef};
 use bevy::pbr::{Material, MaterialPipeline, MaterialPipelineKey, MeshMaterial3d};
 use bevy::prelude::*;
@@ -20,7 +26,7 @@ use bevy::shader::ShaderRef;
 use bevy::time::Real;
 
 use crate::flame::{Flame, FlameAssets, FlameLook, FlameSite};
-use crate::model::{pack_flame_tag, set_flame_brightness};
+use crate::model::{ember_cull_extents, pack_flame_tag, set_flame_brightness, unpack_flame_tag};
 
 /// The embers shader, embedded in the binary by [`FlamePlugin`](crate::FlamePlugin).
 const EMBER_SHADER_PATH: &str = "embedded://bevy_lights/embers.wesl";
@@ -170,11 +176,19 @@ fn build_ember_assets(
     assets.built = true;
 }
 
+/// The half-extents of the culling box of an ember quad whose flame stands at `scale`, the instance scale `update_flames` writes
+/// (`x` the catch, `y` and `z` one more than the lean). The quad is the flame's child at the identity, so the frustum test
+/// multiplies the box by that scale, and [`ember_cull_extents`] divides it out first.
+fn cull_box(height: f32, scale: Vec3) -> Vec3A {
+    Vec3A::from(ember_cull_extents(height, scale.x, [scale.y - 1.0, scale.z - 1.0]))
+}
+
 /// Gives the flame of every [`FlameEmbers`] site one ember quad, carrying the site's phase and height and, in the tag's brightness
-/// byte, the rate.
+/// byte, the rate. The quad's culling box is the crate's own ([`ember_cull_extents`]), for the reason the flame's is: the vertex
+/// stage draws a quad the unit square's box does not hold, and the scale it inherits is data.
 pub(crate) fn dress_embers(
     mut commands: Commands,
-    flames: Query<(Entity, &ChildOf), UndressedFlame>,
+    flames: Query<(Entity, &ChildOf, &Transform), UndressedFlame>,
     sites: Query<(&FlameSite, &FlameEmbers)>,
     ember_assets: Res<EmberAssets>,
     flame_assets: Res<FlameAssets>,
@@ -182,10 +196,13 @@ pub(crate) fn dress_embers(
     if !ember_assets.built || !flame_assets.built() {
         return;
     }
-    for (flame, parent) in &flames {
+    for (flame, parent, at) in &flames {
         let Ok((site, embers)) = sites.get(parent.parent()) else { continue };
-        let tag =
-            MeshTag::new(pack_flame_tag(site.phase, site.height, embers.share(), flame_assets.max_height()));
+        let packed = pack_flame_tag(site.phase, site.height, embers.share(), flame_assets.max_height());
+        let tag = MeshTag::new(packed);
+        // The flame's scale as it stands: a flame dressed in mid-catch or in a wind is not at the identity.
+        let height = unpack_flame_tag(packed, flame_assets.max_height()).1;
+        let bound = Aabb { center: Vec3A::ZERO, half_extents: cull_box(height, at.scale) };
         let mesh = ember_assets.mesh.clone();
         let material = ember_assets.material_for(site.depth_fade).clone();
         commands.entity(flame).queue_silenced(move |mut flame: EntityWorldMut| {
@@ -198,7 +215,9 @@ pub(crate) fn dress_embers(
                     MeshMaterial3d(material),
                     Transform::IDENTITY,
                     NotShadowCaster,
-                    NoFrustumCulling,
+                    // The unit square's box neither holds the sparks' quad nor survives the scale it inherits.
+                    bound,
+                    NoAutoAabb,
                 ));
             });
         });
@@ -208,26 +227,40 @@ pub(crate) fn dress_embers(
 /// A flame that has no ember quad yet.
 type UndressedFlame = (With<Flame>, Without<Embered>);
 
-/// What an ember quad is read through: itself, its flame (its parent), its tag and its material.
-type EmberQuad = (Entity, &'static ChildOf, &'static mut MeshTag, &'static mut MeshMaterial3d<EmberMaterial>);
+/// What an ember quad is read through: itself, its flame (its parent), its tag, its culling box and its material.
+type EmberQuad = (
+    Entity,
+    &'static ChildOf,
+    &'static mut MeshTag,
+    &'static mut Aabb,
+    &'static mut MeshMaterial3d<EmberMaterial>,
+);
 
-/// The flame and the site an ember quad hangs on.
+/// The flame and the site an ember quad hangs on, and the height scale their tags are packed against.
 #[derive(bevy::ecs::system::SystemParam)]
 pub(crate) struct EmberOwners<'w, 's> {
-    flames: Query<'w, 's, &'static ChildOf, With<Flame>>,
+    flames: Query<'w, 's, (&'static ChildOf, &'static Transform), With<Flame>>,
     sites: Query<'w, 's, (&'static FlameSite, Option<&'static FlameEmbers>)>,
+    assets: Res<'w, FlameAssets>,
 }
 
 impl EmberOwners<'_, '_> {
-    /// The site of `flame` and its embers, when `flame` is a flame that hangs on a site.
-    fn site_of(&self, flame: Entity) -> Option<(&FlameSite, Option<&FlameEmbers>)> {
-        let site = self.flames.get(flame).ok()?.parent();
-        self.sites.get(site).ok()
+    /// The site of `flame` and its embers, and the instance scale `flame` stands at, when `flame` is a flame that hangs on a site.
+    fn site_of(&self, flame: Entity) -> Option<(&FlameSite, Option<&FlameEmbers>, Vec3)> {
+        let (parent, at) = self.flames.get(flame).ok()?;
+        let (site, embers) = self.sites.get(parent.parent()).ok()?;
+        Some((site, embers, at.scale))
+    }
+
+    /// The height scale a flame's tag is packed against ([`FlameLook::max_height`] at `Startup`).
+    fn max_height(&self) -> f32 {
+        self.assets.max_height()
     }
 }
 
-/// Follows each site's [`FlameEmbers`] and [`FlameSite::depth_fade`] with its quad, takes the quad away when the component goes, and
-/// ticks the shared clock and a changed [`FlameLook`].
+/// Follows each site's [`FlameEmbers`] and [`FlameSite::depth_fade`] with its quad, takes the quad away when the component goes,
+/// keeps the quad's culling box in step with the flame's scale (it runs after `update_flames`, so the box is never a frame
+/// behind the scale the frustum test multiplies it by), and ticks the shared clock and a changed [`FlameLook`].
 pub(crate) fn update_embers(
     mut commands: Commands,
     real: Res<Time<Real>>,
@@ -240,9 +273,10 @@ pub(crate) fn update_embers(
     if embers.is_empty() {
         return;
     }
-    for (entity, parent, mut tag, mut material) in &mut embers {
+    let max_height = owners.max_height();
+    for (entity, parent, mut tag, mut bound, mut material) in &mut embers {
         let site = owners.site_of(parent.parent());
-        let Some((site, Some(wanted))) = site else {
+        let Some((site, Some(wanted), scale)) = site else {
             // The component is gone (or the flame is): the quad goes, and the flame may be dressed again.
             commands.entity(entity).despawn();
             commands.entity(parent.parent()).remove::<Embered>();
@@ -255,6 +289,11 @@ pub(crate) fn update_embers(
         let packed = set_flame_brightness(tag.value, wanted.share());
         if packed != tag.value {
             tag.value = packed;
+        }
+        // Compared through `Deref`, so a quad whose flame did not change scale is not marked changed.
+        let half_extents = cull_box(unpack_flame_tag(tag.value, max_height).1, scale);
+        if bound.half_extents != half_extents {
+            bound.half_extents = half_extents;
         }
     }
     let elapsed = real.elapsed_secs_wrapped();
@@ -279,7 +318,7 @@ pub(crate) fn update_embers(
 mod tests {
     use super::*;
     use crate::flame::{build_flame_assets, dress_flames, update_flames};
-    use crate::model::{FLICKER_DEPTH, unpack_flame_tag};
+    use crate::model::{FLICKER_DEPTH, ember_reach, unpack_flame_tag};
 
     fn app() -> App {
         let mut app = App::new();
@@ -289,7 +328,10 @@ mod tests {
             .insert_resource(Assets::<EmberMaterial>::default())
             .init_resource::<FlameLook>()
             .init_resource::<FlameAssets>()
-            .init_resource::<EmberAssets>();
+            .init_resource::<EmberAssets>()
+            .insert_resource(bevy::time::TimeUpdateStrategy::ManualDuration(
+                std::time::Duration::from_secs_f64(1.0 / 60.0),
+            ));
         app.add_systems(Startup, (build_flame_assets, build_ember_assets))
             .add_systems(Update, (dress_flames, update_flames, dress_embers, update_embers).chain());
         app.update();
@@ -377,5 +419,141 @@ mod tests {
         assert_eq!(FlameEmbers { rate: f32::NAN }.problems().len(), 1);
         assert_eq!(FlameEmbers { rate: 99.0 }.share(), 1.0);
         assert_eq!(FlameEmbers { rate: f32::NAN }.share(), 0.0);
+    }
+
+    /// Points on the ember quad, a 5 x 5 grid of its corners and interior, where `src/embers.wesl`'s vertex stage puts them: the
+    /// same constants, the same extents (the quad widens downwind by the drift a spark has at the top of its rise), for a camera
+    /// at `eye` whose right axis is `camera_right`. `origin` is the flame's foot, `size` the height it is drawn at, `wind` the
+    /// instance scale's `y` and `z` less one.
+    fn drawn_points(origin: Vec3, size: f32, wind: Vec2, eye: Vec3, camera_right: Vec3) -> Vec<Vec3> {
+        const SOURCE_HEIGHT: f32 = 0.35;
+        const HALF_WIDTH: f32 = 0.7;
+        const RISE_MAX: f32 = 2.6;
+        const MARGIN: f32 = 0.35;
+        const DRIFT: f32 = 1.5;
+        let right = Vec3::new(camera_right.x, 0.0, camera_right.z).normalize();
+        let centre = origin + Vec3::Y * (size * SOURCE_HEIGHT);
+        let to_eye = eye - centre;
+        let sin_e = (to_eye.y / to_eye.length().max(1e-4)).clamp(0.0, 1.0);
+        let cos_e = (1.0 - sin_e * sin_e).max(0.0).sqrt();
+        let reach = DRIFT * wind.dot(Vec2::new(right.x, right.z)) * RISE_MAX;
+        let (x_low, x_high) = (-HALF_WIDTH + reach.min(0.0), HALF_WIDTH + reach.max(0.0));
+        let (v_low, v_high) = (-MARGIN, RISE_MAX * cos_e + MARGIN);
+        let screen_up = to_eye.normalize().cross(right).normalize();
+        let mut points = Vec::new();
+        for i in 0..5 {
+            for j in 0..5 {
+                let (u, v) = (i as f32 / 4.0, j as f32 / 4.0);
+                let across = x_low + (x_high - x_low) * u;
+                let climb = v_low + (v_high - v_low) * v;
+                points.push(origin + right * (across * size) + screen_up * (climb * size));
+            }
+        }
+        points
+    }
+
+    #[test]
+    fn an_ember_quad_any_part_of_which_is_on_screen_is_never_culled() {
+        // The quad the vertex stage draws (`drawn_points`), the box and the scale this crate gives it, and Bevy's own frustum
+        // test: a fire whose sparks are culled while any of their quad is inside the frame sheds none at the screen's edge.
+        crate::flame::culling_tests::assert_a_quad_on_screen_is_never_culled(
+            ember_cull_extents,
+            ember_reach,
+            drawn_points,
+        );
+    }
+
+    /// The ember quad's box as the frustum test sees it, with the scale it inherits from its flame: the half-extents in the
+    /// quad's own axes, the flame's scale, and the box the test builds from the two.
+    fn world_box(app: &mut App) -> Option<(Vec3, Vec3)> {
+        let (flame, bound) =
+            app.world_mut().query_filtered::<(&ChildOf, &Aabb), With<Ember>>().iter(app.world()).next()?;
+        let scale = app.world().get::<Transform>(flame.parent())?.scale;
+        Some((scale, Vec3::from(bound.half_extents) * scale))
+    }
+
+    #[test]
+    fn an_ember_quads_box_keeps_its_size_through_the_catch_and_the_lean_on_every_frame() {
+        // The quad inherits the flame's scale, which is the shader's data (its catch and its lean), and the frustum test
+        // multiplies the box by it. The box must have been divided by it first, in the same frame the scale was written, or a
+        // gusting fire's sparks are culled on screen for the frame the box lags.
+        let mut app = app();
+        app.insert_resource(crate::FlameWind { velocity: Vec2::new(3.0, -1.5) });
+        let height = 0.9;
+        app.world_mut().spawn((
+            FlameSite { kindle: crate::KINDLE_SECONDS, ..site(height, 0.0) },
+            FlameEmbers::default(),
+            Transform::default(),
+        ));
+        let (mut checked, mut seen_small) = (0, false);
+        for frame in 0..(crate::KINDLE_SECONDS * 60.0) as usize + 6 {
+            app.update();
+            let Some((scale, world)) = world_box(&mut app) else { continue };
+            checked += 1;
+            // The shader clamps the catch to 1, so the drawn size does too; the box's `x` is divided by the clamped catch
+            // and multiplied by the real scale, and may exceed the cube by exactly the overshoot, never fall short of it.
+            let size = height * scale.x.min(1.0).powf(2.0 / 3.0);
+            let want = Vec3::splat(ember_reach([scale.y - 1.0, scale.z - 1.0]) * size);
+            let slack = 1e-4 * (1.0 + want.max_element());
+            assert!(
+                (world.y - want.y).abs() < slack
+                    && (world.z - want.z).abs() < slack
+                    && world.x >= want.x - slack
+                    && world.x <= want.x * scale.x.max(1.0) + slack,
+                "frame {frame}: scale {scale}, the box measures {world} and the quad wants {want}"
+            );
+            seen_small |= scale.x < 0.3 && (scale.y - 1.0).abs() > 0.1;
+        }
+        assert!(checked > 30, "only {checked} frames had an ember quad");
+        assert!(
+            seen_small,
+            "the run never had a small, leaning flame, so it did not test the catch and the lean together"
+        );
+    }
+
+    #[test]
+    fn an_ember_quad_added_to_a_flame_mid_catch_has_the_right_box_from_its_first_frame() {
+        // `FlameEmbers` can be added to a fire that is already catching in a wind, so the quad is born under a scale that is
+        // not the identity; its box must be built for that scale and not the identity's.
+        let mut app = app();
+        app.insert_resource(crate::FlameWind { velocity: Vec2::new(0.0, 4.0) });
+        let height = 0.9;
+        let id = app
+            .world_mut()
+            .spawn((FlameSite { kindle: crate::KINDLE_SECONDS, ..site(height, 0.0) }, Transform::default()))
+            .id();
+        for _ in 0..12 {
+            app.update();
+        }
+        app.world_mut().entity_mut(id).insert(FlameEmbers::default());
+        let mut frames = 0;
+        // Until the quad exists no box is seen; the frame it does, it is already right.
+        while world_box(&mut app).is_none() {
+            app.update();
+            frames += 1;
+            assert!(frames < 5, "the quad never appeared");
+        }
+        let (scale, world) = world_box(&mut app).unwrap();
+        assert!(scale.x < 0.9 && (scale.z - 1.0).abs() > 0.1, "the flame is mid-catch and leaning: {scale}");
+        let size = height * scale.x.min(1.0).powf(2.0 / 3.0);
+        let want = ember_reach([scale.y - 1.0, scale.z - 1.0]) * size;
+        assert!((world.y - want).abs() < 1e-3 * (1.0 + want), "y: {world} against {want}");
+        assert!((world.z - want).abs() < 1e-3 * (1.0 + want), "z: {world} against {want}");
+    }
+
+    #[test]
+    fn an_ember_quad_carries_a_box_of_its_own_and_is_not_left_to_the_units_quad() {
+        let mut app = app();
+        app.world_mut().spawn((site(0.5, 0.0), FlameEmbers::default(), Transform::default()));
+        app.update();
+        app.update();
+        let quad = app.world_mut().query_filtered::<Entity, With<Ember>>().single(app.world()).unwrap();
+        let entity = app.world().entity(quad);
+        assert!(entity.contains::<Aabb>(), "an ember quad has a culling box");
+        assert!(entity.contains::<NoAutoAabb>(), "which Bevy is told not to recompute");
+        assert!(
+            !entity.contains::<bevy::camera::visibility::NoFrustumCulling>(),
+            "and which the frustum test uses: an off-screen fire's sparks are not drawn"
+        );
     }
 }
