@@ -85,6 +85,7 @@ mod flicker;
 mod kind;
 mod pool;
 mod report;
+mod smoke;
 
 pub use embers::{FlameEmbers, MAX_EMBER_RATE};
 pub use flame::{Flame, FlameGust, FlameLook, FlameMaterial, FlamePlugin, FlameSite, FlameWind};
@@ -101,6 +102,7 @@ pub use model::{
     raised_light, retint, shadow_set, shared_value, snuff_gain, stops, unpack_flame_tag, white_balanced,
 };
 pub use pool::{FocusRule, LightPool, LightPoolPlugin, PoolBudget, PoolCandidate, PoolLight, Rank};
+pub use smoke::{FlameSmoke, MAX_SMOKE_DENSITY};
 
 use bevy::prelude::*;
 

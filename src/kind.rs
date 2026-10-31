@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use crate::model::{
     CALM_FLICKER_DEPTH, FLICKER_DEPTH, WHIPPING_FLICKER_DEPTH, fire_lumens, flame_light_offset, flicker_rate,
 };
-use crate::{FlameEmbers, FlameSite, Flicker, MAX_EMBER_RATE, PoolCandidate};
+use crate::{FlameEmbers, FlameSite, FlameSmoke, Flicker, MAX_EMBER_RATE, PoolCandidate};
 
 /// A named kind of fire: its fuel-bed diameter, flicker depth and flame height together, so a
 /// picker (or a project file) stores one word instead of three loose numbers.
@@ -149,6 +149,21 @@ impl FireKind {
             FireKind::Bonfire => MAX_EMBER_RATE,
         };
         Some(FlameEmbers { rate })
+    }
+
+    /// The smoke this fire gives off, or `None` for one that gives none worth drawing (a lantern's enclosed wick). A wood or
+    /// pitch fire smokes more than a clean one: a candle a thin wisp, a charcoal brazier little, a torch, a campfire and a
+    /// bonfire a column. Insert the value on the [`FlameSite`] entity, as [`embers`](Self::embers). A design default
+    /// (`docs/research/flame-smoke.md`).
+    pub fn smoke(self) -> Option<FlameSmoke> {
+        let density = match self {
+            FireKind::Lantern => return None,
+            FireKind::Candle => 0.2,
+            FireKind::Torch | FireKind::Campfire => 0.8,
+            FireKind::Brazier => 0.4,
+            FireKind::Bonfire => crate::MAX_SMOKE_DENSITY,
+        };
+        Some(FlameSmoke { density })
     }
 
     /// The flame and its light in one bundle: [`site`](Self::site) and [`candidate`](Self::candidate),

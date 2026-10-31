@@ -576,6 +576,12 @@ fn embers_on() -> Option<FlameEmbers> {
     (rate > 0.0).then_some(FlameEmbers { rate })
 }
 
+/// `LIGHTS_SMOKE=d` gives every flame `FlameSmoke { density: d }`; unset or `0`, the courtyard draws no smoke.
+fn smoke_on() -> Option<FlameSmoke> {
+    let density: f32 = std::env::var("LIGHTS_SMOKE").ok()?.trim().parse().ok()?;
+    (density > 0.0).then_some(FlameSmoke { density })
+}
+
 /// `LIGHTS_EV100=x` overrides the camera's exposure (default [`NIGHT_EV100`]). A higher value is a darker
 /// frame: with the ground not saturated, a flame's own contrast can be judged against it.
 fn exposure_ev100() -> f32 {
@@ -928,6 +934,9 @@ fn spawn_scene(
                 if let Some(embers) = embers_on() {
                     site.insert(embers);
                 }
+                if let Some(smoke) = smoke_on() {
+                    site.insert(smoke);
+                }
             });
     }
 
@@ -1053,6 +1062,9 @@ fn spawn_scene(
                 ));
                 if let Some(embers) = embers_on() {
                     torch.insert(embers);
+                }
+                if let Some(smoke) = smoke_on() {
+                    torch.insert(smoke);
                 }
             });
     }
