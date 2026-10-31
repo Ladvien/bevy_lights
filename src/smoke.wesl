@@ -29,6 +29,9 @@ struct Smoke {
     // the flame, and what it has cooled to near the top of the column.
     warm: vec4<f32>,
     cool: vec4<f32>,
+    // The trail of a fire put out (the model's constants, `SmokeMaterial::tail`): x the trail's length in seconds, y the flame's snuff in seconds,
+    // z how long the wick goes on making smoke, w the coals' glow against the flame's unit light.
+    tail: vec4<f32>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> material: Smoke;
@@ -54,6 +57,12 @@ const SOURCE: f32 = 0.35;
 const SOURCE_HEIGHT: f32 = 0.35;
 const FADE_RADIUS: f32 = 0.10;
 const FADE_MARGIN: f32 = 0.15;
+// The lowest bit of the tag's 16-bit height: this quad is the trail of a fire put out, its scale's x is `1 / (1 + seconds since it went out)`
+// (`src/smoke.rs`, `tail_scale`), and it is drawn at the height the fire burned at whatever the catch says.
+const TAIL_BIT: u32 = 0x10000u;
+// How fast the column's wisps travel along it, in path lengths a second: the noise below scrolls `along * 2.2 - t * 0.7`. The air carries the
+// smoke a fire has made on at this speed, so a source that stops leaves a column whose base lifts off at it.
+const ADVECT: f32 = 0.3181818;
 
 struct SmokeVertexOutput {
     @builtin(position) position: vec4<f32>,
@@ -67,6 +76,8 @@ struct SmokeVertexOutput {
     @location(3) @interpolate(flat) shape: vec4<f32>,
     @location(4) @interpolate(flat) fade: vec4<f32>,
     @location(5) @interpolate(flat) fade_margin: f32,
+    // Seconds since the fire went out for a trail, -1 for a plume that follows its flame.
+    @location(6) @interpolate(flat) tau: f32,
 }
 
 // ---- The depth fade, as `flame.wesl` has it: a fire whose source cannot be seen sheds no smoke -----------------------------
@@ -142,12 +153,16 @@ fn vertex(vertex_in: Vertex) -> SmokeVertexOutput {
     let vertex = decompress_vertex(vertex_in, vertex_in.instance_index);
     let world_from_local = mesh_functions::get_world_from_local(vertex_in.instance_index);
     let origin = world_from_local[3].xyz;
-    let took = clamp(length(world_from_local[0].xyz), 0.0, 1.0);
+    let raw = mesh_functions::get_tag(vertex_in.instance_index);
+    let trail = (raw & TAIL_BIT) != 0u;
+    let scale_x = clamp(length(world_from_local[0].xyz), 0.0, 1.0);
+    // A trail is drawn at the size the fire burned at: the catch reads as 1, and the scale's x is the clock.
+    let took = select(scale_x, 1.0, trail);
+    let tau = select(-1.0, 1.0 / max(scale_x, 0.01) - 1.0, trail);
     let right = normalize(vec3<f32>(view.world_from_view[0].x, 0.0, view.world_from_view[0].z));
     let up = vec3<f32>(0.0, 1.0, 0.0);
     // The tag is the flame's (`pack_flame_tag`): the height in the high 16 bits, the clock phase in the next byte, and in the low byte the
     // density, as a share of the most density a site can ask for (1).
-    let raw = mesh_functions::get_tag(vertex_in.instance_index);
     let tag = unpack2x16unorm(raw);
     let size = tag.y * material.params.y * pow(max(took, 0.0001), CATCH_SIZE_EXPONENT);
     let centre = origin + up * (size * SOURCE_HEIGHT);
@@ -170,6 +185,7 @@ fn vertex(vertex_in: Vertex) -> SmokeVertexOutput {
     out.uv = vec2<f32>(across, climb);
     out.phase = f32((raw >> 8u) & 0xffu) / 255.0 * TAU;
     out.took = took;
+    out.tau = tau;
     out.shape = vec4<f32>(f32(raw & 0xffu) / 255.0, lean, cos_e, sin_e);
     out.fade = fade_probe(origin, right, size);
     out.fade_margin = size * FADE_MARGIN;
@@ -213,11 +229,15 @@ fn wisps(p: vec2<f32>, detail: f32) -> f32 {
 }
 
 // The light a smoke column gives at `uv` (flame heights across and up the screen), `clock` seconds, `phase` radians, a `lean` of the flame
-// along the camera's right, and the camera's elevation cosine. `pixel` is flame heights per pixel.
-fn smoke_light(uv: vec2<f32>, clock: f32, phase: f32, lean: f32, cos_e: f32, pixel: f32) -> vec3<f32> {
+// along the camera's right, and the camera's elevation cosine. `pixel` is flame heights per pixel. `tau` is the seconds since the fire went
+// out for the trail of one that has (`< 0` for a plume that follows its flame, which is then exactly the column below).
+fn smoke_light(uv: vec2<f32>, clock: f32, phase: f32, lean: f32, cos_e: f32, pixel: f32, tau: f32) -> vec3<f32> {
+    let trail = tau >= 0.0;
+    // The flame's share that has gone: `1 - snuff_gain(tau)`, a smoothstep over the snuff's length.
+    let dead = select(0.0, smoothstep(0.0, material.tail.y, tau), trail);
     // The column's own height above the foot: the screen's `up` is `rise * cos_e`, so a camera above the fire sees the column foreshortened.
     let rise = uv.y / max(cos_e, 0.35);
-    if rise < 0.5 || rise > RISE_MAX {
+    if rise < mix(0.5, 0.15, dead) || rise > RISE_MAX {
         return vec3<f32>(0.0);
     }
     let t = clock + phase * 3.1;
@@ -229,10 +249,19 @@ fn smoke_light(uv: vec2<f32>, clock: f32, phase: f32, lean: f32, cos_e: f32, pix
     let centre = LEAN_BEND * lean * rise * reach + meander;
     let slope = 1.5 * LEAN_BEND * lean * reach;
     let stretch = sqrt(1.0 + slope * slope);
+    // A trail (`docs/research/flame-smoke-tail.md`). The air carries the smoke a source made on, so what is at this height left the source
+    // `age` seconds ago, which was `tau - age` seconds after the fire began to go out: before it (negative) the source was whole, after it the
+    // wick was smouldering out (`made` is the share of the whole source it was). The column therefore keeps everything above
+    // `SOURCE + ADVECT * tau`, and its base lifts off at that speed.
+    var made = 1.0;
+    if trail {
+        made = 1.0 - smoothstep(0.0, material.tail.z, tau - max(rise * stretch - SOURCE, 0.0) / ADVECT);
+    }
     // A turbulent plume spreads linearly from its virtual origin, the flame's middle (Morton, Taylor and Turner: `b = 1.2 α z`, α ≈ 0.13), in
     // the plume's own frame: a bent column is cut obliquely by the screen's horizontal, so its half-width across is `stretch` times that. It is
-    // never drawn thinner than a pixel and a quarter: a thinner column keeps its energy in a wider, dimmer one instead of crawling.
-    let true_width = (0.05 + 0.156 * max(rise - SOURCE, 0.0)) * stretch;
+    // never drawn thinner than a pixel and a quarter: a thinner column keeps its energy in a wider, dimmer one instead of crawling. What a
+    // weak source made is a thinner wisp than what the flame made.
+    let true_width = (0.05 + 0.156 * max(rise - SOURCE, 0.0)) * stretch * mix(0.5, 1.0, made);
     let half_width = max(true_width, 1.25 * pixel);
     let across = uv.x - centre;
     if abs(across) > 2.4 * half_width {
@@ -248,17 +277,26 @@ fn smoke_light(uv: vec2<f32>, clock: f32, phase: f32, lean: f32, cos_e: f32, pix
     let lateral = (across + 0.45 * half_width * curl) / half_width;
     let envelope = exp(-lateral * lateral * 1.6);
     let body = 0.3 + 0.7 * smoothstep(0.2, 0.8, wisps(p + vec2<f32>(phase * 5.0, 0.0), detail));
-    let born = smoothstep(0.55, 1.15, rise);
+    // The flame hides the column's first part, up to its tip; as the flame sinks that window slides down to the wick.
+    let born = smoothstep(mix(0.55, 0.10, dead), mix(1.15, 0.45, dead), rise);
     let gone = 1.0 - smoothstep(1.4, RISE_MAX, rise);
     // Lit by the flame: an inverse square from its middle, softened so it does not blow up at the source. The distance is the straight one in
     // the plane the column lives in, not the path's: a bent column is as close to its fire as the wind lets it be.
     let away = length(vec2<f32>(uv.x, rise - SOURCE)) / 0.7;
-    let lit = 1.0 / (1.0 + away * away);
+    var lit = 1.0 / (1.0 + away * away);
+    // A trail is lit by the dying flame while there is one and then by the glow of the coals, a broad weak light that does not fall off like a
+    // point's, and it ends in a fade so that it is dark when its clock stops.
+    var leaving = 1.0;
+    if trail {
+        let glow = material.tail.w / (1.0 + 0.25 * away * away);
+        lit = (1.0 - dead) * lit + dead * glow;
+        leaving = 1.0 - smoothstep(0.3, 1.0, tau / material.tail.x);
+    }
     // The sparks' orange going to their dull red as the column cools, pulled toward its own luminance so it reads as warm grey smoke and not as
     // a second flame.
     var colour = mix(material.warm.rgb, material.cool.rgb, smoothstep(0.9, 2.4, rise));
     colour = mix(colour, vec3<f32>(dot(colour, vec3<f32>(0.2126, 0.7152, 0.0722))), 0.35);
-    return colour * (SMOKE_GAIN * envelope * body * born * gone * lit * (true_width / half_width));
+    return colour * (SMOKE_GAIN * envelope * body * born * gone * lit * made * leaving * (true_width / half_width));
 }
 
 @fragment
@@ -269,7 +307,7 @@ fn fragment(in: SmokeVertexOutput) -> @location(0) vec4<f32> {
     if density < 0.004 || in.took < 0.05 {
         return vec4<f32>(0.0);
     }
-    let light = smoke_light(in.uv, material.params.x, in.phase, in.shape.y, in.shape.z, pixel);
+    let light = smoke_light(in.uv, material.params.x, in.phase, in.shape.y, in.shape.z, pixel, in.tau);
     if max(light.r, max(light.g, light.b)) <= 0.0 {
         return vec4<f32>(0.0);
     }

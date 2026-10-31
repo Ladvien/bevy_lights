@@ -94,7 +94,8 @@ pub use kind::{FireKind, UnknownFireKind};
 pub use model::{
     CALM_FLICKER_DEPTH, DEFAULT_FIRE_DIAMETER, EMBER_AT, FADE_SECONDS, FLAME_REACH, FLAME_TILT_LIMIT,
     FLICKER_DEPTH, HIGH_KEY, HYSTERESIS, KINDLE_SECONDS, LOW_KEY, MAX_FLICKER_DEPTH, MOON_KEY, Problem,
-    ProblemKind, RANGE_MARGIN, SNUFF_SECONDS, WHIPPING_FLICKER_DEPTH, blackbody_colour, blackbody_luminance,
+    ProblemKind, RANGE_MARGIN, SMOKE_TAIL_SECONDS, SNUFF_SECONDS, WHIPPING_FLICKER_DEPTH, blackbody_colour,
+    blackbody_luminance,
     char_field, char_radiance, coal_radiance, ember_cull_extents, ember_reach, fade_factor, fill_for,
     fire_lumens, fire_lux, fire_reach, flame_cull_extents, flame_light_offset, flame_tilt, flicker_depth,
     flicker_factor, flicker_mean, flicker_swing, focus_quota, ground_lux, ground_ramp, ground_reach,
