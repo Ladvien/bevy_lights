@@ -542,19 +542,30 @@ fn depth_fade_on() -> bool {
     std::env::var("LIGHTS_DEPTH_FADE").is_ok_and(|v| v != "0")
 }
 
+/// A fire's own colour in the courtyard: the light's hue, and the flame's, which is the same hue brighter where the hue weighs little
+/// (a blue has half the luminance of the scene's orange at the same channel values, so a flame of it is scaled up to be as prominent
+/// as its neighbours: a flame colour above 1 is a brighter fire).
+struct Hue {
+    light: Color,
+    flame: Color,
+}
+
 /// `LIGHTS_COLOURS=1` gives some fires a colour of their own, on the flame, its sparks and its light at once: braziers 1 and 2 burn a
 /// gas-flame blue and a witch-fire green, and every fifth torch a shrine violet or a blue. Unset or `0`, every fire is the scene's
 /// orange and the courtyard draws exactly as it always has.
-fn palette(index: usize, brazier: bool) -> Option<Color> {
+fn palette(index: usize, brazier: bool) -> Option<Hue> {
     if !std::env::var("LIGHTS_COLOURS").is_ok_and(|v| v != "0") {
         return None;
     }
-    let linear = |r, g, b| Color::from(LinearRgba::rgb(r, g, b));
+    let hue = |r: f32, g: f32, b: f32, flame: f32| Hue {
+        light: Color::from(LinearRgba::rgb(r, g, b)),
+        flame: Color::from(LinearRgba::rgb(r * flame, g * flame, b * flame)),
+    };
     match (brazier, index) {
-        (true, 1) => Some(linear(0.10, 0.32, 1.0)),
-        (true, 2) => Some(linear(0.20, 1.0, 0.30)),
-        (false, i) if i % 5 == 1 => Some(linear(0.10, 0.32, 1.0)),
-        (false, i) if i % 5 == 3 => Some(linear(0.62, 0.20, 1.0)),
+        (true, 1) => Some(hue(0.10, 0.32, 1.0, 1.8)),
+        (true, 2) => Some(hue(0.20, 1.0, 0.30, 1.0)),
+        (false, i) if i % 5 == 1 => Some(hue(0.10, 0.32, 1.0, 1.8)),
+        (false, i) if i % 5 == 3 => Some(hue(0.62, 0.20, 1.0, 1.6)),
         _ => None,
     }
 }
@@ -880,7 +891,7 @@ fn spawn_scene(
                     .spawn((
                         Name::new("Coals"),
                         PointLight {
-                            color: colour.unwrap_or_else(fire_colour),
+                            color: colour.as_ref().map_or_else(fire_colour, |hue| hue.light),
                             intensity: lumens,
                             range: BRAZIER_POOL * POOL_RANGE_MARGIN,
                             shadow_maps_enabled: true,
@@ -909,7 +920,7 @@ fn spawn_scene(
                         depth: brazier_kind().map_or(FLICKER_DEPTH, FireKind::depth),
                         depth_fade: depth_fade_on(),
                         fire: Some(coals),
-                        color: colour,
+                        color: colour.as_ref().map(|hue| hue.flame),
                     },
                     // The flame's foot is on the coals, below the lip with them.
                     Transform::from_xyz(0.0, BRAZIER_TOP * 0.5 + 0.04 - BED_BELOW_LIP, 0.0),
@@ -1022,7 +1033,7 @@ fn spawn_scene(
                         // flame drawn on it instead of the pool slot's phase.
                         phase: Some(phase),
                         diameter: None,
-                        color: colour,
+                        color: colour.as_ref().map(|hue| hue.light),
                         ..default()
                     },
                     // The pool's lights flicker at the un-sized rate (`Flicker { diameter: None }` in
@@ -1036,7 +1047,7 @@ fn spawn_scene(
                         depth: FLICKER_DEPTH,
                         depth_fade: depth_fade_on(),
                         fire: Some(fire),
-                        color: colour,
+                        color: colour.as_ref().map(|hue| hue.flame),
                     },
                     Transform::from_translation(at),
                 ));

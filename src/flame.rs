@@ -226,11 +226,13 @@ pub struct FlameSite {
     /// [`retint`](crate::retint)), so a blue gas lantern, a green witch-fire and a violet shrine brazier are
     /// each one clean colour and not an orange flame tinted over.
     ///
-    /// **Set it to the colour of the light this flame motivates** (the [`PointLight::color`] of the fire's
+    /// **Give it the hue of the light this flame motivates** (the [`PointLight::color`] of the fire's
     /// light, or [`PoolCandidate::color`] on a prop the pool lights): a flame that burns one colour and
     /// throws another reads as a mistake, not a mood (`docs/research/fire-colour.md`). Channels are linear
     /// and non-negative, and the green channel is clamped to 1 as it is for [`FlameLook::color`]; a value above 1
-    /// in the others is a brighter fire.
+    /// in the others is a brighter fire. Hues weigh unequally: at the same channel values a blue flame has half the
+    /// luminance of the scene's orange one, so a flame colour scaled up (the light's hue times 1.8, say) is how a blue
+    /// fire is as prominent as its neighbours while its light stays the hue.
     ///
     /// `None` (the default) is the scene's fire colour and the scene's shared materials, exactly as drawn
     /// before this field existed. Every distinct colour is one more material (and one more batch), shared by

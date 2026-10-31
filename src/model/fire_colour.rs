@@ -11,9 +11,12 @@
 //! `docs/research/fire-colour.md` has the sources.
 //!
 //! The transform is in HSV on the linear values the ramp is made of: the hue turns by the difference of the
-//! two middle colours' hues, the saturation scales by their ratio, the value by theirs. It keeps what makes the
-//! orange ramp read as fire: a rim darker and more saturated than the middle, and a core whose hue sits the
-//! other way from the rim's.
+//! two middle colours' hues, the saturation scales by their ratio, the value by theirs. Then each stop's
+//! **luminance** is put back in the ratio to the middle's it has in the orange ramp (a rim a third of the middle, a core
+//! a quarter brighter), by dimming a stop that is too bright and whitening one that is too dim: hues do not weigh
+//! equally (a blue's rim is *brighter* than its body after the turn, and its core dimmer), and a flame whose rim outshines
+//! its core reads as outlined, not as hottest at the heart. It keeps what makes the orange ramp read as fire: a rim darker
+//! and more saturated than the middle, a core paler and brighter, and the hues the other way from each other.
 
 /// The middle colour of the shipped ramp, a campfire's orange: `FlameLook::default().color`. A design
 /// default (`docs/research/flame.md`).
@@ -86,6 +89,26 @@ fn fire_family(hue: f32, sat: f32) -> f32 {
     (1.0 - smoothstep(0.0, 60.0, beyond)) * smoothstep(0.1, 0.4, sat)
 }
 
+/// The luminance of a linear colour (Rec. 709), what the ramp's brightness structure is kept in.
+fn luminance(c: [f32; 3]) -> f32 {
+    0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]
+}
+
+/// `turned` with its luminance set to `target`, keeping its hue: dimmed in proportion when it is too bright, and when it is
+/// too dim lightened towards the grey of its own value (its largest channel) as far as that grey allows.
+fn with_luminance(turned: [f32; 3], target: f32) -> [f32; 3] {
+    let have = luminance(turned);
+    if target > have {
+        let value = turned[0].max(turned[1]).max(turned[2]);
+        let toward = ((target - have) / (value - have).max(f32::MIN_POSITIVE)).clamp(0.0, 1.0);
+        turned.map(|c| c + toward * (value - c))
+    } else if have > 0.0 {
+        turned.map(|c| c * target / have)
+    } else {
+        turned
+    }
+}
+
 /// `stop`, a colour of the shipped orange ramp, moved to the ramp of a fire whose middle colour is `mid`:
 /// `retint(EDGE_RED, mid)` is that fire's rim, `retint(CORE_YELLOW, mid)` its core, `retint(EMBER_RED, mid)` its colour
 /// while it catches.
@@ -93,7 +116,8 @@ fn fire_family(hue: f32, sat: f32) -> f32 {
 /// A `mid` in the **fire family** (a red, orange or yellow of any depth, see [`fire_family`]) leaves `stop` as it is: that
 /// is the ramp every scene has drawn, whatever its fire colour. Further from the family the ramp turns with the fire: the
 /// hue by the difference of the two middle colours' hues, the saturation by the ratio of their saturations (clamped to full)
-/// and the value by the ratio of their values (so an HDR fire is a brighter one), in HSV on the linear values, blended in over
+/// and the value by the ratio of their values (so an HDR fire is a brighter one), in HSV on the linear values, then the stop's
+/// luminance kept in the ratio to the middle's it has in the orange ramp, blended in over
 /// the 60° of hue beyond the family's ends. A `mid` with no hue (a grey or white fire) is not in the family: its ramp is grey, the
 /// rim a dark grey and the core a bright one. A `mid` that is not finite and non-negative is read channel by channel as zero.
 ///
@@ -120,6 +144,7 @@ pub fn retint(stop: [f32; 3], mid: [f32; 3]) -> [f32; 3] {
     let turned =
         from_hsv(hue + turn, (sat * mid_sat / default_sat).clamp(0.0, 1.0), val * mid_val / default_val);
     let from = sanitised(stop);
+    let turned = with_luminance(turned, luminance(from) / luminance(DEFAULT_MID) * luminance(mid));
     [0, 1, 2].map(|i| from[i] + (turned[i] - from[i]) * (1.0 - family))
 }
 
@@ -189,18 +214,39 @@ mod tests {
         }
     }
 
-    /// The ramp must not jump at the family's edge: a fire whose hue a host slides across the whole wheel (a slider, a
-    /// day-night script) changes its rim and core a little at a time, never in a step.
+    /// The ramp must not jump anywhere on the wheel (the family's edge included): a fire whose hue a host slides across it (a
+    /// slider, a day-night script) changes its rim and core a little at a time, never in a step. A quarter of a degree moves a
+    /// stop by at most 0.03 of a channel (the steepest place is a dark blue rim, whose luminance falls with the hue).
     #[test]
     fn the_ramp_changes_smoothly_across_the_hue_wheel() {
         let mut last = [EDGE_RED, CORE_YELLOW, EMBER_RED];
-        for step in 1..=720 {
-            let mid = from_hsv(step as f32 * 0.5, 0.9, 1.0);
+        for step in 1..=1440 {
+            let mid = from_hsv(step as f32 * 0.25, 0.9, 1.0);
             let now = [retint(EDGE_RED, mid), retint(CORE_YELLOW, mid), retint(EMBER_RED, mid)];
             for (was, is) in last.iter().zip(&now) {
-                assert!(near(*was, *is, 0.03), "hue {}: {was:?} became {is:?}", step as f32 * 0.5);
+                assert!(near(*was, *is, 0.03), "hue {}: {was:?} became {is:?}", step as f32 * 0.25);
             }
             last = now;
+        }
+    }
+
+    /// A flame is hottest at its heart: outside the fire family a fire's rim is dimmer than its middle and its core brighter,
+    /// in luminance (the turn alone made a blue rim *brighter* than the blue body, an outlined flame), in the same ratios the
+    /// orange ramp has.
+    #[test]
+    fn a_rim_is_dimmer_and_a_core_brighter_than_the_middle_in_every_hue_outside_the_family() {
+        let ratio = |stop: [f32; 3]| luminance(stop) / luminance(DEFAULT_MID);
+        for step in 0..=36 {
+            let mid = from_hsv(120.0 + step as f32 * 5.0, 0.9, 1.0);
+            let y = luminance(mid);
+            let (rim, core) = (luminance(retint(EDGE_RED, mid)), luminance(retint(CORE_YELLOW, mid)));
+            assert!(rim < y && y < core + 1e-4, "hue {}: rim {rim}, middle {y}, core {core}", 120 + step * 5);
+            assert!(
+                (rim / y - ratio(EDGE_RED)).abs() < 0.02,
+                "the rim is {} of the middle, the orange ramp's {}",
+                rim / y,
+                ratio(EDGE_RED)
+            );
         }
     }
 
