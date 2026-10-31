@@ -342,6 +342,31 @@ What to look for, and what to measure:
 - **A scene that does not use the component is unchanged.** The default courtyard in ten views (default, ground, edge, top, graze, seed 3 with a pool of 4 and of 16, far at 45 and 95 m, and the close camera with sparks and smoke, 300 frames, `magick compare -metric AE`) against the build before: eight are zero pixels different and two (seed 3 pool 16, the sparks and smoke view) are one pixel off by 1 DN, the GPU's own noise. The courtyard does not use `FuelBed`.
 - **What it costs.** CPU, interleaved against the build before it on a machine at load average 14-20: a scene with no bed is the same (`bench_lights`, seven alternating runs each: `min_us` 328-378 against 343-385, `p50_us` 534-638 against 553-642). `BENCH_BEDS=1 cargo run --release --example bench_flames` (every torch of 5 000 has a bed, 15 in view; needs a GPU adapter) reads 3.5 ms a frame at best against 2.4 without, about 0.2 µs a bed, and 6.0 and 6.8 in the other two runs of three on the same load; a bed is an entity like a flame, and `update_beds` alone is about 0.06 µs a bed a frame in a headless app (5 000 beds, 300 frames). GPU: `LIGHTS_GPU_TIMING=1 LIGHTS_FRAMES=420` with the bonfire 5 m from the camera reads the opaque pass at 303 and 280 µs before and 333 and 292 µs with two beds (two rounds, interleaved), the transparent pass unchanged within the noise (426 and 392 against 435 and 394): 12 to 30 µs for two beds. A host that never asks for a bed builds nothing: the colour table and the coal field (a 128 x 128 tile, about 40 ms in a release build) are made the first time a site has a `FuelBed`.
 
+## Seeing a whole fire (`Fire`)
+
+`examples/fires.rs` is one `Fire` on an empty entity and a one-light pool; `LIGHTS_KIND` names the kind, and the camera stands a fixed number of flame heights back so a candle and a bonfire fill the frame alike. `docs/media/fires.png` is six runs and a montage:
+
+```sh
+cd /path/to/bevy_lights
+for k in candle lantern torch brazier campfire bonfire; do
+  LIGHTS_FRAMES=240 LIGHTS_KIND=$k LIGHTS_SHOT=/tmp/$k.png cargo run --release --example fires
+done
+# six panels at 520 x 293 with the names under them, then an 8-bit PNG (16-bit is 2.7 MB; 128 colours bands the dark ground)
+magick montage -font DejaVu-Sans -pointsize 20 -fill white -background '#050810' -label '%t' \
+  /tmp/{candle,lantern,torch,brazier,campfire,bonfire}.png -tile 3x2 -geometry 520x293+3+3 /tmp/fires16.png
+magick /tmp/fires16.png -depth 8 -define png:compression-level=9 PNG24:docs/media/fires.png
+```
+
+Other switches: `LIGHTS_COLOUR=0.1,0.32,1.0` (linear) is a blue fire (light, flame, sparks and smoke in one hue), `LIGHTS_SMOKE=0`, `LIGHTS_EMBERS=0`, `LIGHTS_TONGUES=0` and `LIGHTS_BED=0` are the `Fire` flags, `LIGHTS_ROW=12` lays twelve side by side (a frame sequence shows them breathing apart: each has its own phase), and `LIGHTS_SNUFF=1.0 LIGHTS_COOLING=6 LIGHTS_KIND=campfire` puts the fire out and leaves its coals cooling, the light, the flame, the smoke's trail and the bed all following the one entity.
+
+What was checked, and how:
+
+- **The build before a `Fire` is the build after.** `examples/campfire.rs` wrote each fire's `PointLight`, `Flicker` and `FlameSite` by hand and is now one `Fire` per fire on a two-light pool (the template's colour dropped, since a `Fire` brings its own). Six still-air views of it (the default, `campfire` and `bonfire` close, from above, the tongue-less comparison, a fire put out) against the old binary at frame 240: **at most 2 DN** anywhere, 0.0017 to 0.017 DN mean, and a fire put out 1 DN over 3 039 pixels. The 2 DN is on the ground and was not isolated; the likely cause is the pool template's one range for both fires (27 m) where the hand-written campfire light had 15 m. **In a wind they differ** (`LIGHTS_WIND=1.5,0`: 430 040 pixels, mean 2.2 DN, max 237): the pooled light leans with its flame (`docs/research/flame-lean-light.md`) and the hand-written one did not, which is the intended difference, though it was not isolated either.
+- **A scene that does not use `Fire` is unchanged.** The default courtyard in eight views (default, ground, edge, top, graze, seed 3 with pools of 4 and 16, and the close camera with sparks and smoke, 300 frames, `magick compare`/numpy count) against the old binary: six zero pixels, edge one pixel and close two pixels off by 1 DN (the GPU's own noise).
+- **The first capture found a white pool.** `Fire { color: None }` first left the candidate's colour to the pool template, whose default is white, and the six kinds were orange flames over white ground. A `Fire` with no colour now throws a `FIRE_KELVIN` (1900 K) light; the unit test asserts it for every kind.
+- **Known limits.** The coals stay coal-coloured under a coloured flame (a green fire on orange coals): turn the bed off for a magic fire. A `Fire` is pooled: a host with no `LightPoolPlugin` gets the flame and a logged error, not a light.
+- **What it costs.** `BENCH_FIRE=1` against `BENCH_FIRE=2` (the same parts written by hand), 5 000 torches, 15 in view, four rounds interleaved, `p50_ms` 3.89 to 4.65 against 3.78 to 3.97 (and one by-hand outlier round at 7.87, min 3.96, on a loaded machine) and `min_ms` 2.82 to 3.11 against 2.79 to 3.01: the component's own cost is at most a tenth of a millisecond at 5 000 fires (about 0.02 µs a fire a frame, inside the noise), and the work a fire does (the linked flame, the sparks, the smoke) is the same either way. `bench_lights` base against new, three rounds, `min_us` 405, 404, 325 against 322, 335, 325, `p50_us` 687, 729, 509 against 558, 713, 542: the same (nothing it runs was touched); `bench_flames` with no `Fire` and with sparks and smoke, base against new, p50 2.47 to 3.28 against 2.40 to 3.96 and 4.30 to 6.16 against 4.68 to 6.12 over three rounds at load average 14: the same.
+
 ## The still
 
 ```sh

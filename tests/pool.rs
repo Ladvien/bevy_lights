@@ -1621,7 +1621,7 @@ fn a_fire_kinds_pooled_light_stands_in_its_flame_and_leans_with_it() {
         let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, ..default() });
         app.insert_resource(FlameWind::default());
         let foot = Vec3::new(2.0, 0.0, -3.0);
-        app.world_mut().spawn((kind.fire(40.0, 1.0), Transform::from_translation(foot)));
+        app.world_mut().spawn((kind.site(), kind.candidate(40.0, 1.0), Transform::from_translation(foot)));
         focus_at(&mut app, Vec3::ZERO);
         settle(&mut app);
         let half = kind.height() * 0.5;

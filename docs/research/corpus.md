@@ -283,3 +283,7 @@ Not in the corpus: Morton, Taylor & Turner 1956 on plumes (cited second-hand thr
 | `10/10.32657_10220_48312.md` (line 1145) | Doyle's colour and lighting design (already listed) | "Doyle uses diegetic colour that originates within the narrative to provide motivation for the incandescent spot": the glow must have a source in the frame |
 
 Not in the corpus: Rein 2009, *Smouldering Combustion Phenomena in Science and Technology* (IRECHE 1; found by `paper_search`, no DOI, `hdl.handle.net/1842/2678`, so `paper_download` cannot take it): the length of a real bed's glow after its flame is out. `docs/research/fuel-bed-heat.md` lists it under `Pending index`. The corpus has no source on coal-bed cooling times; the default `FuelBed::cooling` is a design default for that reason.
+
+## The 2026-10-31 re-scan (iteration 285)
+
+`catalog_recent` (200 rows, newest 11:32 UTC) is clinical-psychology re-embeds, the SIGGRAPH 2017-2025 *Advances* and 2024 papers re-embed iterations 278-284 scanned, and Matulka's plume paper and the two candle-flame papers already listed: no new lighting stem, so no `Research: corpus` commit. `fire-component.md` rests on stems already listed (Marples, GPU Gems 1 ch. 6.2, Chen et al.) and on Bevy's own vendored `Required Components` documentation.

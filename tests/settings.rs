@@ -176,13 +176,11 @@ fn fire_kinds_smoke_by_what_they_burn() {
     assert!(density(FireKind::Torch) <= density(FireKind::Bonfire), "a bonfire is the heaviest");
 }
 
-/// The bundle is the flame and its light together, so nothing a picker spawns can disagree with the kind.
+/// A kind's flame and its light agree on the fire's size and depth, so nothing a picker spawns can disagree with the kind.
 #[test]
-fn a_fire_bundle_is_the_flame_and_the_light_of_one_kind() {
+fn a_kinds_flame_and_light_agree_on_its_diameter_and_depth() {
     for kind in FireKind::ALL {
-        let (site, candidate) = kind.fire(40.0, 1.8);
-        assert_eq!(site, kind.site(), "{}", kind.name());
-        assert_eq!(candidate, kind.candidate(40.0, 1.8), "{}", kind.name());
+        let (site, candidate) = (kind.site(), kind.candidate(40.0, 1.8));
         assert_eq!(
             (candidate.diameter, candidate.depth),
             (site.diameter, Some(site.depth)),

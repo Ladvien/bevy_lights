@@ -2,8 +2,8 @@
 
 A Bevy 0.20 library for the **practical lights** a scene's props actually carry: fires that flicker
 and flare as they kindle, a budgeted pool of real lights handed to the nearest props over thousands
-of virtual ones, and billboarded shader flames. Small on purpose: three plugins, three public
-components' worth of state, an engine-free `src/model/` and one shader.
+of virtual ones, and billboarded shader flames. Small on purpose: three plugins (and a fourth, `FirePlugin`, that writes
+what they run from one component), three public components' worth of state, an engine-free `src/model/` and one shader.
 
 ## Force pushes and deletions need the user's express permission
 
@@ -27,13 +27,14 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 
 - `src/lib.rs` — the crate docs, the flat re-exports (no prelude), and `LightsSystems`.
 - `src/model/mod.rs` — the engine-free half.
-- `src/model/fire.rs` — `flicker_factor`, `kindle_gain`, `KINDLE_SECONDS`.
+- `src/model/fire.rs` — `flicker_factor`, `kindle_gain`, `KINDLE_SECONDS`, `fire_phase` (a fire's own start on its clock, from an entity's bits).
 - `src/model/reach.rs` — `raised_light`, `RANGE_MARGIN`.
 - `src/model/tag.rs` — `pack_flame_tag`, `unpack_flame_tag`.
-- `src/model/fire_colour.rs` — `retint` and the shipped ramp's stops: a fire's own colour, as the orange ramp moved to its hue (`docs/research/fire-colour.md`).
+- `src/model/fire_colour.rs` — `retint`, `flame_mid` and the shipped ramp's stops: a fire's own colour, as the orange ramp moved to its hue (`docs/research/fire-colour.md`), and a flame's middle from its light's colour.
 - `src/model/tongue.rs` — `flame_tongue`, `Tongue`, `MAX_TONGUES`, `MERGE_RATIO`, `INWARD_LEAN`: where a wide fire's tongues stand, how tall each is and how it leans (`docs/research/flame-tongues.md`).
 - `src/model/bed.rs` — `bed_radiance`, `bed_ramp`, `bed_heat_step`, `bed_drawn_heat`, `bed_offset`, `pack_bed_tag`, `BED_*`: a fuel bed's heat, its colour at a heat and its packing (`docs/research/fuel-bed-heat.md`); `src/model/char.rs` also has `char_tile`, the tileable field, and `src/model/cinematography.rs` `blackbody_radiance`, the blackbody below the 1000 K floor.
 - `src/flicker.rs` — `FlickerPlugin`, `Flicker`, `Kindle`, `Kindled`, and `flicker_lights` over both light types.
+- `src/fire.rs` — `FirePlugin`, `Fire`, `expand_fires`, `FIRE_EDGE_LUX`: a whole fire as one serde/Reflect component that writes the `FlameSite`, `PoolCandidate` and the kind's `FlameEmbers`, `FlameSmoke`, `FlameTongues` and `FuelBed` (`docs/research/fire-component.md`). A `Fire` that has just arrived writes each part with `insert_if_new` (what the host spawned beside it wins); a changed one writes them all and removes what it no longer names.
 - `src/pool.rs` — `LightPoolPlugin<F>`, `LightPool`, `FocusRule`, `PoolCandidate`, `PoolLight`, `assign_pool::<F>`. `src/model/pool.rs` holds the hand-off rule and the shared pool's maths (`focus_quota`, `quota_cutoff`, `shared_value`).
 - `src/flame.rs` — `FlamePlugin`, `FlameMaterial`, `FlameLook`, `FlameSite`, `Flame`, `dress_flames`, `update_flames`.
 - `src/flame.wesl` — the flame shader, embedded with `embedded_asset!`.
@@ -47,7 +48,7 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `examples/campfire.rs` — a campfire and a bonfire as `FireKind`s with their tongues and beds (`LIGHTS_TONGUES=0` is the one-flame comparison, `LIGHTS_BED=0` the one without coals).
 - `examples/bench_flames.rs` — what thousands of flames cost when few are on screen: headless, off-screen, needs a GPU adapter.
 - `tests/leaf.rs` — the boundary ratchet: the dependency list, forbidden names, engine-free `src/model/`.
-- `tests/flicker.rs`, `tests/pool.rs` — the two plugins' consumer-visible behaviour.
+- `tests/flicker.rs`, `tests/pool.rs`, `tests/fire.rs` — the plugins' consumer-visible behaviour.
 - `tools/wesl-check/` — compiles `src/flame.wesl` to WGSL and parses it with naga, without a GPU.
 - `docs/research/*.md` — one note per system, plus `corpus.md`.
 - `docs/loop-log.md` — what each improvement-loop iteration did.
@@ -241,3 +242,4 @@ is an art decision, so it needs the same treatment as a physics constant.
   unifies features into the library graph. `cargo build` alone compiles a consumer's view.
 - **A site with `FlameTongues` has several `Flame` children, and everything that finds "the flame of a site" must mean the first.** An extra tongue is a `Flame` tagged `FlameTongue` (so `update_flames` gives it the catch, the snuff, the wind and its own culling box for free), and the sparks and the smoke are one quad each on the middle flame: `dress_embers` and `dress_smoke` skip `With<FlameTongue>`, and a new system that dresses "the flame" of a site must too (a test that counts `With<Flame>` children per site counts the tongues as well). A tongue's inward lean rides the instance scale's `y` and `z` with the wind's (`update_flames` adds `FlameTongue::lean`, turned by the site's `GlobalTransform`, and caps the sum at `FLAME_TILT_LIMIT`'s sine): the shader reads one lean per flame, so a second source of lean is a sum, never a second channel. A change to `FlameTongues` rebuilds the extras (`Tongued` is the count and the spread bits they were built from, so a `NaN` spread compares equal to itself and is the middle flame alone, not a rebuild a frame); the middle flame is the site's own and is never rebuilt, and a change to the site's height or phase moves no tongue, as it moves no flame.
 - **A glow over the fire's own pool needs a dark of its own to be read against, and `Image::new` panics in a debug build on a mip chain.** The first `FuelBed` was an additive disc (as the flame is): over the ground the same fire had lit orange it was a cloud, with nothing dark between the lumps. The disc is an opaque cut-out (`AlphaMode::Mask`, a `discard` past its ragged edge, `ASH` under the glow) drawn before every transparent layer, so the additive flames still burn over it; it writes no prepass, so a host with a `DepthPrepass` is unaffected. `Image::new` `debug_assert`s that the data is one level's size, so a texture with its mips in the same buffer (`field_image`) is made with `Image::new_uninit` and filled: a release capture passed and `cargo test` (a debug build, what a host develops in) caught it. A headless test app has no plugin that gives a `Mesh3d` its `Visibility`, so a system that writes it spawns it explicitly. The shader's `RAMP_FIELD`, `RAMP_HEAT` and `RAMP_LEN` mirror `model::bed`'s `BED_RAMP_FIELD`, `BED_RAMP_HEAT` and their product: a mismatch is a uniform buffer of the wrong size, which wgpu refuses loudly. The bed's brightness is steep in temperature (a blackbody roughly doubles per 25 K near 1200 K), so every heat-to-brightness number is small: `BED_BREATH` 0.06 is a 16 % swing in the hottest coal at a campfire flame's deepest dip, and `BED_COOL_KELVIN` 450 is a factor of ten thousand (measured: 9 400).
+- **A `PoolCandidate` with no colour takes the pool template's, and the template's default is white; a `Fire` is where "arrived" and "changed" differ.** The first `Fire` drawn (the six kinds of `examples/fires.rs`) was orange flames over a white pool: a candidate that names no colour leaves the slot's light as the template has it, and `LightPool::light` is a plain `PointLight`. A `Fire` with no colour therefore sets a `FIRE_KELVIN` (1900 K) light, asserted for every kind in `tests/fire.rs`; a hand-built `PoolCandidate` still needs the template's colour (or its own) set by the host. `expand_fires` is one system over `Query<(Entity, Ref<Fire>), Changed<Fire>>`: `Ref::is_added()` splits a `Fire` that has just arrived (each part is written with `insert_if_new`, so what the host spawned beside it wins, as a required component's explicit value does) from one changed afterwards (every part is written again and an extra the fields no longer name is removed). A `Fire` written in place with `get_mut` re-expands, so BRP and a reflection panel work; **the parts are rewritten**, so a host edit on a part stands only until the `Fire` next changes. A `Fire` cannot be a `#[require]`: the parts depend on its fields' values. `FireKind::fire` (a `(FlameSite, PoolCandidate)` pair that could not carry the optional extras) is gone for it.

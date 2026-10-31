@@ -8,7 +8,7 @@
 //! window and no display; and prints one line:
 //!
 //! ```text
-//! bench_flames flames=5000 visible=21 embers=0 embers_visible=0 smoke=0 smoke_visible=0 tongues=0 beds=0 beds_visible=0 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
+//! bench_flames flames=5000 fire=0 visible=21 embers=0 embers_visible=0 smoke=0 smoke_visible=0 tongues=0 beds=0 beds_visible=0 wind=0,0 frames=300 mean_ms=… p50_ms=… min_ms=…
 //! ```
 //!
 //! `visible` is the number of flames the renderer counted as in view at the last frame (a fire's tongues are flames too), which is what
@@ -21,7 +21,11 @@
 //! how many of those quads the renderer counted as in view. `BENCH_SMOKE=1` gives every torch `FlameSmoke` (one more quad,
 //! the smoke's), and `smoke_visible` counts those the same way. `BENCH_TONGUES=n` gives every torch `FlameTongues` of `n` tongues
 //! (`n - 1` more flames a fire, each its own draw). `BENCH_BEDS=1` gives every torch a `FuelBed` (one more disc a fire, an opaque
-//! cut-out), and `beds_visible` counts the discs the renderer counted as in view.
+//! cut-out), and `beds_visible` counts the discs the renderer counted as in view. `BENCH_FIRE=1` spawns a `Fire::new(FireKind::Torch)`
+//! per torch instead (with `FirePlugin`, which here logs that the pool and the flicker are missing, as the bench has neither: it
+//! measures the expansion and the components it writes, not a light the pool hands out); `BENCH_FIRE=2` spawns the same parts by hand,
+//! the comparison that shows what the component itself costs. The line says `fire=1` or `fire=2`; the torch's own sparks and smoke come
+//! with either, so compare them with each other, not with `BENCH_EMBERS=1 BENCH_SMOKE=1`.
 
 use std::time::Instant;
 
@@ -49,6 +53,7 @@ fn main() {
     let smoke = env_usize("BENCH_SMOKE", 0) != 0;
     let tongues = u8::try_from(env_usize("BENCH_TONGUES", 0)).unwrap_or(u8::MAX);
     let beds = env_usize("BENCH_BEDS", 0) != 0;
+    let fire = u8::try_from(env_usize("BENCH_FIRE", 0)).unwrap_or(0);
     let frames = env_usize("BENCH_FRAMES", 400);
     let wind = std::env::var("BENCH_WIND").ok().and_then(|v| {
         let v: Vec<f32> = v.split(',').filter_map(|p| p.trim().parse().ok()).collect();
@@ -65,8 +70,11 @@ fn main() {
     ))
     .insert_resource(FlameWind { velocity: wind.unwrap_or_default() })
     .add_systems(Startup, move |commands: Commands, images: ResMut<Assets<Image>>| {
-        scene(commands, images, flames, embers, smoke, tongues, beds)
+        scene(commands, images, flames, Dress { embers, smoke, tongues, beds, fire })
     });
+    if fire == 1 {
+        app.add_plugins(FirePlugin);
+    }
     app.finish();
     app.cleanup();
 
@@ -98,7 +106,8 @@ fn main() {
     let at = |i: usize| samples.get(i).copied().unwrap_or(0.0);
     let wind = wind.unwrap_or_default();
     println!(
-        "bench_flames flames={flames} visible={flames_visible} embers={} embers_visible={embers_visible} smoke={} smoke_visible={smoke_visible} tongues={tongues} beds={} beds_visible={beds_visible} wind={},{} frames={} mean_ms={mean:.3} p50_ms={:.3} min_ms={:.3}",
+        "bench_flames flames={flames} fire={} visible={flames_visible} embers={} embers_visible={embers_visible} smoke={} smoke_visible={smoke_visible} tongues={tongues} beds={} beds_visible={beds_visible} wind={},{} frames={} mean_ms={mean:.3} p50_ms={:.3} min_ms={:.3}",
+        fire,
         u8::from(embers),
         u8::from(smoke),
         u8::from(beds),
@@ -110,16 +119,19 @@ fn main() {
     );
 }
 
-/// The torches, and one camera at the grid's corner, drawing to an image no one reads.
-fn scene(
-    mut commands: Commands,
-    mut images: ResMut<Assets<Image>>,
-    flames: usize,
+/// What each torch is given besides its flame (the `BENCH_*` switches).
+#[derive(Clone, Copy)]
+struct Dress {
     embers: bool,
     smoke: bool,
     tongues: u8,
     beds: bool,
-) {
+    fire: u8,
+}
+
+/// The torches, and one camera at the grid's corner, drawing to an image no one reads.
+fn scene(mut commands: Commands, mut images: ResMut<Assets<Image>>, flames: usize, dress: Dress) {
+    let Dress { embers, smoke, tongues, beds, fire } = dress;
     let mut target = Image::new_fill(
         Extent3d { width: 1280, height: 720, depth_or_array_layers: 1 },
         TextureDimension::D2,
@@ -133,7 +145,27 @@ fn scene(
     let side = (flames as f32).sqrt().ceil() as usize;
     for index in 0..flames {
         let at = Vec3::new((index % side) as f32 * SPACING, 0.0, (index / side) as f32 * SPACING);
-        let mut torch = commands.spawn((FireKind::Torch.site(), Transform::from_translation(at)));
+        let mut torch = match fire {
+            1 => commands.spawn((Fire::new(FireKind::Torch), Transform::from_translation(at))),
+            2 => {
+                // What `Fire::new(FireKind::Torch)` writes, by hand: the comparison that shows what the component itself costs.
+                let kind = FireKind::Torch;
+                let mut torch = commands.spawn(Transform::from_translation(at));
+                let this = torch.id();
+                torch.insert((
+                    FlameSite { fire: Some(this), ..kind.site() },
+                    kind.candidate_at_mean(kind.lumens(FIRE_EDGE_LUX, kind.height() * 0.5)),
+                ));
+                if let Some(embers) = kind.embers() {
+                    torch.insert(embers);
+                }
+                if let Some(smoke) = kind.smoke() {
+                    torch.insert(smoke);
+                }
+                torch
+            }
+            _ => commands.spawn((FireKind::Torch.site(), Transform::from_translation(at))),
+        };
         if embers {
             torch.insert(FlameEmbers::default());
         }

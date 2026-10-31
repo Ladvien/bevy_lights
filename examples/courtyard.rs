@@ -84,9 +84,6 @@ const BEARERS: usize = 48;
 // ---- and the sky. Every lumen below is derived from these, not hand-picked. The numbers and their
 // ---- sources are in `docs/research/lighting-look.md`.
 
-/// The temperature a wood fire burns at, in kelvin: the warm half of the scene, and the colour every
-/// fire's light and flame is taken from.
-const FIRE_KELVIN: f32 = 1900.0;
 /// The temperature the camera is balanced to: tungsten, 2856 K (CIE Illuminant A), the standing
 /// convention for a firelit night. Against it a fire at 1900 K reads orange and the sky at 8000 K
 /// reads blue, so the scene's warm/cool split comes from two temperatures and one balance rather

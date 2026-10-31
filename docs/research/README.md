@@ -46,6 +46,9 @@ plainly that it is a design default.
 - [`fuel-bed-heat.md`](fuel-bed-heat.md) — a bed of coals that lives with its fire (`FuelBed`): a tileable char field and a
   temperature ramp whose three stops move with the bed's heat, so the coals breathe with the flicker, warm as the fire catches
   and, when it is put out, go on glowing and cool over a minute instead of vanishing with the flame.
+- [`fire-component.md`](fire-component.md) — a whole fire as one component (`Fire`): a kind, a brightness and a colour become the
+  flame, its pooled light and the kind's sparks, smoke, tongues and bed, each fire on a clock of its own, what a host spawns
+  beside it winning and a change to it rewriting every part.
 - [`corpus.md`](corpus.md) — what the home-still library actually holds for cinematography,
   photography, CG and animation lighting, game-lighting craft, many-light rendering, fire physics and
   perception, with the stems to read and the gaps to fill.

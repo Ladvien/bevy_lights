@@ -46,6 +46,7 @@ then re-lit (`Kindle`), and each flame grows out of its coals as its light flare
   flame, each breathing on the same curve as the light it motivates — and at that light's own rate,
   phase and depth when the site is given them, and catching again or going out when its light is re-lit or snuffed (`FlameSite::fire`).
   A fire can shed sparks (`FlameEmbers`) and go on up as a lit plume of smoke (`FlameSmoke`) that bends over in a wind, and a fire that is put out leaves a trail of that smoke lifting off and thinning for five seconds after its flame is gone. A fire wider than it is tall (a campfire, a bonfire) burns as a mound of tongues (`FlameTongues`), not one slender flame, on a bed of coals (`FuelBed`) that breathes with it and glows on, cooling, after it is put out.
+- **A whole fire as one component** (`FirePlugin`, `Fire`): `Fire::lit(FireKind::Campfire, 250.0, 0.4)` on an entity gives it the kind's flame, the light the pool hands it, and its sparks, smoke, tongues and bed of coals, each fire on a clock of its own and in one colour if you name one; it is `serde`, so a placed fire is one line of a scene file.
 - **The maths as plain functions** (`bevy_lights::model`): the flicker law and its depth, the kindle,
   the pool's hold-and-fade rules, the cinematographer's key against fill, the blackbody, and the
   temperature field of a fuel bed — no `bevy` in any of them, so a host can reuse them in its own
@@ -91,14 +92,26 @@ fn main() {
             FlickerPlugin,
             LightPoolPlugin::<MyFocus>::default(),
             FlamePlugin,
+            FirePlugin,
         ))
         .add_systems(Startup, setup)
         .run();
 }
 
 fn setup(mut commands: Commands) {
-    // A brazier: a real light, sized by the pool it lights (1000 lx at 4 m, from 0.9 m up) and
-    // coloured by the temperature it burns at.
+    // A whole fire is one component. A campfire: the kind's flame, tongues, bed of coals, sparks and
+    // smoke, and a light the pool hands it when it is near, sized so its pool puts 250 lx on the ground
+    // at its edge (the light sits in the flame: 0.35 m up). Every fire gets a clock of its own.
+    commands.spawn((Fire::lit(FireKind::Campfire, 250.0, 0.35), Transform::from_xyz(4.0, 0.0, 2.0)));
+    // A torch in a colour of its own: the light is that colour and the flame is the same hue.
+    commands.spawn((
+        Fire { color: Some(Color::srgb(0.2, 0.9, 0.3)), ..Fire::new(FireKind::Torch) },
+        Transform::from_xyz(-2.0, 1.5, 3.0),
+    ));
+
+    // The same parts by hand, when you want every number yourself. A brazier with a real light of its
+    // own, sized by the pool it lights (1000 lx at 4 m, from 0.9 m up) and coloured by the temperature
+    // it burns at.
     let lumens = fire_lumens(1000.0, 4.0, 0.9);
     let [r, g, b] = blackbody_colour(1900.0, 1.0);
     commands.spawn((
@@ -110,27 +123,6 @@ fn setup(mut commands: Commands) {
         // the `Flicker`'s so the drawn flame breathes at the same rate the light does. `depth` is how
         // far it dips: give the flame the same one as its light, or the two disagree.
         FlameSite { height: 1.1, phase: 0.0, kindle: KINDLE_SECONDS, diameter: Some(0.34), depth: FLICKER_DEPTH, depth_fade: false, fire: None, color: None },
-    ));
-
-    // A torch-bearer: a virtual light, which gets one of the pool's real lights when it is near. A
-    // hand-held flame is smaller, so its pool is sized from its edge.
-    //
-    // One entity holds both the flame and the candidate, so the light it is handed can never drift away
-    // from the fire: `offset` is the flame's own centre (`flame_light_offset`), measured from the site's
-    // origin, and the intensity is sized for the height the light will actually sit at.
-    let torch_height = 0.35;
-    commands.spawn((
-        // `phase` is this torch's own fire clock: the real light it is handed later breathes with the
-        // flame drawn on it, not with the pool slot that happens to own it.
-        PoolCandidate {
-            offset: Vec3::from(flame_light_offset(torch_height)),
-            intensity: fire_lumens(250.0, 2.0, flame_light_offset(torch_height)[1]),
-            phase: Some(1.9),
-            ..default()
-        },
-        // The pool's lights flicker at the un-sized rate, so this flame does too.
-        FlameSite { height: torch_height, phase: 1.9, kindle: 0.0, diameter: None, depth: FLICKER_DEPTH, depth_fade: false, fire: None, color: None },
-        Transform::from_xyz(4.0, 0.0, 2.0),
     ));
 
     commands.spawn((MyFocus, Transform::default()));
@@ -182,6 +174,12 @@ A light with `Kindle` flares up over `KINDLE_SECONDS` (0.6 s) instead of switchi
 time, tips nine tenths of one percent above its base at about 0.46 s, and settles at exactly 1.
 `Kindled { entity }` is the message a host hears on the frame a fire catches, for the sound of it. An
 invisible light is not rewritten (nothing is extracted for it) but its kindle still counts.
+
+**A whole fire.** A fire is up to six components that must agree (`FlameSite`, `PoolCandidate`, and for the kinds that have them `FlameEmbers`, `FlameSmoke`, `FlameTongues`, `FuelBed`), and `Fire` is the one value that writes them: `Fire::lit(FireKind::Campfire, 250.0, 0.4)` (a kind, and the lux its pool puts on the ground at its edge from a light 0.4 m up) or `Fire { color: Some(blue), ..Fire::new(FireKind::Torch) }`. `FirePlugin` (add it with `FlamePlugin`, `FlickerPlugin` and `LightPoolPlugin`, which it reports missing rather than adds) gives the entity the kind's flame, a `PoolCandidate` the pool hands a light with the flame's own rate, depth and phase and the light standing in the flame, and the kind's sparks, smoke, tongues and bed. A `phase` of `None` is derived from the entity (`fire_phase`), so fires placed alike do not breathe together. `color` is the light's colour and the flame's middle at the shipped flame's brightness (`flame_mid`); `None` is a wood fire, a 1900 K light (`FIRE_KELVIN`; a `PoolCandidate` with no colour takes the pool template's, which is white) and the scene's own flame. `embers`, `smoke`, `tongues` and `bed` turn a kind's extra off (the bed stays coal-coloured under a coloured flame, so a magic fire turns it off). What a host spawns beside a `Fire` wins (`(Fire::new(kind), FlameSmoke { density: 0.2 })`), and a `Fire` that is changed afterwards (replaced, or edited through reflection or BRP) writes every part again and removes what it no longer names, so a picker that turns a campfire into a lantern leaves no tongues behind. Put it out and light it again with `Snuff` and `Kindle` on the same entity. It is `serde` with every field optional (`(kind: Campfire)` is a campfire). `docs/research/fire-component.md`.
+
+![The six fire kinds, each one Fire component on an otherwise empty entity: a candle, a lantern, a torch, a brazier, a campfire and a bonfire, each with its flame, the warm pool its light throws on the ground and its own sparks, smoke, tongues and bed of coals where the kind has them](docs/media/fires.png)
+
+*`LIGHTS_KIND=<kind> cargo run --release --example fires` (1578 × 654, an 8-bit PNG: frame 240 of six 1280 × 720 runs, each scaled to 520 × 293 with the kind's name burned in). The camera stands the same number of flame heights back, so each kind fills its panel. The brazier has no bowl in this example, so its flame stands on its bed of coals, which is the small red disc; every light is a pooled one the `Fire` was handed.*
 
 ### The light pool
 
@@ -290,8 +288,8 @@ every flame in the scene bends the same way. The flame keeps its foot and its le
 foot (a 3 m/s wind lays a 0.34 m brazier's flame over by about 60°; the lean is capped at 70°), and it is
 drawn upright from straight overhead. No `FlameWind` (or a zero one) draws every flame exactly as before.
 `flame_tilt(speed, diameter)` is the same law as a plain function. The pool's light for a fire moves with the
-lean, to where the leaned flame's middle is (`lean_light_shift`), so a fire spawned from a `FireKind` bundle
-(`FireKind::Brazier.fire(lux, over)`: its light is handed to the flame's middle, not its foot) keeps its key
+lean, to where the leaned flame's middle is (`lean_light_shift`), so a fire built from a `FireKind` (a `Fire`, or its
+`site()` and `candidate()`: its light is handed to the flame's middle, not its foot) keeps its key
 light in the flame in a wind. `LIGHTS_WIND=x,z cargo run --release --example courtyard` shows it; `docs/research/flame-wind.md`
 has the sources.
 
@@ -351,7 +349,7 @@ engine-free.
 
 ### What a host touches
 
-The components a game spawns or marks are `Reflect` and registered by the plugins — `Flicker`, `Kindle`,
+The components a game spawns or marks are `Reflect` and registered by the plugins — `Fire`, `Flicker`, `Kindle`,
 `PoolCandidate`, `FlameSite` — so a BRP front end can read and drive them, and so are the resources a
 host sets, `LightPool` (size, reach, gain, rank, hysteresis, fade, reserve, shadow cap, the slot light's template)
 `FlameLook` (colour, strength, the set-once `max_height`) and `FlameWind` / `FlameGust` (the wind the flames lean in, and a gusting one the plugin writes into it). The crate spawns `PoolLight` (registered
