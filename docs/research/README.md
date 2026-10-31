@@ -40,6 +40,9 @@ plainly that it is a design default.
 - [`flame-smoke-tail.md`](flame-smoke-tail.md) — what a fire that is put out leaves: smoke density is
   advected, so the column's base lifts off the wick and thins for a few seconds instead of shrinking with the
   flame.
+- [`flame-tongues.md`](flame-tongues.md) — a wide fire as several tongues: a campfire's or a bonfire's bed is
+  two to four times as wide as its one slender flame, so a site may carry `FlameTongues`, extra flames of
+  different heights and phases laid on a Vogel disc and capped by the merge height of group fires (`3 S`).
 - [`corpus.md`](corpus.md) — what the home-still library actually holds for cinematography,
   photography, CG and animation lighting, game-lighting craft, many-light rendering, fire physics and
   perception, with the stems to read and the gaps to fill.

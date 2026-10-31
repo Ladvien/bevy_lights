@@ -25,8 +25,8 @@ use crate::chain_sets;
 use crate::flicker::{Flicker, Kindle, Snuff};
 use crate::model::fire_colour::{CORE_YELLOW, EDGE_RED, EMBER_RED};
 use crate::model::{
-    DEFAULT_FIRE_DIAMETER, FLICKER_DEPTH, KINDLE_SECONDS, flame_cull_extents, flame_tilt, flicker_swing,
-    kindle_gain, pack_flame_tag, retint, set_flame_brightness, snuff_gain, unpack_flame_tag,
+    DEFAULT_FIRE_DIAMETER, FLAME_TILT_LIMIT, FLICKER_DEPTH, KINDLE_SECONDS, flame_cull_extents, flame_tilt,
+    flicker_swing, kindle_gain, pack_flame_tag, retint, set_flame_brightness, snuff_gain, unpack_flame_tag,
 };
 use crate::pool::PoolCandidate;
 
@@ -54,11 +54,14 @@ impl Plugin for FlamePlugin {
             .register_type::<FlameGust>()
             .register_type::<FlameSite>()
             .register_type::<Flame>()
+            .register_type::<crate::FlameTongues>()
+            .register_type::<crate::FlameTongue>()
             .add_systems(
                 Update,
                 (
                     gust_wind,
                     dress_flames,
+                    crate::tongues::dress_tongues,
                     update_flames,
                     crate::embers::dress_embers,
                     crate::embers::update_embers,
@@ -74,6 +77,7 @@ impl Plugin for FlamePlugin {
         crate::report::watch::<FlameSite>(app);
         crate::report::watch::<crate::FlameEmbers>(app);
         crate::report::watch::<crate::FlameSmoke>(app);
+        crate::report::watch::<crate::FlameTongues>(app);
         crate::report::watch_resource::<FlameLook>(app);
         crate::report::watch_resource::<FlameWind>(app);
         crate::report::watch_resource::<FlameGust>(app);
@@ -672,7 +676,47 @@ impl FlameMaterial {
     }
 }
 
-/// Gives every [`FlameSite`] without one a single [`Flame`] child.
+/// The components of one flame of `site`: its clock `phase` and `height` and its starting brightness on a [`MeshTag`], at `offset` from
+/// the site's origin, with the crate's own culling box and the material of the site's colour and fade. The first flame of a site is one
+/// of these at the origin with the site's own phase and height, and each extra tongue of a [`FlameTongues`](crate::FlameTongues) fire
+/// is another. `kindled` is the flame's own catch clock (`f32::MAX`: caught).
+///
+/// The starting brightness is the site's own swing at the site's own phase, the phase the *light* breathes at: a tongue's clock is
+/// turned from it and its brightness is not, since one fire breathes as one.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn flame_parts(
+    site: &FlameSite,
+    height: f32,
+    phase: f32,
+    kindled: f32,
+    offset: Vec3,
+    assets: &mut FlameAssets,
+    materials: &mut Assets<FlameMaterial>,
+    look: &FlameLook,
+    t: f32,
+) -> (Flame, MeshTag, Mesh3d, MeshMaterial3d<FlameMaterial>, Transform, NotShadowCaster, Aabb, NoAutoAabb) {
+    let brightness = flicker_swing(site.diameter, site.depth, t, site.phase);
+    let packed = pack_flame_tag(phase, height, brightness, assets.max_height);
+    // The culling box of a flame at full scale: `update_flames` rewrites it with the scale.
+    let height = unpack_flame_tag(packed, assets.max_height).1;
+    let bound =
+        Aabb { center: Vec3A::ZERO, half_extents: Vec3A::from(flame_cull_extents(height, 1.0, [0.0; 2])) };
+    (
+        Flame { kindled, source: None },
+        MeshTag::new(packed),
+        Mesh3d(assets.mesh.clone()),
+        MeshMaterial3d(assets.material_of(site.color, site.depth_fade, look, materials)),
+        Transform::from_translation(offset),
+        NotShadowCaster,
+        // Bevy's own box is the unit square's, which neither covers the drawn flame nor survives the scale
+        // (`flame_cull_extents`): the box is this crate's, and Bevy must leave it alone.
+        bound,
+        NoAutoAabb,
+    )
+}
+
+/// Gives every [`FlameSite`] without one a single [`Flame`] child (a site with [`FlameTongues`](crate::FlameTongues) gets its extra
+/// tongues from the system after this one).
 ///
 /// The child carries the site's height, phase and starting brightness on its [`MeshTag`] (see
 /// [`pack_flame_tag`](crate::pack_flame_tag)), stands at the site's own origin, and is not a shadow
@@ -695,36 +739,23 @@ pub(crate) fn dress_flames(
     if !assets.built {
         return;
     }
-    let max_height = assets.max_height;
     let t = time.elapsed_secs();
     for (site, flame) in &sites {
-        let catch = flame.kindle;
-        let brightness = flicker_swing(flame.diameter, flame.depth, t, flame.phase);
-        let packed = pack_flame_tag(flame.phase, flame.height, brightness, max_height);
-        let tag = MeshTag::new(packed);
-        // The culling box of a flame at full scale: `update_flames` rewrites it with the scale.
-        let height = unpack_flame_tag(packed, max_height).1;
-        let bound = Aabb {
-            center: Vec3A::ZERO,
-            half_extents: Vec3A::from(flame_cull_extents(height, 1.0, [0.0; 2])),
-        };
-        let mesh = assets.mesh.clone();
-        let material = assets.material_of(flame.color, flame.depth_fade, &look, &mut materials);
+        let kindled = if flame.kindle > 0.0 { 0.0 } else { f32::MAX };
+        let parts = flame_parts(
+            flame,
+            flame.height,
+            flame.phase,
+            kindled,
+            Vec3::ZERO,
+            &mut assets,
+            &mut materials,
+            &look,
+            t,
+        );
         commands.entity(site).queue_silenced(move |mut site: EntityWorldMut| {
             site.insert(Flamed).with_children(|parent| {
-                parent.spawn((
-                    Name::new("Flame"),
-                    Flame { kindled: if catch > 0.0 { 0.0 } else { f32::MAX }, source: None },
-                    tag,
-                    Mesh3d(mesh),
-                    MeshMaterial3d(material),
-                    Transform::IDENTITY,
-                    NotShadowCaster,
-                    // Bevy's own box is the unit square's, which neither covers the drawn flame nor survives
-                    // the scale (`flame_cull_extents`): the box is this crate's, and Bevy must leave it alone.
-                    bound,
-                    NoAutoAabb,
-                ));
+                parent.spawn((Name::new("Flame"), parts));
             });
         });
     }
@@ -739,6 +770,7 @@ type FlameParts = (
     &'static mut MeshTag,
     &'static mut MeshMaterial3d<FlameMaterial>,
     &'static ChildOf,
+    Option<&'static crate::FlameTongue>,
 );
 
 /// Ticks the flames' shared clock, writes each flame's own brightness, and applies a changed
@@ -777,7 +809,7 @@ pub(crate) fn update_flames(
         (speed, if speed > 0.0 && speed.is_finite() { w.velocity / speed } else { Vec2::ZERO })
     });
     let max_height = assets.max_height;
-    for (mut flame, mut transform, mut bound, mut tag, mut material, parent) in &mut flames {
+    for (mut flame, mut transform, mut bound, mut tag, mut material, parent, tongue) in &mut flames {
         let height = unpack_flame_tag(tag.value, max_height).1;
         let (site, owner) = sites.sites.get(parent.parent()).map_or((None, None), |(s, o)| (Some(s), o));
         let source = owner.map(ChildOf::parent).filter(|owner| !sites.sites.contains(*owner));
@@ -804,6 +836,13 @@ pub(crate) fn update_flames(
             if packed != tag.value {
                 tag.value = packed;
             }
+        }
+        // An outer tongue of a wide fire leans in towards the middle one, on top of the wind's lean: a fire draws air in at its foot, so
+        // its tongues converge on a tip instead of standing as a row (`docs/research/flame-tongues.md`). The tongue's lean is in its
+        // site's frame; the shader reads the lean in the world's axes, as the wind's is. The sum stays inside the tilt the wind is capped at.
+        if let Some(tongue) = tongue {
+            lean =
+                (lean + sites.turned(parent.parent(), tongue.lean)).clamp_length_max(FLAME_TILT_LIMIT.sin());
         }
         // A linked fire put out is its light's `Snuff`, on the same `snuff_gain` the light's intensity is multiplied by,
         // so the flame leaves with its light. It outranks a catch, as `Snuff` outranks `Kindle` on the light; removing
@@ -876,6 +915,7 @@ pub(crate) fn update_flames(
 #[derive(bevy::ecs::system::SystemParam)]
 pub(crate) struct Sites<'w, 's> {
     sites: Query<'w, 's, (&'static FlameSite, Option<&'static ChildOf>)>,
+    globals: Query<'w, 's, &'static GlobalTransform>,
     lights: Query<'w, 's, (Option<&'static Flicker>, Option<&'static PoolCandidate>)>,
     kindles: Query<'w, 's, &'static Kindle>,
     snuffs: Query<'w, 's, &'static Snuff>,
@@ -886,6 +926,14 @@ impl Sites<'_, '_> {
     /// The `elapsed` of the [`Kindle`] on the entity a site's [`FlameSite::fire`] names, when it has one.
     fn kindle_of(&self, site: &FlameSite) -> Option<f32> {
         self.kindles.get(site.fire?).ok().map(|kindle| kindle.elapsed)
+    }
+
+    /// `lean`, written in the frame of the site `site`, in the world's axes: the site's own turn about the vertical carries it.
+    fn turned(&self, site: Entity, lean: Vec2) -> Vec2 {
+        self.globals.get(site).map_or(lean, |at| {
+            let turned = at.rotation() * Vec3::new(lean.x, 0.0, lean.y);
+            Vec2::new(turned.x, turned.z)
+        })
     }
 
     /// The `elapsed` of the [`Snuff`] on the entity a site's [`FlameSite::fire`] names, when it has one.
