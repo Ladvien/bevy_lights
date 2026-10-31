@@ -4,6 +4,15 @@ All notable changes to bevy_lights. The format follows [Keep a Changelog](https:
 
 ## [Unreleased]
 
+### Added
+
+- **`ember_cull_extents(height, took, lean)` and `ember_reach(lean)`** (engine-free, in `model::tag`, re-exported flat): the culling box of a flame's ember quad, the counterpart of `flame_cull_extents` and `FLAME_REACH`. The sparks' quad is wider than the flame (3.03 flame heights from the foot in still air, 5.27 at the lean limit, because it widens downwind by the drift a spark has at the top of its rise), so the flame's box cannot be reused.
+- **`BENCH_EMBERS=1` for `examples/bench_flames.rs`** gives every torch `FlameEmbers`, and the printed line gains `embers=` and `embers_visible=`, the renderer's own count of the ember quads it did not cull.
+
+### Changed
+
+- **A fire whose sparks are off the screen no longer draws them.** The ember quad carried `NoFrustumCulling`, so every `FlameEmbers` fire in the world was extracted, sorted and drawn every frame, on screen or not. With every torch embered and about twenty in view, `bench_flames` read (best of three alternating runs, in milliseconds a frame, on a machine at load average 20-36) 4.0, 12.5, 32.8 at 1 000, 5 000 and 20 000 flames before and 2.6, 3.5, 11.5 after (3 m/s wind: 10.0 and 40.8 before, 4.2 and 11.5 after), and the quads in view fell from every one in the world to 18-21. The quad now has a box of its own that `update_embers` rewrites on the frame the flame's scale changes. Nothing visible changes. `docs/research/flame-culling.md` has the geometry and the numbers.
+
 ## [0.3.1] - 2026-10-30
 
 No API break (`cargo semver-checks` against 0.3.0: 202 checks pass); two public items added. Carries the fixes of issues #8, #9, #10 and #11 and flame culling.
