@@ -34,13 +34,13 @@ Fire { kind, lumens: Option<f32>, phase: Option<f32>, color: Option<Color>,
 | part | from |
 |---|---|
 | `FlameSite` | `kind.site()`, `phase`, `color` → the flame's middle (`flame_mid`: the same hue at the shipped ramp's luminance), `fire: Some(this entity)` so the flame follows this entity's `Kindle` and `Snuff` as a pooled torch's does |
-| `PoolCandidate` | `kind.candidate_at_mean(lumens)`, `phase`, `color` → the light's colour |
+| `PoolCandidate` | `kind.candidate_at_mean(lumens)`, `phase`, and the light's colour: `color`, or a 1900 K blackbody (`FIRE_KELVIN`) when there is none |
 | `FlameEmbers`, `FlameSmoke`, `FlameTongues`, `FuelBed` | `kind.embers()` etc., each only if its flag is set and the kind has one |
 
 - **Precedence.** A `Fire` that has just **arrived** writes each part with `insert_if_new`: `(Fire::lit(Brazier, 1000.0, 0.9), FlameSmoke { density: 0.2 })` keeps the host's smoke, as a required component's explicit value does. A `Fire` that is **changed** afterwards (replaced, or mutated through `get_mut`, reflection or BRP) rewrites every part, and removes an optional part the new fields no longer name, so a panel that flips `kind` from `Campfire` to `Lantern` leaves no tongues behind. What a host edits on a part afterwards stands until the `Fire` next changes.
 - **Phase** is `fire_phase(entity)`: a SplitMix64 of the entity's bits mapped to `[0, TAU)` (engine-free, `model::fire::fire_phase`), so identical fires desynchronise by default (Nguyen's "animation start frame") and a seeded run is reproducible. `phase: Some(p)` is the host's.
 - **Lumens** `None` is `kind.lumens(FIRE_EDGE_LUX, h/2)`: 250 lx at the edge of the kind's reach with the light at the flame's middle and the foot on the ground, the courtyard's own figure for a carried fire (`lighting-look.md`: the edge of a pool is two stops under its centre), in the crate's reference exposure (EV100 6). It is a starting point a host replaces with `Some(lumens)` or `Fire::lit(kind, lux, over)`; nothing converts units.
-- **Colour** `Some(c)` is the light's colour, and the flame's middle is `flame_mid(c)`: `c` scaled so its luminance is the shipped middle's (`DEFAULT_MID`), the luminance match iteration 280 made by hand (the courtyard's blue needed 1.8x, its green 1.0x). The orange family is the identity, so `Fire { color: Some(orange) }` is the default fire.
+- **Colour** `Some(c)` is the light's colour, and the flame's middle is `flame_mid(c)`: `c` scaled so its luminance is the shipped middle's (`DEFAULT_MID`), the luminance match iteration 280 made by hand (the courtyard's blue needed 1.8x, its green 1.0x). The orange family is the identity. `None` is **a wood fire**: the flame is the scene's (`FlameLook::color`), and the light is `blackbody_colour(FIRE_KELVIN, 1.0)`, 1900 K (`lighting-look.md`: "fire colour temperature 1900 K, design default in the wood-flame band (1800-2200 K)"). A `PoolCandidate` with no colour takes the pool template's, and the template's default is white, so the first `Fire` the examples drew was orange flames over a white pool (found by looking, the first capture of `examples/fires.rs`).
 - **Removal.** Removing `Fire` leaves the parts in place: the entity is the host's, and the parts are ordinary components it can keep, edit or remove.
 
 ## Parameters
@@ -50,7 +50,7 @@ Fire { kind, lumens: Option<f32>, phase: Option<f32>, color: Option<Color>,
 | `kind` | `Torch` | the kind most often carried; a picker overrides it |
 | `lumens` | `None` (250 lx at the kind's reach) | design default (`lighting-look.md`, the courtyard's carried-fire figure) |
 | `phase` | `None` (from the entity) | Nguyen: a random start frame per instance |
-| `color` | `None` (the scene's orange) | `fire-colour.md` |
+| `color` | `None` (a wood fire: the scene's flame, a 1900 K light) | `fire-colour.md`, `lighting-look.md` |
 | `embers`, `smoke`, `tongues`, `bed` | `true` | the kind's own (`fire-kinds.md`); `false` leaves the kind's part out |
 
 `FireKind::fire` is removed (a `(FlameSite, PoolCandidate)` pair is the same two parts `Fire` writes, without the other four); `FireKind::candidate_at_mean` is added, the one place a candidate is built from a kind and a mean.
@@ -75,6 +75,7 @@ A level author, or an editor's placement panel, writes `Fire::lit(FireKind::Camp
 - `FireKind::fire` is removed (clean cutover; a minor version).
 - `FIRE_EDGE_LUX` (250) is a design default, from the courtyard's carried-fire figure, not a measured one.
 - `flame_mid` reuses the luminance match of `fire-colour.md` as a function of the colour; it replaces a hand-set gain per hue in a host's palette, it does not change `retint`.
+- A `Fire` with no colour sets its candidate's colour (1900 K) instead of leaving the template's: a host that styles pool lights with its own palette (`PoolLight`) and uses `Fire` sets `Fire::color`, or recolours the lights as before (a palette recolours every light that carries its marker, the template's colour included). `FIRE_KELVIN` (1900) is the courtyard's `FIRE_KELVIN` moved into the crate.
 
 ## Pending index
 
