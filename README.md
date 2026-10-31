@@ -154,7 +154,7 @@ A light you want to be able to *re-light* is re-inserted with `Kindle::default()
 `Kindled` again. A fire you want dimmer or brighter is changed through the `Flicker` (`set_mean`, never the light's
 `intensity`: the crate writes the intensity every frame).
 
-`examples/courtyard.rs` is the full showcase, `examples/bench_lights.rs` the CPU bench.
+`examples/courtyard.rs` is the full showcase, `examples/bench_lights.rs` the CPU bench for the pool and the flicker, and `examples/bench_flames.rs` the bench for thousands of flames with few of them on screen (it renders off-screen and needs a GPU adapter).
 
 ## Features
 

@@ -38,6 +38,7 @@ Pinned to **Bevy 0.20.0**. Read the vendored source (`~/.cargo/registry/src/inde
 - `examples/common/mod.rs` — the `LIGHTS_*` run switches and the fly camera.
 - `examples/courtyard.rs` — the showcase and capture scene: four braziers, 48 torch-bearers, an orbit focus.
 - `examples/bench_lights.rs` — the CPU bench, no window and no GPU.
+- `examples/bench_flames.rs` — what thousands of flames cost when few are on screen: headless, off-screen, needs a GPU adapter.
 - `tests/leaf.rs` — the boundary ratchet: the dependency list, forbidden names, engine-free `src/model/`.
 - `tests/flicker.rs`, `tests/pool.rs` — the two plugins' consumer-visible behaviour.
 - `tools/wesl-check/` — compiles `src/flame.wesl` to WGSL and parses it with naga, without a GPU.
@@ -203,8 +204,14 @@ is an art decision, so it needs the same treatment as a physics constant.
   it reports the missing one in `finish()`.
 - **A parent of a visible entity needs the visibility components.** A `FlameSite` gained `#[require(Visibility, InheritedVisibility, ViewVisibility)]` because `dress_flames` spawns a `Flame` under it: without them Bevy warns (B0004) and the child's visibility is not inherited, so a torch's flame does not go out with the torch.
 - **Replacing a component leaves its `added` tick alone.** `entity.insert(Kindle::default())` over an existing `Kindle` updates only the *changed* tick (`Column::replace`), so `Added<Kindle>` never reports a re-lit fire. `Kindled` is announced from `elapsed == 0.0` instead, and `modulate` floors the advance at `f32::MIN_POSITIVE` so a zero-delta frame (the first of a fixed-step run) cannot announce the same fire twice.
-- **`MeshTag::new` is the only constructor** (`type_id` is a private debug-only field), and a
-  billboarded quad needs `NoFrustumCulling`: the CPU `Aabb` of the unit square does not cover what the
-  vertex stage draws.
+- **`MeshTag::new` is the only constructor** (`type_id` is a private debug-only field).
+- **A billboarded quad's box is the crate's, not the engine's.** The CPU `Aabb` of the unit square does not cover what the
+  vertex stage draws, and `NoFrustumCulling` (the old answer) draws and re-extracts every flame in the world every frame:
+  1.3 µs a flame, 6.5 ms at 5 000 torches with none in view. A `Flame` carries its own `Aabb` and `NoAutoAabb`: a cube about
+  the foot of side `2 · FLAME_REACH · size`, **divided by the instance scale** (`flame_cull_extents`), because the catch and
+  the wind's lean are the scale's `x`, `y` and `z` and the engine multiplies a box by its entity's scale. A scale that is data
+  distorts any box built once; `set_scale` rewrites the box on exactly the frames it rewrites the scale. The test
+  `a_flame_any_part_of_which_is_on_screen_is_never_culled` carries a port of the vertex stage's corner formula: change that
+  geometry in `src/flame.wesl` and the port and `FLAME_REACH` must change with it, or flames pop at the screen's edge.
 - **`cargo test` hides holes in a trimmed feature list**, because the full-`bevy` dev-dependency
   unifies features into the library graph. `cargo build` alone compiles a consumer's view.
