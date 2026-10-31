@@ -175,6 +175,18 @@ Compare two builds the way `bench_lights` is compared: separate target directori
 
 Iteration 278's numbers for the ember quads (`BENCH_EMBERS=1`, best of three interleaved runs on a machine at load average 15-26, in ms a frame), before → after the quad got a box of its own: 5 000 flames 11.5 → 4.2, 20 000 37.2 → 9.2, and with `BENCH_WIND=3,0` 5 000 8.8 → 3.6; `embers_visible` fell from every quad in the world to 18-21. A quiet-machine pair before the change (load 18) was 3.7 → 9.5 ms at 5 000 torches without and with sparks, and 9.4 → 46.3 at 20 000. Build the old side as the new `bench_flames.rs` over the old `src/` (`git checkout <old> -- src`), because the old bench has no `BENCH_EMBERS`.
 
+## Seeing the pool serve two viewers
+
+`LIGHTS_FOCI=n` gives the courtyard's pool `n` foci (`FocusRule::Shared`) over the one camera, a cyan marker on each, so an overview shows who the viewers are; `LIGHTS_SPLIT=1` is two viewers with a camera each on the halves of the window (viewers a quarter of the orbit apart, each camera behind its own focus). `LIGHTS_FOCUS_RULE=one` keeps the default rule over the same foci, which leaves the pool dark: the comparison. `LIGHTS_FOCUS_WALK=8` (or 12) sends the foci out so each stands in its own part of the court.
+
+```sh
+LIGHTS_FRAMES=300 LIGHTS_SPLIT=1 LIGHTS_FOCUS_WALK=8 LIGHTS_FOCUS_RULE=one    LIGHTS_SHOT=/tmp/split_one.png    cargo run --release --example courtyard
+LIGHTS_FRAMES=300 LIGHTS_SPLIT=1 LIGHTS_FOCUS_WALK=8                          LIGHTS_SHOT=/tmp/split_shared.png cargo run --release --example courtyard
+magick /tmp/split_shared.png /tmp/split_one.png -compose difference -composite -evaluate Multiply 6 /tmp/split_diff.png
+```
+
+Judge each half separately (`magick f.png -crop 640x720+0+0 +repage -colorspace Gray -format "%[fx:mean*255]" info:`), and the difference image for where the pool lights are. A **moving** camera is a different test from a still one: record a sequence (`LIGHTS_SHOT_DIR`, `LIGHTS_SHOT_FROM=150`) and plot each half's mean luminance per frame; a frame that departs from the mean of its two neighbours by about a DN is a light drawn at a stale intensity (iteration 279 found one at 5.6 DN, in the frame a light entered a camera's view, and fixed it: after, none departs by more than 0.9). A static camera cannot show this. `BENCH_FOCI=n` on `bench_lights` prices the shared pool.
+
 ## Seeing a cross-faded hand-off
 
 The pool's `reserve` light is what makes a hand-off cross-fade rather than dip. The example takes
