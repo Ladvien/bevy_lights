@@ -193,6 +193,75 @@ pub fn shadow_set(holders: &[(f32, bool)], budget: usize, hysteresis: f32) -> Ve
     out
 }
 
+/// How many of a pool's `size` real lights each of `foci` viewers is entitled to when they share it:
+/// `ceil(size / foci)`, never below 1 while the pool has a light at all.
+///
+/// An equal share, and an entitlement and not a reservation: a viewer that does not use its share leaves
+/// it to the others, because [`shared_value`] only ranks, it never sets lights aside. With no foci there
+/// is no one to share with, and the share is 0.
+///
+/// ```
+/// # use bevy_lights::model::pool::*;
+/// assert_eq!(focus_quota(8, 2), 4);
+/// assert_eq!(focus_quota(7, 2), 4, "rounded up, so no light is left over");
+/// assert_eq!(focus_quota(16, 1), 16);
+/// assert_eq!(focus_quota(2, 4), 1, "never below one light while there is one");
+/// assert_eq!(focus_quota(0, 3), 0);
+/// assert_eq!(focus_quota(8, 0), 0);
+/// ```
+pub fn focus_quota(size: usize, foci: usize) -> usize {
+    if size == 0 || foci == 0 { 0 } else { size.div_ceil(foci) }
+}
+
+/// The value of one viewer's `quota`-th best candidate: the number that viewer's other candidates are
+/// measured against by [`shared_value`].
+///
+/// `values` are that viewer's candidates' rank values ("smaller is better", the quantity [`preferred`]
+/// compares), in any order; they are reordered. A viewer with fewer candidates than `quota` is measured
+/// against its worst, so every one of them lands at or inside its share. `None` when the viewer has no
+/// candidates at all. A `NaN` value sorts last and so is never the cutoff while a real one exists.
+///
+/// ```
+/// # use bevy_lights::model::pool::*;
+/// let mut values = [9.0, 1.0, 4.0, 2.0];
+/// assert_eq!(quota_cutoff(&mut values, 2), Some(2.0));
+/// assert_eq!(quota_cutoff(&mut [3.0, 5.0], 8), Some(5.0), "fewer than the quota: its worst");
+/// assert_eq!(quota_cutoff(&mut [], 4), None);
+/// ```
+pub fn quota_cutoff(values: &mut [f32], quota: usize) -> Option<f32> {
+    if values.is_empty() {
+        return None;
+    }
+    let at = quota.clamp(1, values.len()) - 1;
+    let (_, cutoff, _) = values.select_nth_unstable_by(at, f32::total_cmp);
+    Some(*cutoff)
+}
+
+/// A candidate's value for one viewer in a pool several viewers share: its rank `value` measured from
+/// that viewer, as a multiple of that viewer's `cutoff` ([`quota_cutoff`]).
+///
+/// At or below 1 means "inside the share of the viewer it serves". A candidate's value for the pool is
+/// the smallest of these over the viewers whose reach it is in, so one ordered list interleaves the
+/// viewers in proportion to their shares and a fixture between two viewers is one entry, not two. Every
+/// value of one viewer is divided by the same number, so that viewer's order and every ratio between
+/// its values (the overlap rule's margin) are unchanged by it.
+///
+/// The division is done in `f64` and a value that would overflow is held at [`f32::MAX`]: a `cutoff`
+/// of 0 (a fire standing on the viewer) must not turn every other value into the same infinity, which
+/// would break the tie-break on entity. A `cutoff` of 0 with a `value` of 0 is 0.
+///
+/// ```
+/// # use bevy_lights::model::pool::*;
+/// assert_eq!(shared_value(2.0, 4.0), 0.5);
+/// assert_eq!(shared_value(0.0, 0.0), 0.0, "on the viewer, with the viewer's share on the viewer");
+/// assert!(shared_value(1.0, 0.0) > 1.0e30 && shared_value(1.0, 0.0).is_finite());
+/// assert!(shared_value(1.0, 0.0) < shared_value(2.0, 0.0), "still ordered by value");
+/// ```
+pub fn shared_value(value: f32, cutoff: f32) -> f32 {
+    let cutoff = f64::from(cutoff.max(f32::MIN_POSITIVE));
+    (f64::from(value.max(0.0)) / cutoff).min(f64::from(f32::MAX)) as f32
+}
+
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
 mod tests {
@@ -279,5 +348,83 @@ mod tests {
         assert_eq!(shadow_set(&[(1.0, true), (2.0, true), (3.0, true)], 1, HYSTERESIS), [true, false, false]);
         // A worse light never takes a better light's shadow.
         assert_eq!(shadow_set(&[(1.0, true), (5.0, false)], 1, 1.0), [true, false]);
+    }
+
+    /// The pool's whole use of the three functions, on plain numbers: each viewer's values against its own
+    /// cutoff, a candidate's value the smallest over the viewers it is in reach of.
+    fn pool_values(viewers: &[&[f32]], size: usize) -> Vec<Vec<f32>> {
+        let quota = focus_quota(size, viewers.len());
+        viewers
+            .iter()
+            .map(|values| {
+                let cutoff = quota_cutoff(&mut values.to_vec(), quota).unwrap_or(1.0);
+                values.iter().map(|v| shared_value(*v, cutoff)).collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn a_viewers_order_and_ratios_survive_the_division_by_its_cutoff() {
+        let values = [0.4, 1.0, 1.15, 3.0, 9.0];
+        for cutoff in [1e-6_f32, 0.5, 1.0, 7.0, 1e6] {
+            let shared: Vec<f32> = values.iter().map(|v| shared_value(*v, cutoff)).collect();
+            assert!(shared.windows(2).all(|w| w[0] < w[1]), "order kept at cutoff {cutoff}: {shared:?}");
+            for pair in 0..values.len() - 1 {
+                let before = preferred(values[pair + 1], values[pair], HYSTERESIS);
+                let after = preferred(shared[pair + 1], shared[pair], HYSTERESIS);
+                assert_eq!(before, after, "the overlap rule's verdict is the same at cutoff {cutoff}");
+            }
+        }
+    }
+
+    #[test]
+    fn a_sparse_viewer_is_not_starved_by_a_dense_one() {
+        // Eight lights, two viewers: four each. The first has ten fixtures all nearer than anything the
+        // second has; on plain values the second would get none.
+        let dense = [1.0, 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 1.7, 1.8, 1.9];
+        let sparse = [50.0, 60.0, 70.0];
+        let shared = pool_values(&[&dense, &sparse], 8);
+        let mut ranked: Vec<(f32, &str)> = shared[0].iter().map(|v| (*v, "dense")).collect();
+        ranked.extend(shared[1].iter().map(|v| (*v, "sparse")));
+        ranked.sort_by(|a, b| a.0.total_cmp(&b.0));
+        let first_eight: Vec<&str> = ranked.iter().take(8).map(|(_, who)| *who).collect();
+        assert_eq!(
+            first_eight.iter().filter(|w| **w == "sparse").count(),
+            3,
+            "all three of the sparse viewer's: {ranked:?}"
+        );
+        assert_eq!(
+            first_eight.iter().filter(|w| **w == "dense").count(),
+            5,
+            "the dense viewer's share and what is left"
+        );
+    }
+
+    #[test]
+    fn a_viewers_quota_is_exactly_the_candidates_at_or_inside_its_share() {
+        let values = [3.0, 1.0, 2.0, 5.0, 4.0];
+        let cutoff = quota_cutoff(&mut values.to_vec(), 3).unwrap();
+        let at_or_inside = values.iter().filter(|v| shared_value(**v, cutoff) <= 1.0).count();
+        assert_eq!(at_or_inside, 3, "exactly the quota is at or inside the share");
+    }
+
+    #[test]
+    fn a_cutoff_on_the_viewer_does_not_make_every_other_value_the_same() {
+        let values = [0.0, 1e-3, 1.0, 1e4];
+        let shared: Vec<f32> = values.iter().map(|v| shared_value(*v, 0.0)).collect();
+        assert_eq!(shared[0], 0.0);
+        assert!(shared.windows(2).all(|w| w[0] < w[1]), "{shared:?}");
+        assert!(shared.iter().all(|v| v.is_finite()));
+    }
+
+    #[test]
+    fn the_quota_is_an_equal_share_rounded_up() {
+        for size in 1..40 {
+            for foci in 1..=size.min(5) {
+                let quota = focus_quota(size, foci);
+                assert!(quota * foci >= size, "{foci} shares of {quota} cover {size} lights");
+                assert!(quota * (foci - 1) < size, "and no share is wasted: {size}/{foci} gave {quota}");
+            }
+        }
     }
 }
