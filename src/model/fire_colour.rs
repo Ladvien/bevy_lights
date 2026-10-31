@@ -113,7 +113,7 @@ fn with_luminance(turned: [f32; 3], target: f32) -> [f32; 3] {
 /// `retint(EDGE_RED, mid)` is that fire's rim, `retint(CORE_YELLOW, mid)` its core, `retint(EMBER_RED, mid)` its colour
 /// while it catches.
 ///
-/// A `mid` in the **fire family** (a red, orange or yellow of any depth, see [`fire_family`]) leaves `stop` as it is: that
+/// A `mid` in the **fire family** (a red, orange or yellow of any depth: hue within `[0°, 60°]` and saturation from 0.4) leaves `stop` as it is: that
 /// is the ramp every scene has drawn, whatever its fire colour. Further from the family the ramp turns with the fire: the
 /// hue by the difference of the two middle colours' hues, the saturation by the ratio of their saturations (clamped to full)
 /// and the value by the ratio of their values (so an HDR fire is a brighter one), in HSV on the linear values, then the stop's
