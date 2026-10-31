@@ -25,11 +25,17 @@ import bevy_pbr::render::{
 import bevy_pbr::prepass::utils::prepass_depth;
 
 struct Embers {
-    // The host's fire colour; `.a` is the strength.
+    // The fire's colour (`FlameLook::color`, or a site's `FlameSite::color`); `.a` is the strength.
     base: vec4<f32>,
     // x: seconds (wrapped hourly), y: the tag's height scale in world units (`FlameLook::max_height`), z: 1 for the material of a site
     // that asked for the depth fade, w: the strength.
     params: vec4<f32>,
+    // A spark's three colours as it cools, the shipped orange ones moved to the fire's hue by the CPU (`retint` in
+    // `src/model/fire_colour.rs`): almost cool, in the middle of its life, and at its hottest. For the shipped orange they are the numbers
+    // this shader used to hold as constants, `(0.80, 0.11, 0.01)`, `(1.0, 0.42, 0.07)` and `(1.0, 0.78, 0.30)`.
+    dull: vec4<f32>,
+    mild: vec4<f32>,
+    hot: vec4<f32>,
 }
 
 @group(constants::MATERIAL_BIND_GROUP) @binding(0) var<uniform> material: Embers;
@@ -62,9 +68,6 @@ const RADIUS_MAX: f32 = 0.018;
 const RADIUS_PIXELS: f32 = 1.2;
 // Emission at a spark's hottest, against a flame's core of 1: sparks are brighter than the flame they leave, and bloom.
 const SPARK_GAIN: f32 = 4.0;
-const CORE_YELLOW: vec3<f32> = vec3<f32>(1.0, 0.78, 0.30);
-const ORANGE: vec3<f32> = vec3<f32>(1.0, 0.42, 0.07);
-const DULL_RED: vec3<f32> = vec3<f32>(0.80, 0.11, 0.01);
 // The depth fade, the flame's own (`flame.wesl`): the source is a third of the way up the flame, the ring of taps is this fraction of its
 // height, and a tap hides the source when the scene is nearer by FADE_MARGIN of the flame's height.
 const SOURCE_HEIGHT: f32 = 0.35;
@@ -263,8 +266,8 @@ fn fragment(in: EmberVertexOutput) -> @location(0) vec4<f32> {
         }
         // A hot core with a small halo: sparks are points, and a wide glow reads as a smudge.
         let glow = (1.0 - smoothstep(0.5, 1.5, reach)) + 0.18 / (1.0 + reach * reach) * (1.0 - smoothstep(3.0, 5.0, reach));
-        var colour = mix(DULL_RED, ORANGE, smoothstep(0.25, 0.55, heat));
-        colour = mix(colour, CORE_YELLOW, smoothstep(0.55, 0.90, heat));
+        var colour = mix(material.dull.rgb, material.mild.rgb, smoothstep(0.25, 0.55, heat));
+        colour = mix(colour, material.hot.rgb, smoothstep(0.55, 0.90, heat));
         // A spark too small for the pixel is drawn at the pixel's size and dimmed by the width it lost, so a far fire's sparks fade
         // instead of crawling.
         let energy = radius_true / radius;

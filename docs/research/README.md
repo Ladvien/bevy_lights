@@ -33,6 +33,8 @@ plainly that it is a design default.
 - [`pool-foci.md`](pool-foci.md) — the pool for more than one viewer: a shared budget with one focus per
   viewer, why a plain nearest-focus distance starves the sparse viewer, and the light a moving camera
   turns to.
+- [`fire-colour.md`](fire-colour.md) — a fire's own colour on its flame, its sparks and the pooled light
+  it is handed: one hue for the visible source and the light it throws, as the same ramp rotated.
 - [`corpus.md`](corpus.md) — what the home-still library actually holds for cinematography,
   photography, CG and animation lighting, game-lighting craft, many-light rendering, fire physics and
   perception, with the stems to read and the gaps to fill.

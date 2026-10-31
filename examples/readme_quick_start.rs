@@ -36,6 +36,7 @@ fn setup(mut commands: Commands) {
             depth: FLICKER_DEPTH,
             depth_fade: false,
             fire: None,
+            color: None,
         },
     ));
 
@@ -64,6 +65,7 @@ fn setup(mut commands: Commands) {
             depth: FLICKER_DEPTH,
             depth_fade: false,
             fire: None,
+            color: None,
         },
         Transform::from_xyz(4.0, 0.0, 2.0),
     ));

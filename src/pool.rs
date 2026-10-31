@@ -408,6 +408,13 @@ pub struct PoolCandidate {
     /// `None` (the default) is [`FLICKER_DEPTH`](crate::FLICKER_DEPTH). A slot adopts it with the
     /// candidate and takes the default again when the next candidate has none.
     pub depth: Option<f32>,
+    /// The colour of the fire's light, when it is not the pool's: the same value as the
+    /// [`FlameSite::color`](crate::FlameSite::color) of the flame drawn on this prop, so the flame and the light it
+    /// throws are one colour (`docs/research/fire-colour.md`). A slot takes it with the candidate, on the frame the
+    /// owner changes (the light is fading in from nothing then) while the light fading out keeps its owner's, and
+    /// puts the colour it had back when the next candidate has none. `None` (the default) leaves the light as the
+    /// template ([`LightPool::light`]'s colour, or a host's palette) has it.
+    pub color: Option<Color>,
 }
 
 impl PoolCandidate {
@@ -439,6 +446,12 @@ impl PoolCandidate {
         }
         if let Some(d) = self.depth {
             within(&mut out, "depth", d, 0.0, crate::MAX_FLICKER_DEPTH);
+        }
+        if let Some(color) = self.color {
+            let color = LinearRgba::from(color);
+            non_negative(&mut out, "color.red", color.red);
+            non_negative(&mut out, "color.green", color.green);
+            non_negative(&mut out, "color.blue", color.blue);
         }
         out
     }
@@ -634,8 +647,8 @@ fn rank_value(rank: Rank, distance_squared: f32, intensity: f32) -> f32 {
 }
 
 /// A pool light as it last stood: whose light it was, where (the point its `Transform` was given: the
-/// candidate's position plus offset plus the flame's lean), how bright (its candidate's intensity, before
-/// the pool's gain and fade), its flicker, and whether it cast a shadow. A reserve light fading a light out
+/// candidate's position plus offset plus the flame's lean), how bright (its candidate's intensity at the level it was
+/// shown at: after the fade it was in the middle of, before the pool's gain), its flicker, and whether it cast a shadow. A reserve light fading a light out
 /// takes all of it, so the light that leaves keeps moving, and shadowing, exactly as the one that left did —
 /// otherwise the departing and arriving lights swing out of step and their sum wobbles. `at` is where it
 /// last stood, not where it stands: while `owner` is still in the pool the reserve re-reads that candidate's
@@ -649,6 +662,38 @@ struct LastLight {
     diameter: Option<f32>,
     depth: f32,
     shadow: bool,
+    /// The colour the departing owner's light was tinted to, if its candidate asked for one.
+    tint: Option<Color>,
+}
+
+/// Tints a pool light to a candidate's colour, or puts it back.
+///
+/// With `want` set the light takes that colour and `tints` remembers the colour it had, once; with `None` a light
+/// the crate tinted gets that colour back and a light it never tinted is left alone, so a host's palette (a colour it
+/// wrote itself) survives candidates that have no colour. Written only on a change: a light already the right colour is
+/// not marked changed.
+fn paint(
+    tints: &mut std::collections::HashMap<usize, Color>,
+    slot: usize,
+    light: &mut Mut<PointLight>,
+    want: Option<Color>,
+) {
+    match want {
+        Some(color) => {
+            let before = light.color;
+            tints.entry(slot).or_insert(before);
+            if before != color {
+                light.color = color;
+            }
+        }
+        None => {
+            if let Some(before) = tints.remove(&slot)
+                && light.color != before
+            {
+                light.color = before;
+            }
+        }
+    }
 }
 
 /// The pool's memory between frames: what each slot holds, how long since each slot last changed
@@ -676,6 +721,9 @@ struct HandOffState {
     old_look: std::collections::HashMap<Entity, LastLight>,
     /// Which reserve light is fading out which light, by slot index.
     departure_release: std::collections::HashMap<usize, LastLight>,
+    /// The colour each light the crate tinted to a candidate's ([`PoolCandidate::color`]) had before, by slot index
+    /// (reserves included): what [`paint`] puts back.
+    tints: std::collections::HashMap<usize, Color>,
     /// This frame's foci: none, one, or (under [`FocusRule::Shared`]) one per viewer. Scratch, kept for
     /// its capacity.
     foci: Vec<Vec3>,
@@ -736,6 +784,7 @@ fn assign_pool<F: Component>(
         shadow_settings,
         old_look,
         departure_release,
+        tints,
         foci,
         shares,
         column,
@@ -775,6 +824,8 @@ fn assign_pool<F: Component>(
         for (_, _, _, _, _, mut light) in &mut slots {
             apply_shared(&look, &mut light);
         }
+        // Every light is the template's colour now, tinted or not: what a tint goes back to is the new one.
+        tints.clear();
         *applied = Some(look);
     }
 
@@ -1138,10 +1189,9 @@ fn assign_pool<F: Component>(
     let winners: std::collections::HashMap<_, _> = chosen_by_slot
         .values()
         .filter_map(|entity| {
-            candidates
-                .get(*entity)
-                .ok()
-                .map(|(.., candidate)| (*entity, (candidate.phase, candidate.diameter, candidate.depth)))
+            candidates.get(*entity).ok().map(|(.., candidate)| {
+                (*entity, (candidate.phase, candidate.diameter, candidate.depth, candidate.color))
+            })
         })
         .collect();
 
@@ -1209,8 +1259,11 @@ fn assign_pool<F: Component>(
                 if light.shadow_maps_enabled != shadow {
                     light.shadow_maps_enabled = shadow;
                 }
+                // And its colour: the light fading out is the colour it was, whatever the next owner's is.
+                paint(tints, slot.slot, &mut light, last.tint);
                 visibility.set_if_neq(Visibility::Inherited);
             } else {
+                paint(tints, slot.slot, &mut light, None);
                 flicker.base = 0.0;
                 if light.shadow_maps_enabled {
                     light.shadow_maps_enabled = false;
@@ -1254,11 +1307,13 @@ fn assign_pool<F: Component>(
         match assigned {
             Some((at, intensity, entity)) => {
                 // A flame leaning in the wind has its middle, and so its light, off the upright axis.
-                let lean = lean_of(entity, winners.get(&entity).and_then(|(_, diameter, _)| *diameter));
+                let lean = lean_of(entity, winners.get(&entity).and_then(|(_, diameter, ..)| *diameter));
                 transform.translation = at + lean;
                 // The slot keeps its own phase until a candidate says otherwise: the light handed to a
                 // prop must breathe on that prop's clock, or it beats against the flame drawn on it.
-                if let Some((phase, diameter, depth)) = winners.get(&entity).copied() {
+                let color = winners.get(&entity).and_then(|(.., color)| *color);
+                paint(tints, slot.slot, &mut light, color);
+                if let Some((phase, diameter, depth, _)) = winners.get(&entity).copied() {
                     if let Some(phase) = phase {
                         flicker.phase = phase;
                     }
@@ -1289,11 +1344,14 @@ fn assign_pool<F: Component>(
                 LastLight {
                     owner: entity,
                     at: transform.translation,
-                    intensity,
+                    // The level it was shown at, not the full intensity it was heading for: a light handed on in the
+                    // middle of its own fade-in fades out from the few per cent it had reached.
+                    intensity: intensity * fade,
                     phase: flicker.phase,
                     diameter: flicker.diameter,
                     depth: flicker.depth,
                     shadow,
+                    tint: winners.get(&entity).and_then(|(.., color)| *color),
                 },
             );
         }

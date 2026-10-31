@@ -15,7 +15,9 @@ use crate::{FlameEmbers, FlameSite, Flicker, MAX_EMBER_RATE, PoolCandidate};
 /// light's and the flame's settings **from the same three numbers**, so the two breathe together.
 /// Only the brazier row is a number the crate shipped before; the rest are design defaults
 /// (`docs/research/fire-kinds.md`). Spell the rest of a fire with struct update:
-/// `FlameSite { phase: 1.3, ..FireKind::Torch.site() }`.
+/// `FlameSite { phase: 1.3, ..FireKind::Torch.site() }`. A kind carries no colour (all six are soot-incandescent
+/// fuels, the scene's orange): a fire of another hue sets [`FlameSite::color`] and [`PoolCandidate::color`] the
+/// same way, `FlameSite { color: Some(blue), ..FireKind::Lantern.site() }`.
 ///
 /// ```
 /// # use bevy_lights::*;
@@ -190,6 +192,7 @@ impl FireKind {
     /// depth fade, no linked fire.
     pub fn site(self) -> FlameSite {
         FlameSite {
+            color: None,
             height: self.height(),
             phase: 0.0,
             kindle: 0.0,

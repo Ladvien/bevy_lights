@@ -1429,6 +1429,7 @@ fn a_pooled_light_follows_its_flames_lean() {
         .world_mut()
         .spawn((
             FlameSite {
+                color: None,
                 height: 1.0,
                 phase: 0.0,
                 kindle: 0.0,
@@ -1479,6 +1480,7 @@ fn a_pooled_light_linked_by_a_site_follows_the_lean() {
         .id();
     app.world_mut().spawn((
         FlameSite {
+            color: None,
             height: 1.0,
             phase: 0.0,
             kindle: 0.0,
@@ -1507,6 +1509,7 @@ fn a_pooled_light_linked_by_a_site_follows_the_lean() {
 /// A flame site on a torch one metre tall: the light is carried at the flame's middle, half a metre up.
 fn torch_site() -> FlameSite {
     FlameSite {
+        color: None,
         height: 1.0,
         phase: 0.0,
         kindle: 0.0,
@@ -1866,4 +1869,150 @@ fn a_viewer_leaving_does_not_dip_the_pool_when_the_reserves_cover_the_lights_tha
         let total = shown_total(&mut app);
         assert!((total - 400.0).abs() < 1e-3, "frame {frame} after the viewer left: {total}");
     }
+}
+
+/// A candidate at `at`, its light 2 m up, burning at `intensity` in `color`.
+fn coloured_candidate(app: &mut App, at: Vec3, intensity: f32, color: Option<Color>) -> Entity {
+    app.world_mut()
+        .spawn((
+            PoolCandidate { offset: Vec3::Y * 2.0, intensity, color, ..default() },
+            Transform::from_translation(at),
+        ))
+        .id()
+}
+
+/// The colour of the pool light in `slot`.
+fn colour_of(app: &mut App, slot: usize) -> Color {
+    app.world_mut()
+        .query::<(&PoolLight, &PointLight)>()
+        .iter(app.world())
+        .find(|(light, _)| light.slot == slot)
+        .map(|(_, light)| light.color)
+        .expect("the slot exists")
+}
+
+#[test]
+fn a_light_is_the_colour_of_the_fire_it_is_handed_to_and_gives_it_back_to_the_next() {
+    let mut app = app(LightPool { size: 1, reach: 50.0, gain: 1.0, reserve: 0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let template = app.world().resource::<LightPool>().light.color;
+    let blue = Color::srgb(0.1, 0.3, 1.0);
+    let gas = coloured_candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0, Some(blue));
+    settle(&mut app);
+    assert_eq!(colour_of(&mut app, 0), blue, "the blue fire's light is blue");
+    // The blue fire is put out and an orange one, with no colour of its own, is handed the light.
+    app.world_mut().entity_mut(gas).despawn();
+    coloured_candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 100.0, None);
+    settle(&mut app);
+    assert_eq!(
+        colour_of(&mut app, 0),
+        template,
+        "the next fire's light is the template's again, not the last one's"
+    );
+}
+
+#[test]
+fn a_hosts_palette_survives_a_coloured_fire_and_every_hand_off_between_plain_ones() {
+    let mut app = app(LightPool { size: 1, reach: 50.0, gain: 1.0, reserve: 0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let first = coloured_candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0, None);
+    settle(&mut app);
+    // The host's night palette: every pool light a dusk amber it chose itself.
+    let amber = Color::srgb(0.9, 0.45, 0.15);
+    for mut light in
+        app.world_mut().query_filtered::<&mut PointLight, With<PoolLight>>().iter_mut(app.world_mut())
+    {
+        light.color = amber;
+    }
+    app.update();
+    assert_eq!(
+        colour_of(&mut app, 0),
+        amber,
+        "no candidate has a colour, so the pool leaves the palette alone"
+    );
+    // A hand-off between two fires that have none leaves it too.
+    app.world_mut().entity_mut(first).despawn();
+    coloured_candidate(&mut app, Vec3::new(2.0, 0.0, 0.0), 100.0, None);
+    settle(&mut app);
+    assert_eq!(colour_of(&mut app, 0), amber);
+    // A violet fire takes the light and goes; the palette is what comes back.
+    let violet =
+        coloured_candidate(&mut app, Vec3::new(0.5, 0.0, 0.0), 100.0, Some(Color::srgb(0.6, 0.2, 1.0)));
+    settle(&mut app);
+    assert_eq!(colour_of(&mut app, 0), Color::srgb(0.6, 0.2, 1.0));
+    app.world_mut().entity_mut(violet).despawn();
+    settle(&mut app);
+    assert_eq!(colour_of(&mut app, 0), amber, "the host's palette, not the template's");
+}
+
+#[test]
+fn a_departing_light_fades_out_in_its_owners_colour_while_the_arriving_one_fades_in_in_its_own() {
+    let mut app = app(LightPool { size: 1, reach: 100.0, gain: 1.0, reserve: 1, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    let blue = Color::srgb(0.1, 0.3, 1.0);
+    let green = Color::srgb(0.2, 1.0, 0.3);
+    let walker = coloured_candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0, Some(blue));
+    settle(&mut app);
+    // A challenger twice as near takes the light, and the walker leaves the pool.
+    coloured_candidate(&mut app, Vec3::new(0.4, 0.0, 0.0), 100.0, Some(green));
+    app.world_mut().entity_mut(walker).despawn();
+    let mut seen_fading_out = false;
+    for _ in 0..6 {
+        app.update();
+        assert_eq!(
+            colour_of(&mut app, 0),
+            green,
+            "the slot is the arriving fire's from the frame it arrives"
+        );
+        let reserve = lights(&mut app)
+            .into_iter()
+            .find(|(slot, _, visibility, ..)| *slot == 1 && *visibility != Visibility::Hidden);
+        if reserve.is_some() {
+            seen_fading_out = true;
+            assert_eq!(colour_of(&mut app, 1), blue, "the light fading out is still the walker's blue");
+        }
+    }
+    assert!(seen_fading_out, "the reserve never showed, so the cross-fade was not tested");
+}
+
+/// The sum of every visible pool light's base: slots and reserves, the subject's whole pool of light.
+fn pool_total(app: &mut App) -> f32 {
+    slots(app)
+        .iter()
+        .map(|(_, _, visibility, base)| if *visibility == Visibility::Hidden { 0.0 } else { *base })
+        .sum()
+}
+
+#[test]
+fn a_light_handed_on_while_it_is_still_fading_in_fades_out_from_the_level_it_showed() {
+    // A slot whose owner changes twice inside one fade-in: the arriving light has reached a few per cent when the
+    // next challenger takes it, and the reserve that fades it out must start from that few per cent, not from the full
+    // intensity it never reached. Started from full, the pool's light jumped by nearly a whole light on that frame
+    // (the courtyard's `LIGHTS_FOCUS_WALK=18 LIGHTS_POOL=4 LIGHTS_SEED=3 LIGHTS_HYSTERESIS=1.0`: +57 000 lm of 943 000
+    // at frame 235, a visible pop on the pillars and the floor beside it).
+    let mut app =
+        app(LightPool { size: 1, reach: 100.0, gain: 1.0, reserve: 2, hysteresis: 1.0, ..default() });
+    focus_at(&mut app, Vec3::ZERO);
+    candidate(&mut app, Vec3::new(1.0, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    assert!((pool_total(&mut app) - 100.0).abs() < 1.0, "one light, burning at 100");
+    // A nearer candidate takes the light: the slot restarts its fade from nothing.
+    candidate(&mut app, Vec3::new(0.6, 0.0, 0.0), 100.0);
+    settle(&mut app);
+    app.update();
+    // An even nearer one takes it a few frames into that fade-in, while the arriving light is at a few per cent.
+    candidate(&mut app, Vec3::new(0.3, 0.0, 0.0), 100.0);
+    let mut last = pool_total(&mut app);
+    let mut steepest = 0.0f32;
+    for _ in 0..8 {
+        app.update();
+        let now = pool_total(&mut app);
+        steepest = steepest.max(now - last);
+        last = now;
+    }
+    // The fade-in itself is a smoothstep over 0.35 s: at its steepest it adds about 7 a frame to a light of 100.
+    assert!(
+        steepest < 15.0,
+        "the pool's light jumped by {steepest} in a frame of a hand-off that should be seamless"
+    );
 }
