@@ -423,7 +423,10 @@ mod tests {
             for foci in 1..=size.min(5) {
                 let quota = focus_quota(size, foci);
                 assert!(quota * foci >= size, "{foci} shares of {quota} cover {size} lights");
-                assert!(quota * (foci - 1) < size, "and no share is wasted: {size}/{foci} gave {quota}");
+                assert!(
+                    (quota - 1) * foci < size,
+                    "and it is the smallest share that does: {size}/{foci} gave {quota}"
+                );
             }
         }
     }
