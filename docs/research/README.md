@@ -43,6 +43,9 @@ plainly that it is a design default.
 - [`flame-tongues.md`](flame-tongues.md) — a wide fire as several tongues: a campfire's or a bonfire's bed is
   two to four times as wide as its one slender flame, so a site may carry `FlameTongues`, extra flames of
   different heights and phases laid on a Vogel disc and capped by the merge height of group fires (`3 S`).
+- [`fuel-bed-heat.md`](fuel-bed-heat.md) — a bed of coals that lives with its fire (`FuelBed`): a tileable char field and a
+  temperature ramp whose three stops move with the bed's heat, so the coals breathe with the flicker, warm as the fire catches
+  and, when it is put out, go on glowing and cool over a minute instead of vanishing with the flame.
 - [`corpus.md`](corpus.md) — what the home-still library actually holds for cinematography,
   photography, CG and animation lighting, game-lighting craft, many-light rendering, fire physics and
   perception, with the stems to read and the gaps to fill.
