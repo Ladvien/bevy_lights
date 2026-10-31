@@ -132,6 +132,16 @@ then the table row), 5000 of them a frame for the sake of the rare fire that is 
 *table* (`set_table` sets `matches`, `fetch` returns `None` for a row of a table without the column), so a world with no
 `Snuff` anywhere pays one boolean per row and one with every fire out pays one pointer read.
 
+### Measured after
+
+Same machine and load, `bench_before` (b2d38f3 plus the switch) and `bench_after` (the fix) run interleaved. `BENCH_SNUFFED=5000`:
+`pool_p50_us` 6088 / 6712 / 10604 / 6249 µs before, 233 / 216 / 216 / 222 µs after; whole frame `min_us` 5589 / 5586 / 5577 / 5594 µs
+before, 251 / 274 / 268 / 273 µs after. `BENCH_SNUFFED=0`, twelve interleaved runs: `pool_p50_us` best 417 / median 464 µs before,
+419 / 451 µs after; `min_us` best 416 / median 432 µs before, 410 / 432 µs after. The all-out frame is cheaper than the lit one (0.22 ms
+against 0.42 ms) because there is nothing in reach to sort, so the issue's 1.25x acceptance holds with room. The courtyard, captured at
+1280x720 over eight scenes (four with every brazier snuffed from 3 s), differs by at most 1 DN in at most 3 pixels, and its pool-total
+log through the snuff (`flicker frame 180` to `240`, 1062148 to 112412 lm) is identical to the last digit before and after.
+
 ### Validation targets
 
 - `BENCH_SNUFFED=5000` `pool_p50_us` within 1.25x of `BENCH_SNUFFED=0` (the issue's acceptance), same machine, interleaved.
