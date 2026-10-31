@@ -1616,7 +1616,7 @@ mod catch_colour_tests {
 
 #[cfg(test)]
 #[allow(clippy::expect_used, clippy::unwrap_used, clippy::panic)]
-pub(crate) mod culling_tests {
+mod culling_tests {
     use super::*;
     use crate::model::{FLAME_REACH, FLICKER_DEPTH};
     use crate::{FireKind, KINDLE_SECONDS};
@@ -1682,16 +1682,12 @@ pub(crate) mod culling_tests {
         points
     }
 
-    /// The whole chain, as a camera sees it, for the quad a fire's vertex stage draws: the quad's points (`drawn_points`, given
-    /// the fire's foot, the height it is drawn at, its lean, the camera's eye and its right axis), the box and the scale this
-    /// crate gives it (`extents`, cut from a ball of `reach` drawn heights about the foot), and Bevy's own frustum test (the
-    /// sphere test and then the oriented box, as `check_visibility` runs them). A quad culled while any of its drawn points is
-    /// inside the frame is one that pops out at the edge of the screen.
-    pub(crate) fn assert_a_quad_on_screen_is_never_culled(
-        extents: fn(f32, f32, [f32; 2]) -> [f32; 3],
-        reach: fn([f32; 2]) -> f32,
-        drawn_points: fn(Vec3, f32, Vec2, Vec3, Vec3) -> Vec<Vec3>,
-    ) {
+    #[test]
+    fn a_flame_any_part_of_which_is_on_screen_is_never_culled() {
+        // The whole chain, as a camera sees it: the quad the vertex stage draws (`drawn_points`), the box and the
+        // scale this crate gives the flame, and Bevy's own frustum test (the sphere test and then the oriented
+        // box, as `check_visibility` runs them). A flame culled while any of its drawn points is inside the
+        // frame is a flame that pops out at the edge of the screen.
         let mut draw = Draw(0x9e37_79b9_7f4a_7c15);
         let projection = Projection::Perspective(PerspectiveProjection {
             fov: 1.0,
@@ -1742,22 +1738,21 @@ pub(crate) mod culling_tests {
                 origin,
             );
             let global = GlobalTransform::from(world_from_local);
-            let [hx, hy, hz] = extents(height, took, lean.to_array());
+            let [hx, hy, hz] = flame_cull_extents(height, took, lean.to_array());
             let bound = Aabb { center: Vec3A::ZERO, half_extents: Vec3A::new(hx, hy, hz) };
 
             let size = height * took.powf(2.0 / 3.0);
             let world_from_view = camera.affine();
             let view_from_world = world_from_view.inverse();
             let points = drawn_points(origin, size, lean, eye, camera.right().as_vec3());
-            // The constant the box is built from: no point the vertex stage draws is further from the foot than
-            // `reach` of its drawn heights, from any side, at any lean.
-            let ball = (reach(lean.to_array()) * size) * (1.0 + 1e-4);
+            // The constant the box is built from: no point the vertex stage draws is further from the flame's
+            // foot than `FLAME_REACH` of its drawn heights, from any side, at any lean.
+            let reach = (FLAME_REACH * size) * (1.0 + 1e-4);
             let worst = points.iter().map(|p| p.distance(origin)).fold(0.0, f32::max);
             assert!(
-                worst <= ball,
-                "round {round}: a point {worst} from the foot of a quad of drawn height {size}, lean {lean}, ball {ball}"
+                worst <= reach,
+                "round {round}: a point {worst} from the foot of a flame of drawn height {size}"
             );
-            let all = points.len();
             let seen = points
                 .into_iter()
                 .filter(|p| {
@@ -1773,7 +1768,7 @@ pub(crate) mod culling_tests {
                 continue;
             }
             on_screen += 1;
-            if seen < all {
+            if seen < 25 {
                 edge += 1;
             }
             let sphere = Sphere {
@@ -1783,20 +1778,13 @@ pub(crate) mod culling_tests {
             assert!(
                 frustum.intersects_sphere(&sphere, false)
                     && frustum.intersects_obb(&bound, &world_from_local, true, false),
-                "round {round}: {seen} of {all} points of a quad of a {height} m fire (catch {took}, lean {lean}) are on screen, yet it is culled"
+                "round {round}: {seen} of 25 points of a {height} m flame (catch {took}, lean {lean}) are on screen, yet it is culled"
             );
         }
-        // The sweep must have exercised what it claims: many frames with the quad on screen, and many of them
+        // The sweep must have exercised what it claims: many frames with the flame on screen, and many of them
         // at the frame's edge, where a box that is too small is the one that fails.
-        assert!(on_screen > 8_000, "only {on_screen} samples had the quad on screen");
+        assert!(on_screen > 8_000, "only {on_screen} samples had the flame on screen");
         assert!(edge > 1_500, "only {edge} samples had it half out of the frame");
-    }
-
-    #[test]
-    fn a_flame_any_part_of_which_is_on_screen_is_never_culled() {
-        // The quad the vertex stage draws (`drawn_points`), the box and the scale this crate gives the flame, and Bevy's
-        // own frustum test: a flame culled while any of its drawn points is inside the frame pops out at the screen's edge.
-        assert_a_quad_on_screen_is_never_culled(flame_cull_extents, |_| FLAME_REACH, drawn_points);
     }
 
     fn app() -> App {
