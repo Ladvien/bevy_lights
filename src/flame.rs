@@ -64,6 +64,8 @@ impl Plugin for FlamePlugin {
                     crate::embers::update_embers,
                     crate::smoke::dress_smoke,
                     crate::smoke::update_smoke,
+                    crate::smoke::begin_smoke_tails,
+                    crate::smoke::update_smoke_tails,
                 )
                     .chain()
                     .in_set(LightsSystems::Flame),
