@@ -29,6 +29,7 @@ fn setup(mut commands: Commands) {
         // the `Flicker`'s so the drawn flame breathes at the same rate the light does. `depth` is how
         // far it dips: give the flame the same one as its light, or the two disagree.
         FlameSite {
+            color: None,
             height: 1.1,
             phase: 0.0,
             kindle: KINDLE_SECONDS,
@@ -57,6 +58,7 @@ fn setup(mut commands: Commands) {
         },
         // The pool's lights flicker at the un-sized rate, so this flame does too.
         FlameSite {
+            color: None,
             height: torch_height,
             phase: 1.9,
             kindle: 0.0,

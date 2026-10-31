@@ -11,6 +11,7 @@ fn the_defaults_and_a_sane_fire_have_no_problems() {
     assert!(Flicker { base: 800.0, ..Default::default() }.problems().is_empty());
     assert!(Flicker::at_mean(1000.0, WHIPPING_FLICKER_DEPTH).problems().is_empty());
     let site = FlameSite {
+        color: None,
         height: 1.0,
         phase: 0.0,
         kindle: 0.0,
@@ -34,6 +35,7 @@ fn a_flicker_names_every_bad_field() {
 #[test]
 fn a_flame_site_and_look_report_their_own_fields() {
     let site = FlameSite {
+        color: None,
         height: 0.0,
         phase: 0.0,
         kindle: -2.0,
@@ -74,6 +76,7 @@ fn a_pool_candidate_and_a_kindle_report_their_bad_fields() {
     assert!(PoolCandidate::default().problems().is_empty());
     assert!(PoolCandidate::at_mean(900.0, 0.3).problems().is_empty());
     let bad = PoolCandidate {
+        color: None,
         offset: bevy::math::Vec3::new(0.0, f32::NAN, f32::INFINITY),
         intensity: -1.0,
         phase: Some(f32::NAN),

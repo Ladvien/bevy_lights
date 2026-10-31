@@ -1429,6 +1429,7 @@ fn a_pooled_light_follows_its_flames_lean() {
         .world_mut()
         .spawn((
             FlameSite {
+                color: None,
                 height: 1.0,
                 phase: 0.0,
                 kindle: 0.0,
@@ -1479,6 +1480,7 @@ fn a_pooled_light_linked_by_a_site_follows_the_lean() {
         .id();
     app.world_mut().spawn((
         FlameSite {
+            color: None,
             height: 1.0,
             phase: 0.0,
             kindle: 0.0,
@@ -1507,6 +1509,7 @@ fn a_pooled_light_linked_by_a_site_follows_the_lean() {
 /// A flame site on a torch one metre tall: the light is carried at the flame's middle, half a metre up.
 fn torch_site() -> FlameSite {
     FlameSite {
+        color: None,
         height: 1.0,
         phase: 0.0,
         kindle: 0.0,
